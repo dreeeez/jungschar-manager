@@ -2,6 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build --workspace=apps/mini-app",
   "outputDirectory": "apps/mini-app/.next",
-  "installCommand": "npm install",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./apps/mini-app ./packages/shared"
+  "installCommand": "npm install"
 }
