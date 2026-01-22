@@ -45,7 +45,7 @@ export default function HelpersPage() {
 
     const { error } = await supabase
       .from('helpers')
-      .insert({ name: newName.trim() })
+      .insert({ name: newName.trim() } as any)
 
     if (error) {
       showAlert('Fehler beim Hinzufügen: ' + error.message)
