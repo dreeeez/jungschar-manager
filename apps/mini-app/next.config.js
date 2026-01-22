@@ -1,10 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Required for monorepo with shared packages
-  transpilePackages: ['@jungschar/shared'],
-
   webpack: (config) => {
-    // Fix path aliases in monorepo
+    // Fix path aliases
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': __dirname,
