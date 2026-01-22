@@ -9,6 +9,7 @@ import {
 } from '../services/supabase.js';
 import { generateIdea } from '../services/ai-ideas.js';
 import { getWeatherForecast } from '../services/weather.js';
+import { importEventsFromSettings } from '../services/ical-import.js';
 
 // Track users waiting for registration (simple state)
 const pendingRegistrations = new Set<number>();
@@ -249,6 +250,34 @@ Wer kann einspringen?
     }
   });
 
+  // /import command (admin only)
+  bot.command('import', async (ctx) => {
+    const telegramUserId = ctx.from?.id;
+    if (!telegramUserId) {
+      await ctx.reply('Fehler: Konnte deine Telegram-ID nicht ermitteln.');
+      return;
+    }
+
+    const helper = await getHelperByTelegramId(telegramUserId);
+    if (!helper || !helper.is_admin) {
+      await ctx.reply('Nur Admins können den Import ausführen.');
+      return;
+    }
+
+    await ctx.reply('📥 Importiere Events aus iCal...');
+
+    try {
+      const result = await importEventsFromSettings();
+      if (result.success) {
+        await ctx.reply(`✅ ${result.count} Events erfolgreich importiert!`);
+      } else {
+        await ctx.reply(`❌ Fehler beim Import: ${result.error}`);
+      }
+    } catch (error) {
+      await ctx.reply('❌ Fehler beim Import. Bitte versuche es später erneut.');
+    }
+  });
+
   // /help command
   bot.command('help', async (ctx) => {
     const helpMessage = `
@@ -263,6 +292,7 @@ Befehle:
 /idee - KI-Idee für Aktivität generieren
 /kannnicht - Absage & Vertretung anfragen
 /wetter - Wetter-Vorschau
+/import - Events importieren (Admin)
 /help - Diese Hilfe anzeigen
 
 Fragen? Sprich einen Admin an!
