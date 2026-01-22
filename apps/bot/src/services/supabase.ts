@@ -25,6 +25,9 @@ const supabase = new Proxy({} as SupabaseClient<Database>, {
   }
 });
 
+// Export supabase client
+export { supabase };
+
 // Helper functions for database operations
 
 export async function getHelperByTelegramId(telegramUserId: number) {
