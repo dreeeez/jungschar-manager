@@ -1,5 +1,13 @@
 import ICAL from 'ical.js'
+import { createHash } from 'crypto'
 import { supabase } from './supabase.js'
+
+// Convert any string to a valid UUID v5-like format
+function stringToUUID(str: string): string {
+  const hash = createHash('sha256').update(str).digest('hex')
+  // Format as UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  return `${hash.substring(0, 8)}-${hash.substring(8, 12)}-${hash.substring(12, 16)}-${hash.substring(16, 20)}-${hash.substring(20, 32)}`
+}
 
 export async function importEventsFromICS(icsUrl: string) {
   try {
@@ -23,7 +31,7 @@ export async function importEventsFromICS(icsUrl: string) {
     const events = vevents.map((vevent) => {
       const event = new ICAL.Event(vevent)
       return {
-        id: event.uid,
+        id: stringToUUID(event.uid),
         event_date: event.startDate.toJSDate().toISOString(),
         title: event.summary || 'Jungschar',
         description: event.description || null,
