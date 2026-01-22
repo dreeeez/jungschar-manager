@@ -4,5 +4,9 @@
   "private": true,
   "type": "module",
   "main": "index.ts",
-  "types": "index.ts"
+  "types": "index.ts",
+  "exports": {
+    "./database.types": "./database.types.ts",
+    ".": "./index.ts"
+  }
 }
