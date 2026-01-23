@@ -35,15 +35,9 @@ export async function GET(req: NextRequest) {
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
 
   // Verify cron secret to prevent unauthorized access
-  // Allow test mode with ?test=true query param (temporary for testing)
-  const url = new URL(req.url)
-  const isTest = url.searchParams.get('test') === 'true'
-
-  if (!isTest) {
-    const authHeader = req.headers.get('authorization')
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const authHeader = req.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   if (!TELEGRAM_CHAT_ID || !TELEGRAM_BOT_TOKEN) {
@@ -75,10 +69,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Allow forcing a specific day for testing (0=Sunday, 3=Wednesday, 5=Friday)
-    const url = new URL(req.url)
-    const forceDay = url.searchParams.get('forceDay')
-    const dayOfWeek = forceDay !== null ? parseInt(forceDay) : getDayOfWeek()
+    const dayOfWeek = getDayOfWeek()
     const today = new Date().toISOString().split('T')[0]
 
     // Get upcoming events with assignments
