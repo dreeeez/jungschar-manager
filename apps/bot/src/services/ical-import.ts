@@ -26,9 +26,18 @@ export async function importEventsFromICS(icsUrl: string) {
     const comp = new ICAL.Component(jcalData)
     const vevents = comp.getAllSubcomponents('vevent')
 
-    console.log(`Found ${vevents.length} events in iCal feed`)
+    console.log(`Found ${vevents.length} total events in iCal feed`)
 
-    const events = vevents.map((vevent) => {
+    // Filter only Jungschar events
+    const jungscharEvents = vevents.filter((vevent) => {
+      const event = new ICAL.Event(vevent)
+      const title = event.summary || ''
+      return title.toLowerCase().includes('jungschar')
+    })
+
+    console.log(`Found ${jungscharEvents.length} Jungschar events`)
+
+    const events = jungscharEvents.map((vevent) => {
       const event = new ICAL.Event(vevent)
       return {
         id: stringToUUID(event.uid),
