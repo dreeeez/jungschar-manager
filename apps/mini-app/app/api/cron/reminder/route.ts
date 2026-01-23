@@ -1,29 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Initialize Supabase
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-)
-
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID // Group chat ID where reminders are sent
-
-// Send message to Telegram
-async function sendTelegramMessage(chatId: string, text: string) {
-  const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML',
-    }),
-  })
-  return response.json()
-}
-
 // Format date helper
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr)
@@ -53,14 +30,40 @@ function isToday(date: Date): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  // Get env vars at runtime
+  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+  const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID
+  const SUPABASE_URL = process.env.SUPABASE_URL
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY
+
   // Verify cron secret to prevent unauthorized access
   const authHeader = req.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (!TELEGRAM_CHAT_ID) {
-    return NextResponse.json({ error: 'TELEGRAM_CHAT_ID not configured' }, { status: 500 })
+  if (!TELEGRAM_CHAT_ID || !TELEGRAM_BOT_TOKEN) {
+    return NextResponse.json({ error: 'Telegram config missing' }, { status: 500 })
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+    return NextResponse.json({ error: 'Supabase config missing' }, { status: 500 })
+  }
+
+  // Initialize at runtime
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+  async function sendTelegramMessage(chatId: string, text: string) {
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+      }),
+    })
+    return response.json()
   }
 
   try {
