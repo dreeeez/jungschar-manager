@@ -12,21 +12,19 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString('de-DE', options)
 }
 
-// Check if two dates are the same day
-function isSameDay(date1: Date, date2: Date): boolean {
-  return date1.toISOString().split('T')[0] === date2.toISOString().split('T')[0]
+// Get days until event
+function getDaysUntil(eventDate: Date): number {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const event = new Date(eventDate)
+  event.setHours(0, 0, 0, 0)
+  const diffTime = event.getTime() - today.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 }
 
-// Check if date is tomorrow
-function isTomorrow(date: Date): boolean {
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  return isSameDay(date, tomorrow)
-}
-
-// Check if date is today
-function isToday(date: Date): boolean {
-  return isSameDay(date, new Date())
+// Get day of week (0 = Sunday, 1 = Monday, etc.)
+function getDayOfWeek(): number {
+  return new Date().getDay()
 }
 
 export async function GET(req: NextRequest) {
@@ -53,22 +51,28 @@ export async function GET(req: NextRequest) {
   // Initialize at runtime
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-  async function sendTelegramMessage(chatId: string, text: string) {
+  async function sendTelegramMessage(chatId: string, text: string, replyMarkup?: any) {
+    const body: any = {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+    }
+    if (replyMarkup) {
+      body.reply_markup = JSON.stringify(replyMarkup)
+    }
     const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: 'HTML',
-      }),
+      body: JSON.stringify(body),
     })
     return response.json()
   }
 
   try {
-    // Get upcoming events
+    const dayOfWeek = getDayOfWeek()
     const today = new Date().toISOString().split('T')[0]
+
+    // Get upcoming events with assignments
     const { data: events } = await supabase
       .from('events')
       .select('*, assignments(*, helper:helpers(*))')
@@ -80,43 +84,124 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ message: 'No upcoming events' })
     }
 
-    const nextEvent = events[0]
-    const eventDate = new Date(nextEvent.event_date)
-    const helpers = nextEvent.assignments?.map((a: any) => a.helper?.name).filter(Boolean).join(' & ') || 'Niemand eingetragen'
+    const results: any[] = []
 
-    let message = ''
+    for (const event of events) {
+      const eventDate = new Date(event.event_date)
+      const daysUntil = getDaysUntil(eventDate)
 
-    if (isToday(eventDate)) {
-      // Today is Jungschar!
-      message = `🔔 <b>Heute ist Jungschar!</b>
+      // Get helper info with usernames for @mentions
+      const helpers = event.assignments?.map((a: any) => a.helper).filter(Boolean) || []
+      const helperNames = helpers.map((h: any) => h.name).join(' & ') || 'Niemand eingetragen'
 
-📅 ${formatDate(nextEvent.event_date)}
-👥 Team: ${helpers}
+      // Create @mentions for helpers with telegram usernames
+      const mentions = helpers
+        .filter((h: any) => h.telegram_username)
+        .map((h: any) => `@${h.telegram_username}`)
+        .join(' ')
+
+      let message = ''
+      let shouldSend = false
+      let replyMarkup = null
+
+      // Sunday: 1 week reminder (6-8 days before, on Sunday)
+      if (dayOfWeek === 0 && daysUntil >= 6 && daysUntil <= 8) {
+        shouldSend = true
+        message = `📅 <b>Nächste Woche ist Jungschar!</b>
+
+📆 ${formatDate(event.event_date)}
+👥 Team: ${helperNames}
+${mentions ? `\n${mentions} - ihr seid dran!` : ''}
+
+Fangt schon mal an zu planen!`
+      }
+
+      // Wednesday: Mid-week reminder (3-4 days before, on Wednesday)
+      else if (dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4) {
+        shouldSend = true
+        message = `🤔 <b>Habt ihr an alles gedacht?</b>
+
+📆 ${formatDate(event.event_date)} (in ${daysUntil} Tagen)
+👥 Team: ${helperNames}
+
+Checkliste:
+• Material vorbereitet?
+• Programm geplant?
+• Snacks organisiert?`
+
+        replyMarkup = {
+          inline_keyboard: [
+            [
+              { text: '✅ Alles klar!', callback_data: `confirm_${event.id}` },
+              { text: '🆘 Brauche Hilfe', callback_data: `help_${event.id}` }
+            ]
+          ]
+        }
+      }
+
+      // Friday: Final check (1-2 days before, on Friday)
+      else if (dayOfWeek === 5 && daysUntil >= 1 && daysUntil <= 2) {
+        shouldSend = true
+        message = `🔔 <b>Final Check!</b>
+
+📆 ${formatDate(event.event_date)} (${daysUntil === 1 ? 'morgen' : 'übermorgen'})
+👥 Team: ${helperNames}
+${mentions ? `\n${mentions}` : ''}
+
+Seid ihr ready?`
+
+        replyMarkup = {
+          inline_keyboard: [
+            [
+              { text: '✅ Bin dabei!', callback_data: `ready_${event.id}` },
+              { text: '❌ Kann nicht', callback_data: `cancel_${event.id}` }
+            ],
+            [
+              { text: '🆘 Brauche Hilfe/Vertretung', callback_data: `help_${event.id}` }
+            ]
+          ]
+        }
+      }
+
+      // Day of event
+      else if (daysUntil === 0) {
+        shouldSend = true
+        message = `🎉 <b>Heute ist Jungschar!</b>
+
+📆 ${formatDate(event.event_date)}
+👥 Team: ${helperNames}
+${mentions ? `\n${mentions}` : ''}
 
 Viel Spaß und Gottes Segen!`
-    } else if (isTomorrow(eventDate)) {
-      // Tomorrow is Jungschar
-      message = `📅 <b>Morgen ist Jungschar!</b>
+      }
 
-📅 ${formatDate(nextEvent.event_date)}
-👥 Team: ${helpers}
+      if (shouldSend) {
+        const result = await sendTelegramMessage(TELEGRAM_CHAT_ID, message, replyMarkup)
+        results.push({
+          event_id: event.id,
+          event_date: event.event_date,
+          daysUntil,
+          dayOfWeek,
+          result
+        })
+      }
+    }
 
-Nicht vergessen vorzubereiten!`
-    } else {
-      // No reminder needed today
+    if (results.length === 0) {
       return NextResponse.json({
-        message: 'No reminder needed today',
-        nextEvent: nextEvent.event_date
+        message: 'No reminders needed today',
+        dayOfWeek,
+        nextEvents: events.map((e: any) => ({
+          date: e.event_date,
+          daysUntil: getDaysUntil(new Date(e.event_date))
+        }))
       })
     }
 
-    // Send the reminder
-    const result = await sendTelegramMessage(TELEGRAM_CHAT_ID, message)
-
     return NextResponse.json({
       success: true,
-      message: 'Reminder sent',
-      telegramResult: result
+      message: `${results.length} reminder(s) sent`,
+      results
     })
 
   } catch (error) {

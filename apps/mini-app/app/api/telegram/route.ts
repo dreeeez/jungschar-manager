@@ -112,6 +112,15 @@ async function getUpcomingEvents(limit = 5) {
   return data || []
 }
 
+async function getEventById(eventId: string) {
+  const { data } = await getSupabase()
+    .from('events')
+    .select('*, assignments(*, helper:helpers(*))')
+    .eq('id', eventId)
+    .single()
+  return data
+}
+
 // Setup bot commands
 function setupCommands(bot: Bot) {
   bot.command('start', async (ctx) => {
@@ -224,6 +233,75 @@ Fragen? Sprich einen Admin an!
       } catch (error) {
         await ctx.reply('Fehler bei der Registrierung. Bitte versuche es erneut mit /register')
       }
+    }
+  })
+
+  // Handle callback queries from inline buttons
+  bot.on('callback_query:data', async (ctx) => {
+    const callbackData = ctx.callbackQuery.data
+    const user = ctx.from
+    const userName = user.first_name || user.username || 'Jemand'
+
+    try {
+      // Parse callback data
+      const [action, eventId] = callbackData.split('_')
+
+      // Get event info
+      const event = await getEventById(eventId)
+      const eventInfo = event ? formatDate(event.event_date) : 'dem Termin'
+
+      let responseMessage = ''
+
+      switch (action) {
+        case 'confirm':
+          responseMessage = `✅ ${userName} hat bestätigt: Alles klar für ${eventInfo}!`
+          break
+
+        case 'ready':
+          responseMessage = `✅ ${userName} ist dabei für ${eventInfo}!`
+          break
+
+        case 'cancel':
+          responseMessage = `❌ ${userName} kann leider nicht bei ${eventInfo}.`
+          // Also send a message asking for help
+          await ctx.reply(
+            `⚠️ <b>Vertretung gesucht!</b>\n\n` +
+            `${userName} kann am ${eventInfo} nicht.\n` +
+            `Kann jemand einspringen?`,
+            { parse_mode: 'HTML' }
+          )
+          break
+
+        case 'help':
+          responseMessage = `🆘 ${userName} braucht Hilfe für ${eventInfo}!`
+          // Send a help request to the group
+          await ctx.reply(
+            `🆘 <b>Hilfe benötigt!</b>\n\n` +
+            `${userName} braucht Unterstützung für ${eventInfo}.\n` +
+            `Wer kann helfen?`,
+            { parse_mode: 'HTML' }
+          )
+          break
+
+        default:
+          responseMessage = `Aktion: ${callbackData}`
+      }
+
+      // Answer the callback (removes loading state on button)
+      await ctx.answerCallbackQuery({
+        text: responseMessage.substring(0, 200) // Max 200 chars for callback answer
+      })
+
+      // Also send a message to the chat so everyone sees the response
+      if (action !== 'cancel' && action !== 'help') {
+        await ctx.reply(responseMessage)
+      }
+
+    } catch (error) {
+      console.error('Error handling callback:', error)
+      await ctx.answerCallbackQuery({
+        text: 'Fehler bei der Verarbeitung'
+      })
     }
   })
 }
