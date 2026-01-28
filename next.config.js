@@ -1,10 +1,11 @@
+const path = require('path')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   webpack: (config) => {
-    // Fix path aliases
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': __dirname,
+      '@': path.resolve(__dirname, 'src'),
     }
     return config
   },
