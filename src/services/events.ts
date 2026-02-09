@@ -6,7 +6,7 @@ import { getSupabase, getTodayISO } from './database'
 export async function getNextEvent() {
   const { data } = await getSupabase()
     .from('events')
-    .select('*, assignments(*, helper:helpers(*))')
+    .select('*, assignments(*, helper:helpers(*)), parent_duties(*, parent:parents(*))')
     .gte('event_date', getTodayISO())
     .order('event_date', { ascending: true })
     .limit(1)
@@ -20,7 +20,7 @@ export async function getNextEvent() {
 export async function getUpcomingEvents(limit = 5) {
   const { data } = await getSupabase()
     .from('events')
-    .select('*, assignments(*, helper:helpers(*))')
+    .select('*, assignments(*, helper:helpers(*)), parent_duties(*, parent:parents(*))')
     .gte('event_date', getTodayISO())
     .order('event_date', { ascending: true })
     .limit(limit)
@@ -33,7 +33,7 @@ export async function getUpcomingEvents(limit = 5) {
 export async function getEventById(eventId: string) {
   const { data } = await getSupabase()
     .from('events')
-    .select('*, assignments(*, helper:helpers(*))')
+    .select('*, assignments(*, helper:helpers(*)), parent_duties(*, parent:parents(*))')
     .eq('id', eventId)
     .single()
   return data
@@ -45,7 +45,7 @@ export async function getEventById(eventId: string) {
 export async function getAllEvents() {
   const { data } = await getSupabase()
     .from('events')
-    .select('*, assignments(id, helper_id, helper:helpers(id, name))')
+    .select('*, assignments(id, helper_id, helper:helpers(id, name)), parent_duties(id, parent_id, parent:parents(id, name))')
     .order('event_date', { ascending: true })
   return data || []
 }

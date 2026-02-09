@@ -90,6 +90,9 @@ export interface Database {
           all_ready: boolean
           needs_help: boolean
           help_note: string | null
+          kinderstunde_ready: boolean
+          elternchat_communicated: boolean
+          material_ready: boolean
           updated_at: string
         }
         Insert: {
@@ -100,6 +103,9 @@ export interface Database {
           all_ready?: boolean
           needs_help?: boolean
           help_note?: string | null
+          kinderstunde_ready?: boolean
+          elternchat_communicated?: boolean
+          material_ready?: boolean
           updated_at?: string
         }
         Update: {
@@ -110,6 +116,9 @@ export interface Database {
           all_ready?: boolean
           needs_help?: boolean
           help_note?: string | null
+          kinderstunde_ready?: boolean
+          elternchat_communicated?: boolean
+          material_ready?: boolean
           updated_at?: string
         }
       }
@@ -209,6 +218,75 @@ export interface Database {
           key?: string
           value?: string
           created_at?: string
+        }
+      }
+      parents: {
+        Row: {
+          id: string
+          name: string
+          phone: string | null
+          notes: string | null
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          phone?: string | null
+          notes?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          phone?: string | null
+          notes?: string | null
+          active?: boolean
+          created_at?: string
+        }
+      }
+      parent_duties: {
+        Row: {
+          id: string
+          event_id: string
+          parent_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          parent_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          parent_id?: string
+          created_at?: string
+        }
+      }
+      attendance_votes: {
+        Row: {
+          id: string
+          event_id: string
+          helper_id: string
+          attending: boolean
+          voted_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          helper_id: string
+          attending: boolean
+          voted_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          helper_id?: string
+          attending?: boolean
+          voted_at?: string
         }
       }
     }

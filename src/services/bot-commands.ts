@@ -3,6 +3,8 @@ import { formatDate } from '@/utils/format'
 import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './helpers'
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { getSupabase } from './database'
+import { recordVote } from './attendance'
+import { generateIdeaForEvent, sendIdeaToUser } from './ai-ideas'
 
 // Track pending registrations (in-memory, resets on cold start)
 const pendingRegistrations = new Set<number>()
@@ -208,6 +210,7 @@ Fragen? Sprich einen Admin an!
   bot.on('callback_query:data', async (ctx) => {
     const callbackData = ctx.callbackQuery.data
     const user = ctx.from
+    const telegramUserId = user.id
     const userName = user.first_name || user.username || 'Jemand'
 
     try {
@@ -215,37 +218,85 @@ Fragen? Sprich einen Admin an!
       const event = await getEventById(eventId)
       const eventInfo = event ? formatDate(event.event_date) : 'dem Termin'
 
-      let responseMessage = ''
-
       switch (action) {
-        case 'confirm':
-          responseMessage = `✅ ${userName} hat bestätigt: Alles klar für ${eventInfo}!`
+        case 'join': {
+          // Helfer stimmt "dabei" ab
+          const helper = await getHelperByTelegramId(telegramUserId)
+          if (!helper) {
+            await ctx.answerCallbackQuery({
+              text: 'Bitte registriere dich zuerst mit /register',
+              show_alert: true,
+            })
+            return
+          }
+          await recordVote(eventId, helper.id, true)
+          await ctx.answerCallbackQuery({ text: `Du bist dabei für ${eventInfo}!` })
+          await ctx.reply(`✅ ${userName} ist auch dabei für ${eventInfo}!`)
           break
+        }
+
+        case 'skip': {
+          // Helfer stimmt "nicht dabei" ab
+          const helper = await getHelperByTelegramId(telegramUserId)
+          if (!helper) {
+            await ctx.answerCallbackQuery({
+              text: 'Bitte registriere dich zuerst mit /register',
+              show_alert: true,
+            })
+            return
+          }
+          await recordVote(eventId, helper.id, false)
+          await ctx.answerCallbackQuery({ text: 'Schade, vielleicht nächstes Mal!' })
+          break
+        }
+
+        case 'idea': {
+          // AI-Idee generieren und als PN senden
+          await ctx.answerCallbackQuery({ text: '💡 Idee wird generiert...' })
+
+          try {
+            const idea = await generateIdeaForEvent(event?.event_date || '')
+            const sent = await sendIdeaToUser(
+              telegramUserId,
+              `💡 <b>Idee für ${eventInfo}:</b>\n\n${idea}`
+            )
+
+            if (!sent) {
+              await ctx.reply(
+                `⚠️ ${userName}, ich kann dir keine Privatnachricht senden. ` +
+                `Bitte starte zuerst eine Unterhaltung mit mir (klicke auf meinen Namen und drücke /start).`
+              )
+            }
+          } catch (error) {
+            console.error('Error generating idea:', error)
+            await ctx.reply('Fehler beim Generieren der Idee. Versuche /idee im Chat.')
+          }
+          break
+        }
+
+        // Legacy-Callbacks für alte Nachrichten
+        case 'confirm':
         case 'ready':
-          responseMessage = `✅ ${userName} ist dabei für ${eventInfo}!`
+          await ctx.answerCallbackQuery({ text: `${userName} hat bestätigt!` })
+          await ctx.reply(`✅ ${userName} hat bestätigt für ${eventInfo}!`)
           break
         case 'cancel':
-          responseMessage = `❌ ${userName} kann leider nicht bei ${eventInfo}.`
+          await ctx.answerCallbackQuery({ text: 'Notiert!' })
           await ctx.reply(
             `⚠️ <b>Vertretung gesucht!</b>\n\n${userName} kann am ${eventInfo} nicht.\nKann jemand einspringen?`,
             { parse_mode: 'HTML' }
           )
           break
         case 'help':
-          responseMessage = `🆘 ${userName} braucht Hilfe für ${eventInfo}!`
+          await ctx.answerCallbackQuery({ text: 'Notiert!' })
           await ctx.reply(
             `🆘 <b>Hilfe benötigt!</b>\n\n${userName} braucht Unterstützung für ${eventInfo}.\nWer kann helfen?`,
             { parse_mode: 'HTML' }
           )
           break
+
         default:
-          responseMessage = `Aktion: ${callbackData}`
-      }
-
-      await ctx.answerCallbackQuery({ text: responseMessage.substring(0, 200) })
-
-      if (action !== 'cancel' && action !== 'help') {
-        await ctx.reply(responseMessage)
+          await ctx.answerCallbackQuery({ text: `Unbekannte Aktion: ${action}` })
       }
     } catch (error) {
       console.error('Error handling callback:', error)

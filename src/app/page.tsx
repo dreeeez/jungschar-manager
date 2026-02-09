@@ -35,6 +35,12 @@ export default function Home() {
           description="Termine & Zuweisungen"
         />
         <NavCard
+          href="/parents"
+          icon="👨‍👩‍👧"
+          title="Eltern"
+          description="Elterndienst verwalten"
+        />
+        <NavCard
           href="/children"
           icon="🧒"
           title="Kinder"

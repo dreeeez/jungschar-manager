@@ -10,10 +10,21 @@ interface Helper {
   name: string
 }
 
+interface Parent {
+  id: string
+  name: string
+}
+
 interface Assignment {
   id: string
   helper_id: string
   helper: Helper | null
+}
+
+interface ParentDuty {
+  id: string
+  parent_id: string
+  parent: Parent | null
 }
 
 interface Event {
@@ -23,12 +34,14 @@ interface Event {
   description: string | null
   imported_at: string
   assignments: Assignment[]
+  parent_duties: ParentDuty[]
 }
 
 export default function CalendarPage() {
   const { showAlert } = useTelegram()
   const [events, setEvents] = useState<Event[]>([])
   const [helpers, setHelpers] = useState<Helper[]>([])
+  const [parents, setParents] = useState<Parent[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [saving, setSaving] = useState(false)
@@ -38,15 +51,20 @@ export default function CalendarPage() {
   }, [])
 
   async function fetchData() {
-    const [eventsResult, helpersResult] = await Promise.all([
+    const [eventsResult, helpersResult, parentsResult] = await Promise.all([
       supabase
         .from('events')
-        .select('*, assignments(id, helper_id, helper:helpers(id, name))')
+        .select('*, assignments(id, helper_id, helper:helpers(id, name)), parent_duties(id, parent_id, parent:parents(id, name))')
         .order('event_date', { ascending: true }),
       supabase
         .from('helpers')
         .select('id, name')
-        .order('name', { ascending: true })
+        .order('name', { ascending: true }),
+      (supabase as any)
+        .from('parents')
+        .select('id, name')
+        .eq('active', true)
+        .order('name', { ascending: true }),
     ])
 
     if (eventsResult.error) {
@@ -60,6 +78,12 @@ export default function CalendarPage() {
       console.error('Error fetching helpers:', helpersResult.error)
     } else {
       setHelpers(helpersResult.data || [])
+    }
+
+    if (parentsResult.error) {
+      console.error('Error fetching parents:', parentsResult.error)
+    } else {
+      setParents(parentsResult.data || [])
     }
 
     setLoading(false)
@@ -99,6 +123,15 @@ export default function CalendarPage() {
     return names?.length ? names.join(' & ') : 'Niemand'
   }
 
+  function getParentDutyName(event: Event): string {
+    const duty = event.parent_duties?.[0]
+    return duty?.parent?.name || ''
+  }
+
+  function getAssignedParentId(event: Event): string | null {
+    return event.parent_duties?.[0]?.parent_id || null
+  }
+
   async function toggleHelper(helperId: string) {
     if (!selectedEvent || saving) return
 
@@ -108,7 +141,6 @@ export default function CalendarPage() {
 
     try {
       if (isAssigned) {
-        // Remove assignment
         const { error } = await supabase
           .from('assignments')
           .delete()
@@ -117,7 +149,6 @@ export default function CalendarPage() {
 
         if (error) throw error
       } else {
-        // Add assignment
         const { error } = await supabase
           .from('assignments')
           .insert({
@@ -128,28 +159,69 @@ export default function CalendarPage() {
         if (error) throw error
       }
 
-      // Refresh data
-      await fetchData()
-
-      // Update selected event with new data
-      const updatedEvent = events.find(e => e.id === selectedEvent.id)
-      if (updatedEvent) {
-        // Re-fetch to get updated assignments
-        const { data } = await supabase
-          .from('events')
-          .select('*, assignments(id, helper_id, helper:helpers(id, name))')
-          .eq('id', selectedEvent.id)
-          .single()
-
-        if (data) {
-          setSelectedEvent(data as any)
-        }
-      }
+      await refreshSelectedEvent()
     } catch (error: any) {
       showAlert('Fehler: ' + error.message)
     }
 
     setSaving(false)
+  }
+
+  async function toggleParentDuty(parentId: string) {
+    if (!selectedEvent || saving) return
+
+    setSaving(true)
+    const currentParentId = getAssignedParentId(selectedEvent)
+
+    try {
+      if (currentParentId === parentId) {
+        // Zuweisung entfernen
+        const { error } = await (supabase as any)
+          .from('parent_duties')
+          .delete()
+          .eq('event_id', selectedEvent.id)
+          .eq('parent_id', parentId)
+
+        if (error) throw error
+      } else {
+        // Alte Zuweisung entfernen, neue setzen
+        await (supabase as any)
+          .from('parent_duties')
+          .delete()
+          .eq('event_id', selectedEvent.id)
+
+        const { error } = await (supabase as any)
+          .from('parent_duties')
+          .insert({
+            event_id: selectedEvent.id,
+            parent_id: parentId,
+          })
+
+        if (error) throw error
+      }
+
+      await refreshSelectedEvent()
+    } catch (error: any) {
+      showAlert('Fehler: ' + error.message)
+    }
+
+    setSaving(false)
+  }
+
+  async function refreshSelectedEvent() {
+    if (!selectedEvent) return
+
+    await fetchData()
+
+    const { data } = await supabase
+      .from('events')
+      .select('*, assignments(id, helper_id, helper:helpers(id, name)), parent_duties(id, parent_id, parent:parents(id, name))')
+      .eq('id', selectedEvent.id)
+      .single()
+
+    if (data) {
+      setSelectedEvent(data as any)
+    }
   }
 
   if (loading) {
@@ -194,6 +266,11 @@ export default function CalendarPage() {
                     <p className="text-sm text-tg-hint mt-2">
                       👥 {getAssignedHelperNames(event)}
                     </p>
+                    {getParentDutyName(event) && (
+                      <p className="text-xs text-tg-hint mt-1">
+                        🍽️ {getParentDutyName(event)}
+                      </p>
+                    )}
                   </div>
                   <span className="text-tg-hint">›</span>
                 </div>
@@ -237,7 +314,7 @@ export default function CalendarPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Helfer zuweisen</h2>
+              <h2 className="text-lg font-bold">Termin bearbeiten</h2>
               <button
                 onClick={() => setSelectedEvent(null)}
                 className="p-2 text-tg-hint"
@@ -253,11 +330,12 @@ export default function CalendarPage() {
               </p>
             </div>
 
+            {/* Helfer zuweisen */}
             <p className="text-sm text-tg-hint mb-3">
-              Tippe auf einen Helfer um ihn zuzuweisen/zu entfernen:
+              👥 Helfer zuweisen:
             </p>
 
-            <div className="space-y-2">
+            <div className="space-y-2 mb-6">
               {helpers.map((helper) => {
                 const isAssigned = getAssignedHelperIds(selectedEvent).includes(helper.id)
                 return (
@@ -276,13 +354,43 @@ export default function CalendarPage() {
                   </button>
                 )
               })}
+              {helpers.length === 0 && (
+                <p className="text-center text-tg-hint py-4">
+                  Keine Helfer vorhanden.
+                </p>
+              )}
             </div>
 
-            {helpers.length === 0 && (
-              <p className="text-center text-tg-hint py-8">
-                Keine Helfer vorhanden. Füge zuerst Helfer hinzu.
-              </p>
-            )}
+            {/* Elterndienst zuweisen */}
+            <p className="text-sm text-tg-hint mb-3">
+              🍽️ Elterndienst (Essen):
+            </p>
+
+            <div className="space-y-2">
+              {parents.map((parent) => {
+                const isAssigned = getAssignedParentId(selectedEvent) === parent.id
+                return (
+                  <button
+                    key={parent.id}
+                    onClick={() => toggleParentDuty(parent.id)}
+                    disabled={saving}
+                    className={`w-full p-4 rounded-xl text-left flex items-center justify-between transition-colors ${
+                      isAssigned
+                        ? 'bg-orange-500/20 border-2 border-orange-500'
+                        : 'bg-tg-secondary-bg border-2 border-transparent'
+                    } ${saving ? 'opacity-50' : ''}`}
+                  >
+                    <span className="font-medium">{parent.name}</span>
+                    {isAssigned && <span className="text-orange-500">🍽️</span>}
+                  </button>
+                )
+              })}
+              {parents.length === 0 && (
+                <p className="text-center text-tg-hint py-4">
+                  Keine Eltern vorhanden. Füge sie unter "Eltern" hinzu.
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}
