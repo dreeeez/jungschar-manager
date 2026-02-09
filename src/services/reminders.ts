@@ -3,6 +3,7 @@ import { getUpcomingEvents, getHelperNames, getHelperMentions } from './events'
 import { getParentDutyName } from './parents'
 import { getAttendingHelperNames } from './attendance'
 import { getSupabase } from './database'
+import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './weather'
 
 interface ReminderMessage {
   message: string
@@ -66,10 +67,33 @@ async function logReminder(eventId: string, reminderType: string): Promise<void>
 }
 
 /**
+ * Formatiert eine Wetter-Zeile für die Nachricht
+ */
+function formatWeatherLine(weather: WeatherForecast | null): string {
+  if (!weather) return ''
+  return `🌤️ Wetter: ${weather.weather_description}, ${Math.round(weather.temperature_min)}–${Math.round(weather.temperature_max)}°C` +
+    (weather.precipitation_probability > 30 ? ` (☔ ${weather.precipitation_probability}%)` : '') +
+    '\n'
+}
+
+/**
+ * Holt die Wettervorhersage für ein Event-Datum
+ */
+async function fetchWeatherForEvent(eventDate: string): Promise<WeatherForecast | null> {
+  try {
+    const location = await getLocationFromSettings()
+    if (!location) return null
+    return await getWeatherForecast(location.latitude, location.longitude, eventDate)
+  } catch {
+    return null
+  }
+}
+
+/**
  * STUFE 1 — Sonntag (6-8 Tage vorher)
  * Event-Ankündigung mit Team und Elterndienst
  */
-function generateStage1Message(event: any): ReminderMessage {
+function generateStage1Message(event: any, weather: WeatherForecast | null): ReminderMessage {
   const helperNames = getHelperNames(event)
   const mentions = getHelperMentions(event)
   const parentName = getParentDutyName(event)
@@ -77,6 +101,7 @@ function generateStage1Message(event: any): ReminderMessage {
   return {
     message: `📅 <b>Nächste Woche ist Jungschar!</b>\n\n` +
       `📆 ${formatDate(event.event_date)}\n` +
+      `${formatWeatherLine(weather)}` +
       `👥 Team: ${helperNames}\n` +
       `${mentions ? `${mentions} - ihr seid dran!\n` : ''}` +
       `🍽️ Essen: ${parentName}\n\n` +
@@ -91,7 +116,8 @@ function generateStage1Message(event: any): ReminderMessage {
 function generateStage2Message(
   event: any,
   daysUntil: number,
-  attendingNames: string[]
+  attendingNames: string[],
+  weather: WeatherForecast | null
 ): ReminderMessage {
   const helperNames = getHelperNames(event)
   const mentions = getHelperMentions(event)
@@ -104,6 +130,7 @@ function generateStage2Message(
     message: `🤔 <b>Wie ist der Status?</b>\n\n` +
       `Noch <b>${daysUntil} Tage</b> bis zur Jungschar!\n` +
       `📆 ${formatDate(event.event_date)}\n` +
+      `${formatWeatherLine(weather)}` +
       `👥 Team: ${helperNames}\n` +
       `${mentions ? `${mentions}\n` : ''}` +
       `\n📋 <b>Checkliste:</b>\n` +
@@ -170,7 +197,8 @@ export async function processReminders(chatId: string, testStage?: number) {
     if (testStage === 1 || (dayOfWeek === 0 && daysUntil >= 6 && daysUntil <= 8)) {
       reminderType = STAGE_SUNDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
-        reminder = generateStage1Message(event)
+        const weather = await fetchWeatherForEvent(event.event_date)
+        reminder = generateStage1Message(event, weather)
       }
     }
 
@@ -178,8 +206,11 @@ export async function processReminders(chatId: string, testStage?: number) {
     if (testStage === 2 || (dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4)) {
       reminderType = STAGE_WEDNESDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
-        const attendingNames = await getAttendingHelperNames(event.id)
-        reminder = generateStage2Message(event, daysUntil, attendingNames)
+        const [attendingNames, weather] = await Promise.all([
+          getAttendingHelperNames(event.id),
+          fetchWeatherForEvent(event.event_date),
+        ])
+        reminder = generateStage2Message(event, daysUntil, attendingNames, weather)
       }
     }
 
