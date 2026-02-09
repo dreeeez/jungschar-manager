@@ -147,8 +147,9 @@ function generateStage3Message(event: any, daysUntil: number): ReminderMessage {
 
 /**
  * Prüft alle Events und sendet fällige Erinnerungen
+ * testStage: 1/2/3 = forciert Stufe unabhängig von Wochentag/Tagen (nur zum Testen)
  */
-export async function processReminders(chatId: string) {
+export async function processReminders(chatId: string, testStage?: number) {
   const dayOfWeek = getDayOfWeek()
   const events = await getUpcomingEvents(5)
 
@@ -157,6 +158,7 @@ export async function processReminders(chatId: string) {
   }
 
   const results: any[] = []
+  const isTest = testStage !== undefined
 
   for (const event of events) {
     const eventDate = new Date(event.event_date)
@@ -165,47 +167,53 @@ export async function processReminders(chatId: string) {
     let reminderType: string | null = null
 
     // Stufe 1: Sonntag, 6-8 Tage vorher
-    if (dayOfWeek === 0 && daysUntil >= 6 && daysUntil <= 8) {
+    if (testStage === 1 || (dayOfWeek === 0 && daysUntil >= 6 && daysUntil <= 8)) {
       reminderType = STAGE_SUNDAY
-      if (!(await wasReminderSent(event.id, reminderType))) {
+      if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         reminder = generateStage1Message(event)
       }
     }
 
     // Stufe 2: Mittwoch, 3-4 Tage vorher
-    if (dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4) {
+    if (testStage === 2 || (dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4)) {
       reminderType = STAGE_WEDNESDAY
-      if (!(await wasReminderSent(event.id, reminderType))) {
+      if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         const attendingNames = await getAttendingHelperNames(event.id)
         reminder = generateStage2Message(event, daysUntil, attendingNames)
       }
     }
 
     // Stufe 3: Freitag, 1-2 Tage vorher
-    if (dayOfWeek === 5 && daysUntil >= 1 && daysUntil <= 2) {
+    if (testStage === 3 || (dayOfWeek === 5 && daysUntil >= 1 && daysUntil <= 2)) {
       reminderType = STAGE_FRIDAY
-      if (!(await wasReminderSent(event.id, reminderType))) {
+      if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         reminder = generateStage3Message(event, daysUntil)
       }
     }
 
     if (reminder && reminderType) {
       const result = await sendTelegramMessage(chatId, reminder.message, reminder.replyMarkup)
-      await logReminder(event.id, reminderType)
+      if (!isTest) {
+        await logReminder(event.id, reminderType)
+      }
       results.push({
         event_id: event.id,
         event_date: event.event_date,
         daysUntil,
         dayOfWeek,
         reminderType,
+        test: isTest,
         result,
       })
+
+      // Im Testmodus nur 1 Event senden
+      if (isTest) break
     }
   }
 
   if (results.length === 0) {
     return {
-      message: 'No reminders needed today',
+      message: isTest ? 'No upcoming events to test with' : 'No reminders needed today',
       dayOfWeek,
       nextEvents: events.map((e: any) => ({
         date: e.event_date,
@@ -216,7 +224,7 @@ export async function processReminders(chatId: string) {
 
   return {
     success: true,
-    message: `${results.length} reminder(s) sent`,
+    message: `${results.length} reminder(s) sent${isTest ? ' (TEST)' : ''}`,
     results,
   }
 }

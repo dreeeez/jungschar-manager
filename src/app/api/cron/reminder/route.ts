@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await processReminders(chatId)
+    const testStage = req.nextUrl.searchParams.get('test')
+    const result = await processReminders(chatId, testStage ? parseInt(testStage) : undefined)
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error in reminder cron:', error)
