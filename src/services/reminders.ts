@@ -1,13 +1,13 @@
 import { formatDate, getDaysUntil, getDayOfWeek } from '@/utils/format'
 import { getUpcomingEvents, getHelperNames, getHelperMentions } from './events'
 import { getParentDutyName } from './parents'
-import { getAttendingHelperNames } from './attendance'
 import { getSupabase } from './database'
 import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './weather'
 
 interface ReminderMessage {
   message: string
   replyMarkup?: any
+  poll?: { question: string; options: string[] }
 }
 
 // Reminder-Typen für Duplikat-Schutz
@@ -39,6 +39,31 @@ export async function sendTelegramMessage(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  })
+
+  return response.json()
+}
+
+/**
+ * Sendet einen nativen Telegram Poll
+ */
+export async function sendTelegramPoll(
+  chatId: string,
+  question: string,
+  options: string[]
+): Promise<any> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendPoll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      question,
+      options: JSON.stringify(options),
+      is_anonymous: false,
+      allows_multiple_answers: false,
+    }),
   })
 
   return response.json()
@@ -162,16 +187,11 @@ function generateStage1Message(event: any, weather: WeatherForecast | null, birt
 function generateStage2Message(
   event: any,
   daysUntil: number,
-  attendingNames: string[],
   weather: WeatherForecast | null,
   birthdays: string[]
 ): ReminderMessage {
   const helperNames = getHelperNames(event)
   const mentions = getHelperMentions(event)
-
-  const attendingLine = attendingNames.length > 0
-    ? `\n\n👋 Sind auch dabei: ${attendingNames.join(', ')}`
-    : ''
 
   return {
     message: `🤔 <b>Wie ist der Status?</b>\n\n` +
@@ -186,18 +206,17 @@ function generateStage2Message(
       `• Steht das Programm?\n` +
       `• Material vorbereitet?\n` +
       `• Kinderstunde vorbereitet?\n` +
-      `• Programm in Elternchat kommuniziert?` +
-      attendingLine,
+      `• Programm in Elternchat kommuniziert?`,
     replyMarkup: {
       inline_keyboard: [
-        [
-          { text: '✅ Bin dabei!', callback_data: `join_${event.id}` },
-          { text: '❌ Kann nicht', callback_data: `skip_${event.id}` },
-        ],
         [
           { text: '💡 Wir brauchen eine Idee!', callback_data: `idea_${event.id}` },
         ],
       ],
+    },
+    poll: {
+      question: `Wer ist am ${formatDate(event.event_date)} dabei?`,
+      options: ['✅ Bin dabei!', '❌ Kann leider nicht'],
     },
   }
 }
@@ -257,12 +276,11 @@ export async function processReminders(chatId: string, testStage?: number) {
     if (testStage === 2 || (dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4)) {
       reminderType = STAGE_WEDNESDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
-        const [attendingNames, weather, birthdays] = await Promise.all([
-          getAttendingHelperNames(event.id),
+        const [weather, birthdays] = await Promise.all([
           fetchWeatherForEvent(event.event_date),
           getBirthdaysAroundEvent(event.event_date),
         ])
-        reminder = generateStage2Message(event, daysUntil, attendingNames, weather, birthdays)
+        reminder = generateStage2Message(event, daysUntil, weather, birthdays)
       }
     }
 
@@ -276,6 +294,10 @@ export async function processReminders(chatId: string, testStage?: number) {
 
     if (reminder && reminderType) {
       const result = await sendTelegramMessage(chatId, reminder.message, reminder.replyMarkup)
+      // Nativen Poll senden (Stage 2)
+      if (reminder.poll) {
+        await sendTelegramPoll(chatId, reminder.poll.question, reminder.poll.options)
+      }
       if (!isTest) {
         await logReminder(event.id, reminderType)
       }

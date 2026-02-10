@@ -3,7 +3,6 @@ import { formatDate } from '@/utils/format'
 import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './helpers'
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { getSupabase } from './database'
-import { recordVote, getVotesForEvent } from './attendance'
 import { generateIdeaForEvent, sendIdeaToUser } from './ai-ideas'
 
 // Track pending registrations (in-memory, resets on cold start)
@@ -219,66 +218,6 @@ Fragen? Sprich einen Admin an!
       const eventInfo = event ? formatDate(event.event_date) : 'dem Termin'
 
       switch (action) {
-        case 'join':
-        case 'skip': {
-          const attending = action === 'join'
-          const helper = await getHelperByTelegramId(telegramUserId)
-          if (!helper) {
-            await ctx.answerCallbackQuery({
-              text: 'Bitte registriere dich zuerst mit /register',
-              show_alert: true,
-            })
-            return
-          }
-          await recordVote(eventId, helper.id, attending)
-          await ctx.answerCallbackQuery({
-            text: attending ? `Du bist dabei für ${eventInfo}!` : 'Schade, vielleicht nächstes Mal!',
-          })
-
-          // Nachricht visuell aktualisieren mit allen Votes
-          const votes = await getVotesForEvent(eventId)
-          const yesVotes = votes.filter((v: any) => v.attending).map((v: any) => v.helper?.name).filter(Boolean)
-          const noVotes = votes.filter((v: any) => !v.attending).map((v: any) => v.helper?.name).filter(Boolean)
-
-          // Original-Text holen und Vote-Sektion ersetzen/anhängen
-          const originalText = (ctx.callbackQuery.message as any)?.text || ''
-          const baseText = originalText.split('\n\n📊')[0]
-
-          let voteSection = '\n\n📊 Abstimmung:'
-          if (yesVotes.length > 0) {
-            voteSection += `\n✅ Dabei (${yesVotes.length}): ${yesVotes.join(', ')}`
-          }
-          if (noVotes.length > 0) {
-            voteSection += `\n❌ Nicht dabei (${noVotes.length}): ${noVotes.join(', ')}`
-          }
-          if (yesVotes.length === 0 && noVotes.length === 0) {
-            voteSection += '\nNoch keine Stimmen'
-          }
-
-          try {
-            await ctx.editMessageText(baseText + voteSection, {
-              parse_mode: 'HTML',
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    { text: `✅ Dabei (${yesVotes.length})`, callback_data: `join_${eventId}` },
-                    { text: `❌ Nicht dabei (${noVotes.length})`, callback_data: `skip_${eventId}` },
-                  ],
-                  [
-                    { text: '💡 Wir brauchen eine Idee!', callback_data: `idea_${eventId}` },
-                  ],
-                ],
-              },
-            })
-          } catch (editError: any) {
-            // "message is not modified" ist ok (gleicher Vote nochmal)
-            if (!editError.message?.includes('not modified')) {
-              console.error('Error editing message:', editError)
-            }
-          }
-          break
-        }
-
         case 'idea': {
           // AI-Idee generieren und als PN senden
           await ctx.answerCallbackQuery({ text: '💡 Idee wird generiert...' })
