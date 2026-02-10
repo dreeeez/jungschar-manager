@@ -7,7 +7,6 @@ import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './
 interface ReminderMessage {
   message: string
   replyMarkup?: any
-  poll?: { question: string; options: string[] }
 }
 
 // Reminder-Typen für Duplikat-Schutz
@@ -201,22 +200,27 @@ function generateStage2Message(
       `👥 Team: ${helperNames}\n` +
       `${mentions ? `${mentions}\n` : ''}` +
       `${formatBirthdayLine(birthdays)}` +
-      `\n📋 <b>Checkliste:</b>\n` +
+      `\n━━━━━━━━━━━━━━━\n\n` +
+      `📋 <b>Checkliste:</b>\n` +
       `⚠️ Eltern wegen Essen kontaktiert? — <b>Frist HEUTE!</b>\n` +
       `• Steht das Programm?\n` +
       `• Material vorbereitet?\n` +
       `• Kinderstunde vorbereitet?\n` +
-      `• Programm in Elternchat kommuniziert?`,
+      `• Programm in Elternchat kommuniziert?\n` +
+      `\n━━━━━━━━━━━━━━━\n\n` +
+      `📊 <b>Wer ist dabei?</b>\n\n` +
+      `✅ Dabei: —\n` +
+      `❌ Absagen: —`,
     replyMarkup: {
       inline_keyboard: [
+        [
+          { text: '✅ Bin dabei!', callback_data: `votey_${event.id}` },
+          { text: '❌ Kann nicht', callback_data: `voten_${event.id}` },
+        ],
         [
           { text: '💡 Wir brauchen eine Idee!', callback_data: `idea_${event.id}` },
         ],
       ],
-    },
-    poll: {
-      question: `Wer ist am ${formatDate(event.event_date)} dabei?`,
-      options: ['✅ Bin dabei!', '❌ Kann leider nicht'],
     },
   }
 }
@@ -294,10 +298,6 @@ export async function processReminders(chatId: string, testStage?: number) {
 
     if (reminder && reminderType) {
       const result = await sendTelegramMessage(chatId, reminder.message, reminder.replyMarkup)
-      // Nativen Poll senden (Stage 2)
-      if (reminder.poll) {
-        await sendTelegramPoll(chatId, reminder.poll.question, reminder.poll.options)
-      }
       if (!isTest) {
         await logReminder(event.id, reminderType)
       }

@@ -8,6 +8,46 @@ import { generateIdeaForEvent, sendIdeaToUser } from './ai-ideas'
 // Track pending registrations (in-memory, resets on cold start)
 const pendingRegistrations = new Set<number>()
 
+/**
+ * Escapes HTML special characters
+ */
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Reconstructs HTML from plain text + Telegram message entities
+ */
+function rebuildHtml(text: string, entities: any[]): string {
+  if (!entities?.length) return escapeHtml(text)
+
+  const sorted = [...entities].sort((a: any, b: any) => a.offset - b.offset)
+  let result = ''
+  let pos = 0
+
+  for (const ent of sorted) {
+    result += escapeHtml(text.slice(pos, ent.offset))
+    const content = escapeHtml(text.slice(ent.offset, ent.offset + ent.length))
+
+    switch (ent.type) {
+      case 'bold':
+        result += `<b>${content}</b>`
+        break
+      case 'italic':
+        result += `<i>${content}</i>`
+        break
+      default:
+        result += content
+        break
+    }
+
+    pos = ent.offset + ent.length
+  }
+
+  result += escapeHtml(text.slice(pos))
+  return result
+}
+
 // Aktivitäts-Ideen für /idee Command
 const ACTIVITY_IDEAS = [
   '🎨 **Kreativ-Werkstatt**: Malt gemeinsam ein großes Bild zum Thema "Gottes Schöpfung"',
@@ -218,6 +258,59 @@ Fragen? Sprich einen Admin an!
       const eventInfo = event ? formatDate(event.event_date) : 'dem Termin'
 
       switch (action) {
+        case 'votey':
+        case 'voten': {
+          const isYes = action === 'votey'
+          const msg = ctx.callbackQuery.message
+          const text = msg?.text || ''
+          const entities = (msg as any)?.entities || []
+
+          // Parse current votes from plain text
+          const dabeiMatch = text.match(/✅ Dabei(?:\s*\(\d+\))?: (.+)/)
+          const absagenMatch = text.match(/❌ Absagen(?:\s*\(\d+\))?: (.+)/)
+
+          let dabei = !dabeiMatch?.[1] || dabeiMatch[1] === '—' ? [] : dabeiMatch[1].split(', ')
+          let absagen = !absagenMatch?.[1] || absagenMatch[1] === '—' ? [] : absagenMatch[1].split(', ')
+
+          // Remove user from both lists (handles vote change)
+          dabei = dabei.filter(n => n !== userName)
+          absagen = absagen.filter(n => n !== userName)
+
+          if (isYes) {
+            dabei.push(userName)
+          } else {
+            absagen.push(userName)
+          }
+
+          // Build new vote lines (HTML-escaped)
+          const esc = (s: string) => escapeHtml(s)
+          const dabeiLine = dabei.length > 0
+            ? `✅ Dabei (${dabei.length}): ${dabei.map(esc).join(', ')}`
+            : '✅ Dabei: —'
+          const absagenLine = absagen.length > 0
+            ? `❌ Absagen (${absagen.length}): ${absagen.map(esc).join(', ')}`
+            : '❌ Absagen: —'
+
+          // Rebuild HTML and replace vote lines
+          const html = rebuildHtml(text, entities)
+            .replace(/✅ Dabei(?:\s*\(\d+\))?: .+/, dabeiLine)
+            .replace(/❌ Absagen(?:\s*\(\d+\))?: .+/, absagenLine)
+
+          try {
+            await ctx.editMessageText(html, {
+              parse_mode: 'HTML',
+              reply_markup: (msg as any)?.reply_markup,
+            })
+          } catch {
+            // Message not modified (same content) — ignore
+          }
+
+          await ctx.answerCallbackQuery({
+            text: isYes ? '✅ Du bist dabei!' : '❌ Notiert!',
+          })
+          break
+        }
+
         case 'idea': {
           // AI-Idee generieren und als PN senden
           await ctx.answerCallbackQuery({ text: '💡 Idee wird generiert...' })
