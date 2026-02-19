@@ -47,6 +47,12 @@ export default function Home() {
           description="Kinder & Geburtstage"
         />
         <NavCard
+          href="/ideas"
+          icon="📋"
+          title="Aktivitäten"
+          description="Was wir gemacht haben"
+        />
+        <NavCard
           href="/settings"
           icon="⚙️"
           title="Einstellungen"

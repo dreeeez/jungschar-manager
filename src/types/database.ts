@@ -151,6 +151,7 @@ export interface Database {
           material: string | null
           was_used: boolean
           rating: string | null
+          source: string
           created_at: string
         }
         Insert: {
@@ -161,6 +162,7 @@ export interface Database {
           material?: string | null
           was_used?: boolean
           rating?: string | null
+          source?: string
           created_at?: string
         }
         Update: {
@@ -171,6 +173,7 @@ export interface Database {
           material?: string | null
           was_used?: boolean
           rating?: string | null
+          source?: string
           created_at?: string
         }
       }

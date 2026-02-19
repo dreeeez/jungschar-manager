@@ -37,14 +37,28 @@ interface Event {
   parent_duties: ParentDuty[]
 }
 
+interface IdeaRecord {
+  id: string
+  event_id: string
+  title: string
+  description: string | null
+  was_used: boolean
+  source: string
+  created_at: string
+}
+
 export default function CalendarPage() {
   const { showAlert } = useTelegram()
   const [events, setEvents] = useState<Event[]>([])
   const [helpers, setHelpers] = useState<Helper[]>([])
   const [parents, setParents] = useState<Parent[]>([])
+  const [ideasMap, setIdeasMap] = useState<Map<string, IdeaRecord>>(new Map())
   const [loading, setLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const [selectedEventIdea, setSelectedEventIdea] = useState<IdeaRecord | null | undefined>(undefined)
   const [saving, setSaving] = useState(false)
+  const [newActivityText, setNewActivityText] = useState('')
+  const [savingActivity, setSavingActivity] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -67,11 +81,13 @@ export default function CalendarPage() {
         .order('name', { ascending: true }),
     ])
 
+    const loadedEvents = eventsResult.data as any[] || []
+
     if (eventsResult.error) {
       console.error('Error fetching events:', eventsResult.error)
       showAlert('Fehler beim Laden der Events')
     } else {
-      setEvents(eventsResult.data as any || [])
+      setEvents(loadedEvents)
     }
 
     if (helpersResult.error) {
@@ -84,6 +100,27 @@ export default function CalendarPage() {
       console.error('Error fetching parents:', parentsResult.error)
     } else {
       setParents(parentsResult.data || [])
+    }
+
+    // Load ideas for all events (for badges)
+    if (loadedEvents.length > 0) {
+      const eventIds = loadedEvents.map((e: any) => e.id)
+      const { data: ideas } = await (supabase as any)
+        .from('ideas')
+        .select('*')
+        .in('event_id', eventIds)
+        .order('created_at', { ascending: false })
+
+      if (ideas) {
+        // Build map: event_id → most recent idea
+        const map = new Map<string, IdeaRecord>()
+        for (const idea of ideas) {
+          if (!map.has(idea.event_id)) {
+            map.set(idea.event_id, idea)
+          }
+        }
+        setIdeasMap(map)
+      }
     }
 
     setLoading(false)
@@ -132,6 +169,32 @@ export default function CalendarPage() {
     return event.parent_duties?.[0]?.parent_id || null
   }
 
+  function sourceLabel(source: string): string {
+    switch (source) {
+      case 'elterngruppe': return '📨 Elterngruppe'
+      case 'manual': return '✍️ Manuell erfasst'
+      default: return '💡 Idee'
+    }
+  }
+
+  function openModal(event: Event) {
+    setSelectedEvent(event)
+    setSelectedEventIdea(undefined) // undefined = loading
+    setNewActivityText('')
+
+    // Load idea for this specific event
+    ;(supabase as any)
+      .from('ideas')
+      .select('*')
+      .eq('event_id', event.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }: any) => {
+        setSelectedEventIdea(data ?? null) // null = no idea found
+      })
+  }
+
   async function toggleHelper(helperId: string) {
     if (!selectedEvent || saving) return
 
@@ -175,7 +238,6 @@ export default function CalendarPage() {
 
     try {
       if (currentParentId === parentId) {
-        // Zuweisung entfernen
         const { error } = await (supabase as any)
           .from('parent_duties')
           .delete()
@@ -184,7 +246,6 @@ export default function CalendarPage() {
 
         if (error) throw error
       } else {
-        // Alte Zuweisung entfernen, neue setzen
         await (supabase as any)
           .from('parent_duties')
           .delete()
@@ -206,6 +267,34 @@ export default function CalendarPage() {
     }
 
     setSaving(false)
+  }
+
+  async function saveManualActivity() {
+    if (!selectedEvent || !newActivityText.trim()) return
+
+    setSavingActivity(true)
+    try {
+      const { data, error } = await (supabase as any)
+        .from('ideas')
+        .insert({
+          event_id: selectedEvent.id,
+          title: newActivityText.trim().slice(0, 200),
+          description: newActivityText.trim(),
+          was_used: true,
+          source: 'manual',
+        })
+        .select('*')
+        .single()
+
+      if (error) throw error
+
+      setSelectedEventIdea(data)
+      setIdeasMap(prev => new Map(prev).set(selectedEvent.id, data))
+      setNewActivityText('')
+    } catch (error: any) {
+      showAlert('Fehler: ' + error.message)
+    }
+    setSavingActivity(false)
   }
 
   async function refreshSelectedEvent() {
@@ -251,31 +340,39 @@ export default function CalendarPage() {
           </p>
         ) : (
           <div className="space-y-3">
-            {upcomingEvents.map((event) => (
-              <div
-                key={event.id}
-                onClick={() => setSelectedEvent(event)}
-                className="p-4 bg-tg-secondary-bg rounded-xl cursor-pointer active:opacity-80 transition-opacity"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">📅</span>
-                      <span className="font-medium">{formatDate(event.event_date)}</span>
-                    </div>
-                    <p className="text-sm text-tg-hint mt-2">
-                      👥 {getAssignedHelperNames(event)}
-                    </p>
-                    {getParentDutyName(event) && (
-                      <p className="text-xs text-tg-hint mt-1">
-                        🍽️ {getParentDutyName(event)}
+            {upcomingEvents.map((event) => {
+              const idea = ideasMap.get(event.id)
+              return (
+                <div
+                  key={event.id}
+                  onClick={() => openModal(event)}
+                  className="p-4 bg-tg-secondary-bg rounded-xl cursor-pointer active:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-lg">📅</span>
+                        <span className="font-medium">{formatDate(event.event_date)}</span>
+                        {idea && (
+                          <span className="text-xs bg-green-500/20 text-green-600 px-2 py-0.5 rounded-full font-medium">
+                            📋 Log
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-tg-hint mt-2">
+                        👥 {getAssignedHelperNames(event)}
                       </p>
-                    )}
+                      {getParentDutyName(event) && (
+                        <p className="text-xs text-tg-hint mt-1">
+                          🍽️ {getParentDutyName(event)}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-tg-hint">›</span>
                   </div>
-                  <span className="text-tg-hint">›</span>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -284,21 +381,39 @@ export default function CalendarPage() {
       {pastEvents.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold mb-4">Vergangene Termine</h2>
-          <div className="space-y-3 opacity-60">
-            {pastEvents.slice(-5).reverse().map((event) => (
-              <div
-                key={event.id}
-                className="p-4 bg-tg-secondary-bg rounded-xl"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">📅</span>
-                  <span className="font-medium">{formatDate(event.event_date)}</span>
+          <div className="space-y-3">
+            {pastEvents.slice(-5).reverse().map((event) => {
+              const idea = ideasMap.get(event.id)
+              return (
+                <div
+                  key={event.id}
+                  onClick={() => openModal(event)}
+                  className="p-4 bg-tg-secondary-bg rounded-xl cursor-pointer active:opacity-80 transition-opacity opacity-70"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-lg">📅</span>
+                        <span className="font-medium">{formatDate(event.event_date)}</span>
+                        {idea ? (
+                          <span className="text-xs bg-green-500/20 text-green-600 px-2 py-0.5 rounded-full font-medium">
+                            📋 Log
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-tg-hint/10 text-tg-hint px-2 py-0.5 rounded-full">
+                            kein Log
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-tg-hint mt-2">
+                        👥 {getAssignedHelperNames(event)}
+                      </p>
+                    </div>
+                    <span className="text-tg-hint">›</span>
+                  </div>
                 </div>
-                <p className="text-sm text-tg-hint mt-2">
-                  👥 {getAssignedHelperNames(event)}
-                </p>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -366,7 +481,7 @@ export default function CalendarPage() {
               🍽️ Elterndienst (Essen):
             </p>
 
-            <div className="space-y-2">
+            <div className="space-y-2 mb-6">
               {parents.map((parent) => {
                 const isAssigned = getAssignedParentId(selectedEvent) === parent.id
                 return (
@@ -387,8 +502,46 @@ export default function CalendarPage() {
               })}
               {parents.length === 0 && (
                 <p className="text-center text-tg-hint py-4">
-                  Keine Eltern vorhanden. Füge sie unter "Eltern" hinzu.
+                  Keine Eltern vorhanden. Füge sie unter &quot;Eltern&quot; hinzu.
                 </p>
+              )}
+            </div>
+
+            {/* Aktivitäts-Log */}
+            <div className="border-t border-tg-hint/20 pt-5">
+              <p className="text-sm text-tg-hint mb-3">📋 Aktivitäts-Log:</p>
+
+              {selectedEventIdea === undefined ? (
+                <div className="flex items-center gap-2 py-3 text-tg-hint text-sm">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-tg-button" />
+                  Lädt...
+                </div>
+              ) : selectedEventIdea ? (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                  <p className="font-medium text-sm">✅ {selectedEventIdea.title}</p>
+                  <p className="text-xs text-tg-hint mt-1">{sourceLabel(selectedEventIdea.source)}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-tg-hint">Noch keine Aktivität erfasst.</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newActivityText}
+                      onChange={(e) => setNewActivityText(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && saveManualActivity()}
+                      placeholder="Was habt ihr gemacht?"
+                      className="flex-1 px-3 py-2 bg-tg-secondary-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button"
+                    />
+                    <button
+                      onClick={saveManualActivity}
+                      disabled={savingActivity || !newActivityText.trim()}
+                      className="px-4 py-2 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
+                    >
+                      {savingActivity ? '...' : '✓'}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>

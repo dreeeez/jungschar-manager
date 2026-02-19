@@ -4,6 +4,8 @@ import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './h
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { getSupabase } from './database'
 import { generateIdeaForEvent, sendIdeaToUser } from './ai-ideas'
+import { extractActivityFromMessage } from './activity-extractor'
+import { saveActivity } from './ideas'
 
 // Track pending registrations (in-memory, resets on cold start)
 const pendingRegistrations = new Set<number>()
@@ -207,6 +209,11 @@ Registriere dich mit /register um loszulegen!
     )
   })
 
+  // /chatid - zeigt die aktuelle Chat-ID (für Setup)
+  bot.command('chatid', async (ctx) => {
+    await ctx.reply(`Chat-ID: \`${ctx.chat.id}\``, { parse_mode: 'Markdown' })
+  })
+
   // /help
   bot.command('help', async (ctx) => {
     await ctx.reply(`
@@ -226,10 +233,27 @@ Fragen? Sprich einen Admin an!
     `.trim())
   })
 
-  // Text Messages (für Registrierung)
+  // Text Messages (für Elterngruppe, Registrierung)
   bot.on('message:text', async (ctx) => {
     const telegramUserId = ctx.from?.id
     const text = ctx.message.text
+    const chatId = String(ctx.chat?.id)
+    const elternChatId = process.env.TELEGRAM_ELTERN_CHAT_ID
+
+    // Elterngruppe: Aktivitäts-Ankündigung automatisch erfassen
+    if (elternChatId && chatId === elternChatId) {
+      try {
+        const result = await extractActivityFromMessage(text)
+        if (result.is_activity && result.activity) {
+          const nextEvent = await getNextEvent()
+          await saveActivity(result.activity, text, nextEvent?.id ?? null, 'elterngruppe')
+          console.log(`Activity saved from Elterngruppe: "${result.activity}"`)
+        }
+      } catch (error) {
+        console.error('Error processing Elterngruppe message:', error)
+      }
+      return // Elterngruppe messages are only used for activity tracking
+    }
 
     if (text.startsWith('/')) return
 
