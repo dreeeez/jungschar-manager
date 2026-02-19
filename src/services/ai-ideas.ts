@@ -36,7 +36,7 @@ export async function generateActivityIdea(context: IdeaContext): Promise<string
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
 
     let weatherInfo = 'Keine Wetterdaten verfügbar.'
     if (context.weather) {
