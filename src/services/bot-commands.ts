@@ -4,8 +4,6 @@ import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './h
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { getSupabase } from './database'
 import { generateIdeaForEvent, sendIdeaToUser } from './ai-ideas'
-import { extractActivityFromMessage } from './activity-extractor'
-import { saveActivity } from './ideas'
 
 // Track pending registrations (in-memory, resets on cold start)
 const pendingRegistrations = new Set<number>()
@@ -240,22 +238,8 @@ Fragen? Sprich einen Admin an!
     const chatId = String(ctx.chat?.id)
     const elternChatId = process.env.TELEGRAM_ELTERN_CHAT_ID
 
-    console.log(`[message:text] chatId=${chatId} elternChatId=${elternChatId} text="${text?.slice(0, 50)}"`)
-
-    // Elterngruppe: Aktivitäts-Ankündigung automatisch erfassen
-    if (elternChatId && chatId === elternChatId) {
-      try {
-        const result = await extractActivityFromMessage(text)
-        if (result.is_activity && result.activity) {
-          const nextEvent = await getNextEvent()
-          await saveActivity(result.activity, text, nextEvent?.id ?? null, 'elterngruppe')
-          console.log(`Activity saved from Elterngruppe: "${result.activity}"`)
-        }
-      } catch (error) {
-        console.error('Error processing Elterngruppe message:', error)
-      }
-      return // Elterngruppe messages are only used for activity tracking
-    }
+    // Elterngruppe activity tracking is disabled for now
+    if (elternChatId && chatId === elternChatId) return
 
     if (text.startsWith('/')) return
 
