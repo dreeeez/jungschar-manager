@@ -10,14 +10,16 @@ export async function GET(req: NextRequest) {
 
   try {
     const testStage = req.nextUrl.searchParams.get('test')
+    const forceLive = req.nextUrl.searchParams.get('live') === '1'
     const isTest = !!testStage
 
-    const chatId = isTest
+    const useTestChat = isTest && !forceLive
+    const chatId = useTestChat
       ? process.env.TELEGRAM_TEST_CHAT_ID
       : process.env.TELEGRAM_CHAT_ID
 
     if (!chatId) {
-      const missing = isTest ? 'TELEGRAM_TEST_CHAT_ID' : 'TELEGRAM_CHAT_ID'
+      const missing = useTestChat ? 'TELEGRAM_TEST_CHAT_ID' : 'TELEGRAM_CHAT_ID'
       return NextResponse.json({ error: `${missing} not configured` }, { status: 500 })
     }
 
