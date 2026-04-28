@@ -8,14 +8,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const chatId = process.env.TELEGRAM_CHAT_ID
-  if (!chatId) {
-    return NextResponse.json({ error: 'TELEGRAM_CHAT_ID not configured' }, { status: 500 })
-  }
-
   try {
     const testStage = req.nextUrl.searchParams.get('test')
-    const result = await processReminders(chatId, testStage ? parseInt(testStage) : undefined)
+    const isTest = !!testStage
+
+    const chatId = isTest
+      ? process.env.TELEGRAM_TEST_CHAT_ID
+      : process.env.TELEGRAM_CHAT_ID
+
+    if (!chatId) {
+      const missing = isTest ? 'TELEGRAM_TEST_CHAT_ID' : 'TELEGRAM_CHAT_ID'
+      return NextResponse.json({ error: `${missing} not configured` }, { status: 500 })
+    }
+
+    const result = await processReminders(chatId, isTest ? parseInt(testStage!) : undefined)
     return NextResponse.json(result)
   } catch (error) {
     console.error('Error in reminder cron:', error)
