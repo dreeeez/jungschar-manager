@@ -4,6 +4,7 @@ import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './h
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { getSupabase } from './database'
 import { generateIdeaForEvent, sendIdeaToUser } from './ai-ideas'
+import { recordVote } from './attendance'
 
 // Track pending registrations (in-memory, resets on cold start)
 const pendingRegistrations = new Set<number>()
@@ -274,6 +275,17 @@ Fragen? Sprich einen Admin an!
           const msg = ctx.callbackQuery.message
           const text = msg?.text || ''
           const entities = (msg as any)?.entities || []
+
+          // Persist vote in DB so the Thursday non-voter cron can find non-responders.
+          // Failures here must not break the in-message rendering below.
+          try {
+            const helper = await getHelperByTelegramId(telegramUserId)
+            if (helper && eventId) {
+              await recordVote(eventId, helper.id, isYes)
+            }
+          } catch (e) {
+            console.error('Failed to persist vote:', e)
+          }
 
           // Parse current votes from plain text
           const dabeiMatch = text.match(/✅ Dabei(?:\s*\(\d+\))?: (.+)/)

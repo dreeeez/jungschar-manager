@@ -84,10 +84,18 @@ async function wasReminderSent(eventId: string, reminderType: string): Promise<b
 /**
  * Loggt eine gesendete Erinnerung
  */
-async function logReminder(eventId: string, reminderType: string): Promise<void> {
+async function logReminder(
+  eventId: string,
+  reminderType: string,
+  messageId?: number
+): Promise<void> {
   await getSupabase()
     .from('reminder_log')
-    .insert({ event_id: eventId, reminder_type: reminderType } as any)
+    .insert({
+      event_id: eventId,
+      reminder_type: reminderType,
+      message_id: messageId ?? null,
+    } as any)
 }
 
 /**
@@ -298,8 +306,9 @@ export async function processReminders(chatId: string, testStage?: number) {
 
     if (reminder && reminderType) {
       const result = await sendTelegramMessage(chatId, reminder.message, reminder.replyMarkup)
+      const messageId: number | undefined = result?.result?.message_id
       if (!isTest) {
-        await logReminder(event.id, reminderType)
+        await logReminder(event.id, reminderType, messageId)
       }
       results.push({
         event_id: event.id,
