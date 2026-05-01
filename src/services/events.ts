@@ -70,3 +70,20 @@ export function getHelperMentions(event: any): string {
     .map((h: any) => `@${h.telegram_username}`)
     .join(' ')
 }
+
+/**
+ * Team-Tags: bevorzugt @username, sonst HTML-Mention via telegram_user_id,
+ * sonst Klarname. Mit ' & ' verbunden — gibt EINE Zeile statt
+ * "Team: …" + separate Mention-Zeile.
+ */
+export function getHelperTags(event: any): string {
+  const helpers = event?.assignments?.map((a: any) => a.helper).filter(Boolean) || []
+  if (helpers.length === 0) return 'Niemand eingetragen'
+  return helpers
+    .map((h: any) => {
+      if (h.telegram_username) return `@${h.telegram_username}`
+      if (h.telegram_user_id) return `<a href="tg://user?id=${h.telegram_user_id}">${h.name}</a>`
+      return h.name
+    })
+    .join(' & ')
+}

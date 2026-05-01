@@ -5,6 +5,7 @@ export interface WeatherForecast {
   temperature_max: number
   temperature_min: number
   precipitation_probability: number
+  weather_code: number
   weather_description: string
 }
 
@@ -35,8 +36,14 @@ const WEATHER_CODES: Record<number, string> = {
   99: 'Gewitter mit starkem Hagel',
 }
 
+// Jungschar-Zeit: 17–18 Uhr. Wir wollen Wetter für genau diesen Slot,
+// nicht das 24h-Tagesminimum/-maximum (das wäre Nacht-Tiefstwert).
+const JUNGSCHAR_HOURS = ['T17:00', 'T18:00']
+
 /**
- * Holt die Wettervorhersage von Open-Meteo (kostenlos, kein API-Key)
+ * Holt die Wettervorhersage von Open-Meteo (kostenlos, kein API-Key).
+ * Verwendet Stundenwerte aus dem Jungschar-Zeitraum (17–18 Uhr) statt
+ * der irreführenden 24h-Tages-Min/Max-Spanne.
  */
 export async function getWeatherForecast(
   latitude: number,
@@ -44,23 +51,35 @@ export async function getWeatherForecast(
   targetDate: string
 ): Promise<WeatherForecast | null> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code&timezone=Europe/Berlin&start_date=${targetDate}&end_date=${targetDate}`
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,precipitation_probability,weather_code&timezone=Europe/Berlin&start_date=${targetDate}&end_date=${targetDate}`
 
     const response = await fetch(url)
     if (!response.ok) return null
 
     const data = await response.json()
-    const daily = data.daily
+    const hourly = data.hourly
+    if (!hourly?.time) return null
 
-    if (!daily || !daily.time || daily.time.length === 0) return null
+    const indices = JUNGSCHAR_HOURS
+      .map((suffix) => (hourly.time as string[]).findIndex((t) => t.endsWith(suffix)))
+      .filter((i) => i >= 0)
 
-    const weatherCode = daily.weather_code[0]
+    if (indices.length === 0) return null
+
+    const temps = indices
+      .map((i) => hourly.temperature_2m[i])
+      .filter((t: number | null) => t != null) as number[]
+    const precs = indices
+      .map((i) => hourly.precipitation_probability[i])
+      .filter((p: number | null) => p != null) as number[]
+    const weatherCode = hourly.weather_code[indices[0]]
 
     return {
-      date: daily.time[0],
-      temperature_max: daily.temperature_2m_max[0],
-      temperature_min: daily.temperature_2m_min[0],
-      precipitation_probability: daily.precipitation_probability_max[0],
+      date: targetDate,
+      temperature_max: Math.max(...temps),
+      temperature_min: Math.min(...temps),
+      precipitation_probability: precs.length ? Math.max(...precs) : 0,
+      weather_code: weatherCode,
       weather_description: WEATHER_CODES[weatherCode] || 'Unbekannt',
     }
   } catch (error) {

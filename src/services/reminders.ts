@@ -1,6 +1,6 @@
 import { formatDate, getDaysUntil, getDayOfWeek } from '@/utils/format'
-import { getUpcomingEvents, getHelperNames, getHelperMentions } from './events'
-import { getParentDutyName } from './parents'
+import { getUpcomingEvents, getHelperTags } from './events'
+import { getParentDutyDisplay } from './parents'
 import { getSupabase } from './database'
 import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './weather'
 
@@ -12,7 +12,7 @@ interface ReminderMessage {
 // Reminder-Typen für Duplikat-Schutz
 const STAGE_SUNDAY = 'stage1_sunday'
 const STAGE_WEDNESDAY = 'stage2_wednesday'
-const STAGE_FRIDAY = 'stage3_friday'
+const STAGE_SATURDAY = 'stage3_saturday'
 
 /**
  * Sendet eine Nachricht an Telegram
@@ -82,21 +82,35 @@ async function wasReminderSent(eventId: string, reminderType: string): Promise<b
 }
 
 /**
- * Loggt eine gesendete Erinnerung
+ * Loggt eine gesendete Erinnerung. Upsert auf (event_id, reminder_type),
+ * damit Test-Reruns die message_id überschreiben statt zu crashen.
  */
-async function logReminder(eventId: string, reminderType: string): Promise<void> {
+async function logReminder(
+  eventId: string,
+  reminderType: string,
+  messageId?: number
+): Promise<void> {
   await getSupabase()
     .from('reminder_log')
-    .insert({ event_id: eventId, reminder_type: reminderType } as any)
+    .upsert(
+      {
+        event_id: eventId,
+        reminder_type: reminderType,
+        message_id: messageId ?? null,
+      } as any,
+      { onConflict: 'event_id,reminder_type' }
+    )
 }
 
+type Birthday = { name: string; dayMonth: string; age: number }
+
 /**
- * Findet Kinder mit Geburtstag in der Woche des Events (Mo-So)
+ * Findet Kinder mit Geburtstag im Zeitraum ±3 Tage um das Event und
+ * gibt strukturierte Daten zurück (Name, Tag/Monat, Alter).
  */
-async function getBirthdaysAroundEvent(eventDate: string): Promise<string[]> {
+async function getBirthdaysAroundEvent(eventDate: string): Promise<Birthday[]> {
   try {
     const event = new Date(eventDate)
-    // Woche um das Event: 3 Tage vorher bis 3 Tage nachher
     const from = new Date(event)
     from.setDate(from.getDate() - 3)
     const to = new Date(event)
@@ -113,14 +127,18 @@ async function getBirthdaysAroundEvent(eventDate: string): Promise<string[]> {
     return data
       .filter((child: any) => {
         const bday = new Date(child.birthday)
-        // Geburtstag im selben Zeitraum prüfen (Monat + Tag)
         const bdayThisYear = new Date(event.getFullYear(), bday.getMonth(), bday.getDate())
         return bdayThisYear >= from && bdayThisYear <= to
       })
       .map((child: any) => {
         const bday = new Date(child.birthday)
         const age = event.getFullYear() - bday.getFullYear()
-        return `${child.name} (wird ${age})`
+        const bdayThisYear = new Date(event.getFullYear(), bday.getMonth(), bday.getDate())
+        return {
+          name: child.name,
+          dayMonth: bdayThisYear.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
+          age,
+        }
       })
   } catch {
     return []
@@ -128,21 +146,49 @@ async function getBirthdaysAroundEvent(eventDate: string): Promise<string[]> {
 }
 
 /**
- * Formatiert die Geburtstags-Zeile
+ * Geburtstags-Block: ein Header + eine Zeile pro Kind mit
+ * Kind-Emoji, Name, Datum und Alter.
  */
-function formatBirthdayLine(birthdays: string[]): string {
+function formatBirthdayLine(birthdays: Birthday[]): string {
   if (birthdays.length === 0) return ''
-  return `🎂 Geburtstag diese Woche: ${birthdays.join(', ')}\n`
+  const lines = birthdays.map((b) => `🧒 ${b.name} — ${b.dayMonth} (wird ${b.age})`).join('\n')
+  return `🎂 <b>Geburtstag diese Woche:</b>\n${lines}\n`
 }
 
 /**
- * Formatiert eine Wetter-Zeile für die Nachricht
+ * Wählt ein passendes Emoji für die Wetterlage. Open-Meteo liefert
+ * WMO-Codes, die wir hier in einzelne Emojis übersetzen. Bei <=2°C
+ * gewinnt das Frost-Emoji (sonst sieht eine sonnige Eiseskälte falsch aus).
  */
-function formatWeatherLine(weather: WeatherForecast | null): string {
+function weatherEmoji(weather: WeatherForecast | null): string {
+  if (!weather) return '🌤️'
+  if (weather.temperature_max <= 2) return '🥶'
+  const code = weather.weather_code
+  if (code === 0) return '☀️'
+  if (code === 1) return '🌤️'
+  if (code === 2) return '⛅'
+  if (code === 3) return '☁️'
+  if (code === 45 || code === 48) return '🌫️'
+  if ([51, 53, 55].includes(code)) return '🌦️'
+  if ([61, 63, 65, 80, 81, 82].includes(code)) return '🌧️'
+  if ([71, 73, 75, 85, 86].includes(code)) return '🌨️'
+  if ([95, 96, 99].includes(code)) return '⛈️'
+  return '🌤️'
+}
+
+function weatherTempStr(weather: WeatherForecast): string {
+  const min = Math.round(weather.temperature_min)
+  const max = Math.round(weather.temperature_max)
+  return min === max ? `${max}°C` : `${min}–${max}°C`
+}
+
+/**
+ * Standalone-Wetterzeile für Stage 2: "⛅ Teilweise bewölkt, 25°C [(Regen 60%)]".
+ */
+function formatWeatherStandalone(weather: WeatherForecast | null): string {
   if (!weather) return ''
-  return `🌤️ Wetter: ${weather.weather_description}, ${Math.round(weather.temperature_min)}–${Math.round(weather.temperature_max)}°C` +
-    (weather.precipitation_probability > 30 ? ` (☔ ${weather.precipitation_probability}%)` : '') +
-    '\n'
+  return `${weatherEmoji(weather)} ${weather.weather_description}, ${weatherTempStr(weather)}` +
+    (weather.precipitation_probability > 30 ? ` (Regen ${weather.precipitation_probability}%)` : '')
 }
 
 /**
@@ -162,20 +208,115 @@ async function fetchWeatherForEvent(eventDate: string): Promise<WeatherForecast 
  * STUFE 1 — Sonntag (6-8 Tage vorher)
  * Event-Ankündigung mit Team und Elterndienst
  */
-function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: string[]): ReminderMessage {
-  const helperNames = getHelperNames(event)
-  const mentions = getHelperMentions(event)
-  const parentName = getParentDutyName(event)
+type Stage1Ctx = {
+  date: string
+  emoji: string
+  desc: string
+  temp: string
+  team: string
+  parent: string
+  birthdayLine: string
+}
 
+// Pool an themed Stage-1-Templates. Eines pro Send wird zufällig gezogen.
+// Jedes muss klar Datum, Wetter, Team, Eltern-Essen kommunizieren — nur
+// die "Verkleidung" wechselt.
+const STAGE1_TEMPLATES: Array<(c: Stage1Ctx) => string> = [
+  // 1. Spy / Mission Impossible
+  (c) =>
+    `🗺️ <b>Eure Mission, falls ihr sie annehmt:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Agenten: ${c.team}\n` +
+    `🍽️ Verpflegung: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nDiese Nachricht zerstört sich nicht selbst — fangt schon mal an zu planen 🙌`,
+
+  // 2. Wahrsager / Glaskugel
+  (c) =>
+    `🔮 <b>Die Glaskugel hat gesprochen:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Auserwählte: ${c.team}\n` +
+    `🍽️ Am Herd: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nSchicksal akzeptiert — fangt an zu planen 🚀`,
+
+  // 3. Wettervorhersage parodiert
+  (c) =>
+    `📡 <b>Vorhersage für ${c.date}:</b>\n\n` +
+    `${c.emoji} ${c.desc}, ${c.temp}\n` +
+    `👥 mit hoher Wahrscheinlichkeit ${c.team}\n` +
+    `🍽️ und einer kräftigen Brise ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nAussichten: ihr seid dran. Planen anfangen 🌦️`,
+
+  // 4. Spotify Wrapped
+  (c) =>
+    `🎵 <b>Jungschar Wrapped — eure nächste Schicht:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Top-Acts: ${c.team}\n` +
+    `🍽️ Featured: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nPress play in einer Woche ▶️`,
+
+  // 5. Stadion-Ansage
+  (c) =>
+    `📣 <b>Achtung Achtung — die nächste Aufstellung:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Mannschaft: ${c.team}\n` +
+    `🍽️ Catering: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nAufwärmen darf beginnen 🏃`,
+
+  // 6. Festival-Plakat
+  (c) =>
+    `🎤 <b>Festival-Lineup für ${c.date}:</b>\n\n` +
+    `${c.emoji} Wetterprognose: ${c.temp}, ${c.desc}\n` +
+    `👥 Headliner: ${c.team}\n` +
+    `🍽️ Foodtruck: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nSoundcheck in einer Woche 🎸`,
+
+  // 7. Mission Control / Space
+  (c) =>
+    `🚀 <b>Mission Briefing — T-minus 7 Tage:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Astronauten: ${c.team}\n` +
+    `🍽️ Bord-Verpflegung: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nAlle Systeme bereit machen 🛰️`,
+]
+
+function pickStage1Template(): (c: Stage1Ctx) => string {
+  return STAGE1_TEMPLATES[Math.floor(Math.random() * STAGE1_TEMPLATES.length)]
+}
+
+// Top-Header für Stage 1 — rotiert unabhängig vom Theme.
+// Bewusst etwas länger gehalten, sonst wirken kurze Titel im "+++ X +++"
+// Wrap visuell unausgewogen.
+const STAGE1_TOP_HEADERS = [
+  'JUNGSCHAR NEWS',
+  'JUNGSCHAR INTEL',
+  'HEADS-UP — NÄCHSTE WOCHE',
+  'NÄCHSTE WOCHE JUNGSCHAR',
+  '📣 ANKÜNDIGUNG',
+]
+
+function pickStage1TopHeader(): string {
+  return STAGE1_TOP_HEADERS[Math.floor(Math.random() * STAGE1_TOP_HEADERS.length)]
+}
+
+function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: Birthday[]): ReminderMessage {
+  const ctx: Stage1Ctx = {
+    date: formatDate(event.event_date),
+    emoji: weatherEmoji(weather),
+    desc: weather?.weather_description ?? 'Wetter unbekannt',
+    temp: weather ? weatherTempStr(weather) : '?°C',
+    team: getHelperTags(event),
+    parent: getParentDutyDisplay(event),
+    birthdayLine: formatBirthdayLine(birthdays),
+  }
   return {
-    message: `📅 <b>Nächste Woche ist Jungschar!</b>\n\n` +
-      `📆 ${formatDate(event.event_date)}\n` +
-      `${formatWeatherLine(weather)}` +
-      `👥 Team: ${helperNames}\n` +
-      `${mentions ? `${mentions} - ihr seid dran!\n` : ''}` +
-      `🍽️ Essen: ${parentName}\n` +
-      `${formatBirthdayLine(birthdays)}` +
-      `\nFangt an zu planen!`,
+    message: `+++ ${pickStage1TopHeader()} +++\n\n${pickStage1Template()(ctx)}`,
   }
 }
 
@@ -187,28 +328,22 @@ function generateStage2Message(
   event: any,
   daysUntil: number,
   weather: WeatherForecast | null,
-  birthdays: string[]
+  birthdays: Birthday[]
 ): ReminderMessage {
-  const helperNames = getHelperNames(event)
-  const mentions = getHelperMentions(event)
+  const teamTags = getHelperTags(event)
+  const dayWord = daysUntil === 1 ? 'Tag' : 'Tage'
 
   return {
-    message: `🤔 <b>Wie ist der Status?</b>\n\n` +
-      `Noch <b>${daysUntil} Tage</b> bis zur Jungschar!\n` +
-      `📆 ${formatDate(event.event_date)}\n` +
-      `${formatWeatherLine(weather)}` +
-      `👥 Team: ${helperNames}\n` +
-      `${mentions ? `${mentions}\n` : ''}` +
+    message: `+++ 🔥 <b>Countdown: ${daysUntil} ${dayWord}</b> 🔥 +++\n` +
+      `${formatWeatherStandalone(weather)}\n` +
+      `Team: ${teamTags}\n` +
       `${formatBirthdayLine(birthdays)}` +
-      `\n━━━━━━━━━━━━━━━\n\n` +
-      `📋 <b>Checkliste:</b>\n` +
-      `⚠️ Eltern wegen Essen kontaktiert? — <b>Frist HEUTE!</b>\n` +
-      `• Steht das Programm?\n` +
-      `• Material vorbereitet?\n` +
-      `• Kinderstunde vorbereitet?\n` +
-      `• Programm in Elternchat kommuniziert?\n` +
-      `\n━━━━━━━━━━━━━━━\n\n` +
-      `📊 <b>Wer ist dabei?</b>\n\n` +
+      `\n📋 <b>Checkliste</b> — Eltern (Essen) heute!\n` +
+      `☐ Programm\n` +
+      `☐ Material\n` +
+      `☐ Kinderstunde\n` +
+      `☐ Eltern-Chat\n` +
+      `\n📊 <b>Wer ist dabei?</b>\n` +
       `✅ Dabei: —\n` +
       `❌ Absagen: —`,
     replyMarkup: {
@@ -217,30 +352,100 @@ function generateStage2Message(
           { text: '✅ Bin dabei!', callback_data: `votey_${event.id}` },
           { text: '❌ Kann nicht', callback_data: `voten_${event.id}` },
         ],
-        [
-          { text: '💡 Wir brauchen eine Idee!', callback_data: `idea_${event.id}` },
-        ],
       ],
     },
   }
 }
 
-/**
- * STUFE 3 — Freitag (1-2 Tage vorher)
- * Final Reminder, kurz und ermutigend
- */
-function generateStage3Message(event: any, daysUntil: number): ReminderMessage {
-  const helperNames = getHelperNames(event)
-  const mentions = getHelperMentions(event)
-  const dayWord = daysUntil === 1 ? 'morgen' : 'übermorgen'
+// Bibelvers-Pool für Stage 3 (Samstag morgen). Mix aus Helfer-Kontext
+// (Kinder, Dienst, Weisheit) und allgemein motivierenden Versen.
+// Schlachter/Luther-nah übersetzt.
+const BIBLE_VERSES: Array<{ ref: string; text: string }> = [
+  { ref: 'Josua 1,9', text: 'Sei stark und mutig! Hab keine Angst und verzage nicht; denn der HERR, dein Gott, ist mit dir überall, wo du hingehst.' },
+  { ref: 'Philipper 4,13', text: 'Ich vermag alles durch den, der mich kräftig macht, Christus.' },
+  { ref: 'Kolosser 3,23', text: 'Alles, was ihr tut, das tut von Herzen als dem Herrn und nicht den Menschen.' },
+  { ref: 'Matthäus 19,14', text: 'Lasst die Kinder zu mir kommen und hindert sie nicht; denn solchen wie ihnen gehört das Reich Gottes.' },
+  { ref: '2. Timotheus 1,7', text: 'Gott hat uns nicht gegeben den Geist der Furcht, sondern der Kraft und der Liebe und der Besonnenheit.' },
+  { ref: '1. Korinther 16,14', text: 'Alles, was ihr tut, das tut in Liebe!' },
+  { ref: 'Sprüche 3,5–6', text: 'Verlass dich auf den HERRN von ganzem Herzen … so wird er deine Pfade ebnen.' },
+  { ref: 'Matthäus 5,16', text: 'Lasst euer Licht leuchten vor den Leuten, damit sie eure guten Werke sehen und euren Vater im Himmel preisen.' },
+  { ref: 'Jesaja 41,10', text: 'Fürchte dich nicht, ich bin mit dir … Ich stärke dich, ich helfe dir auch.' },
+  { ref: 'Jakobus 1,5', text: 'Wenn aber jemandem unter euch Weisheit mangelt, so bitte er Gott, der allen gern und ohne Vorwurf gibt.' },
+  { ref: 'Galater 6,9', text: 'Lasst uns aber Gutes tun und nicht müde werden; denn zu seiner Zeit werden wir ernten, wenn wir nicht nachlassen.' },
+  { ref: 'Sprüche 16,3', text: 'Befiehl dem HERRN deine Werke, so wird er deine Pläne festigen.' },
+  { ref: 'Psalm 16,11', text: 'Vor dir ist Freude die Fülle und Wonne zu deiner Rechten ewiglich.' },
+  { ref: 'Epheser 4,32', text: 'Seid aber untereinander freundlich und herzlich und vergebt einander.' },
+  { ref: '5. Mose 31,6', text: 'Seid stark und mutig! … denn der HERR, dein Gott, geht selbst mit dir.' },
+  { ref: 'Hebräer 12,1', text: 'Lasst uns mit Geduld laufen in dem Kampf, der uns bestimmt ist.' },
+  { ref: 'Römer 12,11', text: 'Seid nicht träge in dem, was ihr tun sollt. Seid brennend im Geist. Dient dem Herrn.' },
+  { ref: 'Psalm 118,24', text: 'Dies ist der Tag, den der HERR gemacht hat; lasst uns freuen und fröhlich an ihm sein.' },
+]
 
-  return {
-    message: `🔔 <b>Jungschar ist ${dayWord}!</b>\n\n` +
-      `📆 ${formatDate(event.event_date)}\n` +
-      `👥 Team: ${helperNames}\n` +
-      `${mentions ? `${mentions}\n` : ''}\n` +
-      `Ihr schafft das! Viel Spaß und Gottes Segen! 🙏`,
+function pickBibleVerse() {
+  return BIBLE_VERSES[Math.floor(Math.random() * BIBLE_VERSES.length)]
+}
+
+type Stage3Ctx = {
+  verse: string
+  reference: string
+}
+
+// 6 themed Stage-3-Greetings für Samstag morgen (Tag des Events).
+// Kompakt — kein Team, keine Sekundär-Greeting-Zeile, nur Theme +
+// Bibelvers + Closing.
+const STAGE3_TEMPLATES: Array<(c: Stage3Ctx) => string> = [
+  // 1. Klassisch
+  (c) =>
+    `🌅 <b>Heute ist es soweit — Jungschar!</b>\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
+
+  // 2. Coffee Mode
+  (c) =>
+    `☕ <b>Espresso doppelt — Jungschar-Modus on!</b>\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
+
+  // 3. Showtime
+  (c) =>
+    `🎬 <b>Showtime!</b>\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
+
+  // 4. Aufwachen-Crew
+  (c) =>
+    `🌅 <b>Aufstehen, Helfer-Crew!</b>\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
+
+  // 5. Mission Control
+  (c) =>
+    `🚀 <b>Mission Control: Heute ist der Tag!</b>\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
+
+  // 6. Powerwecker
+  (c) =>
+    `⏰ <b>Powerwecker — 3, 2, 1, JUNGSCHAR!</b>\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
+]
+
+function pickStage3Template(): (c: Stage3Ctx) => string {
+  return STAGE3_TEMPLATES[Math.floor(Math.random() * STAGE3_TEMPLATES.length)]
+}
+
+/**
+ * STUFE 3 — Samstag morgen (Tag des Events)
+ * Aufwacher-Gruß mit themed Greeting + rotierendem Bibelvers.
+ */
+function generateStage3Message(_event: any): ReminderMessage {
+  const verse = pickBibleVerse()
+  const ctx: Stage3Ctx = {
+    verse: verse.text,
+    reference: verse.ref,
   }
+  return { message: pickStage3Template()(ctx) }
 }
 
 /**
@@ -265,7 +470,7 @@ export async function processReminders(chatId: string, testStage?: number) {
     let reminderType: string | null = null
 
     // Stufe 1: Sonntag, 6-8 Tage vorher
-    if (testStage === 1 || (dayOfWeek === 0 && daysUntil >= 6 && daysUntil <= 8)) {
+    if (testStage === 1 || (!isTest && dayOfWeek === 0 && daysUntil >= 6 && daysUntil <= 8)) {
       reminderType = STAGE_SUNDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         const [weather, birthdays] = await Promise.all([
@@ -277,7 +482,7 @@ export async function processReminders(chatId: string, testStage?: number) {
     }
 
     // Stufe 2: Mittwoch, 3-4 Tage vorher
-    if (testStage === 2 || (dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4)) {
+    if (testStage === 2 || (!isTest && dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4)) {
       reminderType = STAGE_WEDNESDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         const [weather, birthdays] = await Promise.all([
@@ -288,19 +493,20 @@ export async function processReminders(chatId: string, testStage?: number) {
       }
     }
 
-    // Stufe 3: Freitag, 1-2 Tage vorher
-    if (testStage === 3 || (dayOfWeek === 5 && daysUntil >= 1 && daysUntil <= 2)) {
-      reminderType = STAGE_FRIDAY
+    // Stufe 3: Tag des Events (Samstag morgen)
+    if (testStage === 3 || (!isTest && daysUntil === 0)) {
+      reminderType = STAGE_SATURDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
-        reminder = generateStage3Message(event, daysUntil)
+        reminder = generateStage3Message(event)
       }
     }
 
     if (reminder && reminderType) {
       const result = await sendTelegramMessage(chatId, reminder.message, reminder.replyMarkup)
-      if (!isTest) {
-        await logReminder(event.id, reminderType)
-      }
+      const messageId: number | undefined = result?.result?.message_id
+      // Auch im Testmodus loggen, damit der Donnerstags-Reply-Test
+      // die message_id auflesen kann (Upsert vermeidet UNIQUE-Konflikte).
+      await logReminder(event.id, reminderType, messageId)
       results.push({
         event_id: event.id,
         event_date: event.event_date,

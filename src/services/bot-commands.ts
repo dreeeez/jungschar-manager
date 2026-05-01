@@ -3,7 +3,7 @@ import { formatDate } from '@/utils/format'
 import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './helpers'
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { getSupabase } from './database'
-import { generateIdeaForEvent, sendIdeaToUser } from './ai-ideas'
+import { recordVote } from './attendance'
 
 // Track pending registrations (in-memory, resets on cold start)
 const pendingRegistrations = new Set<number>()
@@ -47,22 +47,6 @@ function rebuildHtml(text: string, entities: any[]): string {
   result += escapeHtml(text.slice(pos))
   return result
 }
-
-// Aktivitäts-Ideen für /idee Command
-const ACTIVITY_IDEAS = [
-  '🎨 **Kreativ-Werkstatt**: Malt gemeinsam ein großes Bild zum Thema "Gottes Schöpfung"',
-  '🏃 **Schnitzeljagd**: Versteckt Hinweise im Gemeindehaus mit Bibelversen',
-  '🎭 **Theaterspiel**: Spielt eine Geschichte aus der Bibel nach (z.B. David & Goliath)',
-  '🧩 **Escape Room**: Löst Rätsel um eine "Schatztruhe" zu öffnen',
-  '🍪 **Back-Aktion**: Backt gemeinsam Kekse für Senioren in der Gemeinde',
-  '🎵 **Musik-Session**: Lernt ein neues Lied mit Bewegungen',
-  '⚽ **Sport-Olympiade**: Verschiedene Stationen mit kleinen Wettkämpfen',
-  '🔬 **Experimente**: Einfache Experimente die Gottes Wunder zeigen',
-  '📖 **Bibelquiz**: Teams treten gegeneinander an',
-  '🌳 **Natur-Rallye**: Erkundet die Natur und sammelt Schätze',
-  '🎲 **Spieleabend**: Brettspiele und Gemeinschaft',
-  '✉️ **Briefaktion**: Schreibt ermutigende Briefe an Gemeindemitglieder',
-]
 
 /**
  * Richtet alle Bot Commands ein
@@ -134,15 +118,6 @@ Registriere dich mit /register um loszulegen!
 
 👥 Team: ${getHelperNames(event)}
     `.trim())
-  })
-
-  // /idee - Aktivitäts-Idee
-  bot.command('idee', async (ctx) => {
-    const randomIdea = ACTIVITY_IDEAS[Math.floor(Math.random() * ACTIVITY_IDEAS.length)]
-    await ctx.reply(
-      `💡 **Idee für heute:**\n\n${randomIdea}\n\n_Nochmal /idee für eine neue Idee!_`,
-      { parse_mode: 'Markdown' }
-    )
   })
 
   // /mystatus - Meine Einsätze
@@ -223,7 +198,6 @@ Befehle:
 /status - Status für nächste Jungschar
 /next - Nächste Termine anzeigen
 /mystatus - Meine Einsätze
-/idee - Aktivitäts-Idee
 /kannnicht - Vertretung anfragen
 /help - Diese Hilfe anzeigen
 
@@ -275,6 +249,17 @@ Fragen? Sprich einen Admin an!
           const text = msg?.text || ''
           const entities = (msg as any)?.entities || []
 
+          // Persist vote in DB so the Thursday non-voter cron can find non-responders.
+          // Failures here must not break the in-message rendering below.
+          try {
+            const helper = await getHelperByTelegramId(telegramUserId)
+            if (helper && eventId) {
+              await recordVote(eventId, helper.id, isYes)
+            }
+          } catch (e) {
+            console.error('Failed to persist vote:', e)
+          }
+
           // Parse current votes from plain text
           const dabeiMatch = text.match(/✅ Dabei(?:\s*\(\d+\))?: (.+)/)
           const absagenMatch = text.match(/❌ Absagen(?:\s*\(\d+\))?: (.+)/)
@@ -315,35 +300,33 @@ Fragen? Sprich einen Admin an!
             // Message not modified (same content) — ignore
           }
 
+          // Big-Mode Reaction: Konfetti bei Zusage, traurig bei Absage.
+          // Failures hier dürfen die Vote-Logik nicht abreißen.
+          if (msg) {
+            const token = process.env.TELEGRAM_BOT_TOKEN
+            fetch(`https://api.telegram.org/bot${token}/setMessageReaction`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: msg.chat.id,
+                message_id: msg.message_id,
+                reaction: [{ type: 'emoji', emoji: isYes ? '🎉' : '😢' }],
+                is_big: true,
+              }),
+            }).catch((e) => console.error('Failed to set reaction:', e))
+          }
+
           await ctx.answerCallbackQuery({
             text: isYes ? '✅ Du bist dabei!' : '❌ Notiert!',
           })
           break
         }
 
-        case 'idea': {
-          // AI-Idee generieren und als PN senden
-          await ctx.answerCallbackQuery({ text: '💡 Idee wird generiert...' })
-
-          try {
-            const idea = await generateIdeaForEvent(event?.event_date || '')
-            const sent = await sendIdeaToUser(
-              telegramUserId,
-              `💡 <b>Idee für ${eventInfo}:</b>\n\n${idea}`
-            )
-
-            if (!sent) {
-              await ctx.reply(
-                `⚠️ ${userName}, ich kann dir keine Privatnachricht senden. ` +
-                `Bitte starte zuerst eine Unterhaltung mit mir (klicke auf meinen Namen und drücke /start).`
-              )
-            }
-          } catch (error) {
-            console.error('Error generating idea:', error)
-            await ctx.reply('Fehler beim Generieren der Idee. Versuche /idee im Chat.')
-          }
+        // Alte Idee-Buttons in archivierten Stage-2-Nachrichten:
+        // Klick stumm absorbieren (kein Toast), damit der Spinner verschwindet.
+        case 'idea':
+          await ctx.answerCallbackQuery()
           break
-        }
 
         // Legacy-Callbacks für alte Nachrichten
         case 'confirm':
