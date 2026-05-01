@@ -322,6 +322,12 @@ Fragen? Sprich einen Admin an!
           break
         }
 
+        // Alte Idee-Buttons in archivierten Stage-2-Nachrichten:
+        // Klick stumm absorbieren (kein Toast), damit der Spinner verschwindet.
+        case 'idea':
+          await ctx.answerCallbackQuery()
+          break
+
         // Legacy-Callbacks für alte Nachrichten
         case 'confirm':
         case 'ready':
