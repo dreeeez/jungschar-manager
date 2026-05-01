@@ -385,21 +385,6 @@ function pickBibleVerse() {
   return BIBLE_VERSES[Math.floor(Math.random() * BIBLE_VERSES.length)]
 }
 
-// Top-Header für Stage 3 — rotiert. Längere Titel wegen visueller
-// Balance im "+++ X +++" Wrap.
-const STAGE3_TOP_HEADERS = [
-  'HEUTE IST JUNGSCHAR',
-  'JUNGSCHAR-DAY IS HERE',
-  'GAME ON — JUNGSCHAR HEUTE',
-  'SHOWTIME — JUNGSCHAR HEUTE',
-  'T-0 — JETZT IST ES SOWEIT',
-  'DER GROSSE JUNGSCHAR-TAG',
-]
-
-function pickStage3TopHeader(): string {
-  return STAGE3_TOP_HEADERS[Math.floor(Math.random() * STAGE3_TOP_HEADERS.length)]
-}
-
 type Stage3Ctx = {
   verse: string
   reference: string
@@ -460,9 +445,7 @@ function generateStage3Message(_event: any): ReminderMessage {
     verse: verse.text,
     reference: verse.ref,
   }
-  return {
-    message: `+++ ${pickStage3TopHeader()} +++\n\n${pickStage3Template()(ctx)}`,
-  }
+  return { message: pickStage3Template()(ctx) }
 }
 
 /**
