@@ -82,7 +82,8 @@ async function wasReminderSent(eventId: string, reminderType: string): Promise<b
 }
 
 /**
- * Loggt eine gesendete Erinnerung
+ * Loggt eine gesendete Erinnerung. Upsert auf (event_id, reminder_type),
+ * damit Test-Reruns die message_id überschreiben statt zu crashen.
  */
 async function logReminder(
   eventId: string,
@@ -91,11 +92,14 @@ async function logReminder(
 ): Promise<void> {
   await getSupabase()
     .from('reminder_log')
-    .insert({
-      event_id: eventId,
-      reminder_type: reminderType,
-      message_id: messageId ?? null,
-    } as any)
+    .upsert(
+      {
+        event_id: eventId,
+        reminder_type: reminderType,
+        message_id: messageId ?? null,
+      } as any,
+      { onConflict: 'event_id,reminder_type' }
+    )
 }
 
 /**
@@ -307,9 +311,9 @@ export async function processReminders(chatId: string, testStage?: number) {
     if (reminder && reminderType) {
       const result = await sendTelegramMessage(chatId, reminder.message, reminder.replyMarkup)
       const messageId: number | undefined = result?.result?.message_id
-      if (!isTest) {
-        await logReminder(event.id, reminderType, messageId)
-      }
+      // Auch im Testmodus loggen, damit der Donnerstags-Reply-Test
+      // die message_id auflesen kann (Upsert vermeidet UNIQUE-Konflikte).
+      await logReminder(event.id, reminderType, messageId)
       results.push({
         event_id: event.id,
         event_date: event.event_date,
