@@ -398,37 +398,37 @@ const STAGE3_TEMPLATES: Array<(c: Stage3Ctx) => string> = [
   (c) =>
     `🌅 <b>Heute ist es soweit — Jungschar!</b>\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
-    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
 
   // 2. Coffee Mode
   (c) =>
     `☕ <b>Espresso doppelt — Jungschar-Modus on!</b>\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
-    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
 
   // 3. Showtime
   (c) =>
     `🎬 <b>Showtime!</b>\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
-    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
 
   // 4. Aufwachen-Crew
   (c) =>
     `🌅 <b>Aufstehen, Helfer-Crew!</b>\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
-    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
 
   // 5. Mission Control
   (c) =>
     `🚀 <b>Mission Control: Heute ist der Tag!</b>\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
-    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
 
   // 6. Powerwecker
   (c) =>
     `⏰ <b>Powerwecker — 3, 2, 1, JUNGSCHAR!</b>\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
-    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+    `Ihr schafft das heute! Viel Spaß und Gottes Segen 🙏`,
 ]
 
 function pickStage3Template(): (c: Stage3Ctx) => string {
