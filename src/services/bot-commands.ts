@@ -327,6 +327,22 @@ Fragen? Sprich einen Admin an!
             // Message not modified (same content) — ignore
           }
 
+          // Big-Mode Reaction: Konfetti bei Zusage, traurig bei Absage.
+          // Failures hier dürfen die Vote-Logik nicht abreißen.
+          if (msg) {
+            const token = process.env.TELEGRAM_BOT_TOKEN
+            fetch(`https://api.telegram.org/bot${token}/setMessageReaction`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: msg.chat.id,
+                message_id: msg.message_id,
+                reaction: [{ type: 'emoji', emoji: isYes ? '🎉' : '😢' }],
+                is_big: true,
+              }),
+            }).catch((e) => console.error('Failed to set reaction:', e))
+          }
+
           await ctx.answerCallbackQuery({
             text: isYes ? '✅ Du bist dabei!' : '❌ Notiert!',
           })

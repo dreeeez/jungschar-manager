@@ -1,6 +1,6 @@
 import { formatDate, getDaysUntil, getDayOfWeek } from '@/utils/format'
-import { getUpcomingEvents, getHelperNames, getHelperMentions } from './events'
-import { getParentDutyName } from './parents'
+import { getUpcomingEvents, getHelperTags } from './events'
+import { getParentDutyDisplay } from './parents'
 import { getSupabase } from './database'
 import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './weather'
 
@@ -152,7 +152,10 @@ function formatBirthdayLine(birthdays: string[]): string {
  */
 function formatWeatherLine(weather: WeatherForecast | null): string {
   if (!weather) return ''
-  return `🌤️ Wetter: ${weather.weather_description}, ${Math.round(weather.temperature_min)}–${Math.round(weather.temperature_max)}°C` +
+  const min = Math.round(weather.temperature_min)
+  const max = Math.round(weather.temperature_max)
+  const tempStr = min === max ? `${max}°C` : `${min}–${max}°C`
+  return `🌤️ Wetter: ${weather.weather_description}, ${tempStr}` +
     (weather.precipitation_probability > 30 ? ` (☔ ${weather.precipitation_probability}%)` : '') +
     '\n'
 }
@@ -175,17 +178,15 @@ async function fetchWeatherForEvent(eventDate: string): Promise<WeatherForecast 
  * Event-Ankündigung mit Team und Elterndienst
  */
 function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: string[]): ReminderMessage {
-  const helperNames = getHelperNames(event)
-  const mentions = getHelperMentions(event)
-  const parentName = getParentDutyName(event)
+  const teamTags = getHelperTags(event)
+  const parentDisplay = getParentDutyDisplay(event)
 
   return {
     message: `📅 <b>Nächste Woche ist Jungschar!</b>\n\n` +
       `📆 ${formatDate(event.event_date)}\n` +
       `${formatWeatherLine(weather)}` +
-      `👥 Team: ${helperNames}\n` +
-      `${mentions ? `${mentions} - ihr seid dran!\n` : ''}` +
-      `🍽️ Essen: ${parentName}\n` +
+      `👥 Team: ${teamTags} - ihr seid dran!\n` +
+      `🍽️ Essen: ${parentDisplay}\n` +
       `${formatBirthdayLine(birthdays)}` +
       `\nFangt an zu planen!`,
   }
@@ -201,26 +202,18 @@ function generateStage2Message(
   weather: WeatherForecast | null,
   birthdays: string[]
 ): ReminderMessage {
-  const helperNames = getHelperNames(event)
-  const mentions = getHelperMentions(event)
+  const teamTags = getHelperTags(event)
 
   return {
-    message: `🤔 <b>Wie ist der Status?</b>\n\n` +
-      `Noch <b>${daysUntil} Tage</b> bis zur Jungschar!\n` +
+    message: `🔥 <b>Countdown: ${daysUntil} Tage</b>\n\n` +
       `📆 ${formatDate(event.event_date)}\n` +
       `${formatWeatherLine(weather)}` +
-      `👥 Team: ${helperNames}\n` +
-      `${mentions ? `${mentions}\n` : ''}` +
+      `👥 Team: ${teamTags}\n` +
       `${formatBirthdayLine(birthdays)}` +
-      `\n━━━━━━━━━━━━━━━\n\n` +
-      `📋 <b>Checkliste:</b>\n` +
-      `⚠️ Eltern wegen Essen kontaktiert? — <b>Frist HEUTE!</b>\n` +
-      `• Steht das Programm?\n` +
-      `• Material vorbereitet?\n` +
-      `• Kinderstunde vorbereitet?\n` +
-      `• Programm in Elternchat kommuniziert?\n` +
-      `\n━━━━━━━━━━━━━━━\n\n` +
-      `📊 <b>Wer ist dabei?</b>\n\n` +
+      `\n📋 <b>Checkliste:</b>\n` +
+      `⚠️ Eltern (Essen) — <b>Frist HEUTE!</b>\n` +
+      `☑️ Programm · Material · Kinderstunde · Eltern-Chat\n` +
+      `\n📊 <b>Wer ist dabei?</b>\n\n` +
       `✅ Dabei: —\n` +
       `❌ Absagen: —`,
     replyMarkup: {
@@ -242,15 +235,13 @@ function generateStage2Message(
  * Final Reminder, kurz und ermutigend
  */
 function generateStage3Message(event: any, daysUntil: number): ReminderMessage {
-  const helperNames = getHelperNames(event)
-  const mentions = getHelperMentions(event)
+  const teamTags = getHelperTags(event)
   const dayWord = daysUntil === 1 ? 'morgen' : 'übermorgen'
 
   return {
     message: `🔔 <b>Jungschar ist ${dayWord}!</b>\n\n` +
       `📆 ${formatDate(event.event_date)}\n` +
-      `👥 Team: ${helperNames}\n` +
-      `${mentions ? `${mentions}\n` : ''}\n` +
+      `👥 Team: ${teamTags}\n\n` +
       `Ihr schafft das! Viel Spaß und Gottes Segen! 🙏`,
   }
 }

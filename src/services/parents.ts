@@ -15,15 +15,44 @@ export async function getAllParents() {
 /**
  * Erstellt ein neues Elternteil
  */
-export async function createParent(name: string, phone?: string) {
+export async function createParent(
+  name: string,
+  phone?: string,
+  telegramUsername?: string
+) {
   const { data, error } = await getSupabase()
     .from('parents')
-    .insert({ name, phone: phone || null } as any)
+    .insert({
+      name,
+      phone: phone || null,
+      telegram_username: telegramUsername || null,
+    } as any)
     .select()
     .single()
 
   if (error) throw error
   return data
+}
+
+/**
+ * Aktualisiert ein Elternteil (z.B. um nachträglich einen
+ * Telegram-Tag zu hinterlegen).
+ */
+export async function updateParent(
+  parentId: string,
+  patch: { name?: string; phone?: string | null; telegramUsername?: string | null }
+) {
+  const update: Record<string, unknown> = {}
+  if (patch.name !== undefined) update.name = patch.name
+  if (patch.phone !== undefined) update.phone = patch.phone
+  if (patch.telegramUsername !== undefined) update.telegram_username = patch.telegramUsername
+
+  const { error } = await getSupabase()
+    .from('parents')
+    .update(update as any)
+    .eq('id', parentId)
+
+  if (error) throw error
 }
 
 /**
@@ -88,4 +117,18 @@ export async function getParentDutyForEvent(eventId: string) {
 export function getParentDutyName(event: any): string {
   const duty = event?.parent_duties?.[0]
   return duty?.parent?.name || 'Noch nicht eingeteilt'
+}
+
+/**
+ * Extrahiert Name + (optional) Telegram-Tag des zugewiesenen
+ * Elternteils, sodass die Helfer direkt anschreiben können.
+ * Beispiel: "Familie Müller @muellerfamily"
+ */
+export function getParentDutyDisplay(event: any): string {
+  const duty = event?.parent_duties?.[0]
+  const parent = duty?.parent
+  if (!parent) return 'Noch nicht eingeteilt'
+  return parent.telegram_username
+    ? `${parent.name} @${parent.telegram_username}`
+    : parent.name
 }

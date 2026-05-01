@@ -228,6 +228,7 @@ export interface Database {
           id: string
           name: string
           phone: string | null
+          telegram_username: string | null
           notes: string | null
           active: boolean
           created_at: string
@@ -236,6 +237,7 @@ export interface Database {
           id?: string
           name: string
           phone?: string | null
+          telegram_username?: string | null
           notes?: string | null
           active?: boolean
           created_at?: string
@@ -244,6 +246,7 @@ export interface Database {
           id?: string
           name?: string
           phone?: string | null
+          telegram_username?: string | null
           notes?: string | null
           active?: boolean
           created_at?: string

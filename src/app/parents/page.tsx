@@ -9,7 +9,12 @@ interface Parent {
   id: string
   name: string
   phone: string | null
+  telegram_username: string | null
   active: boolean
+}
+
+function stripAt(s: string): string {
+  return s.trim().replace(/^@+/, '')
 }
 
 export default function ParentsPage() {
@@ -18,6 +23,10 @@ export default function ParentsPage() {
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
+  const [newTag, setNewTag] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editPhone, setEditPhone] = useState('')
+  const [editTag, setEditTag] = useState('')
 
   useEffect(() => {
     fetchParents()
@@ -46,15 +55,49 @@ export default function ParentsPage() {
 
     const { error } = await (supabase as any)
       .from('parents')
-      .insert({ name: newName.trim(), phone: newPhone.trim() || null })
+      .insert({
+        name: newName.trim(),
+        phone: newPhone.trim() || null,
+        telegram_username: stripAt(newTag) || null,
+      })
 
     if (error) {
       showAlert('Fehler beim Hinzufügen: ' + error.message)
     } else {
       setNewName('')
       setNewPhone('')
+      setNewTag('')
       fetchParents()
     }
+  }
+
+  function startEdit(parent: Parent) {
+    setEditingId(parent.id)
+    setEditPhone(parent.phone || '')
+    setEditTag(parent.telegram_username || '')
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditPhone('')
+    setEditTag('')
+  }
+
+  async function saveEdit(parentId: string) {
+    const { error } = await (supabase as any)
+      .from('parents')
+      .update({
+        phone: editPhone.trim() || null,
+        telegram_username: stripAt(editTag) || null,
+      })
+      .eq('id', parentId)
+
+    if (error) {
+      showAlert('Fehler beim Speichern: ' + error.message)
+      return
+    }
+    cancelEdit()
+    fetchParents()
   }
 
   async function deleteParent(id: string, name: string) {
@@ -112,6 +155,13 @@ export default function ParentsPage() {
           placeholder="Telefon (optional)"
           className="w-full px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
         />
+        <input
+          type="text"
+          value={newTag}
+          onChange={(e) => setNewTag(e.target.value)}
+          placeholder="Telegram-Tag, z.B. @muellerfamily (optional)"
+          className="w-full px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
+        />
       </div>
 
       {/* Parent list */}
@@ -121,25 +171,79 @@ export default function ParentsPage() {
             Noch keine Eltern vorhanden
           </p>
         ) : (
-          parents.map((parent) => (
-            <div
-              key={parent.id}
-              className="flex items-center justify-between p-4 bg-tg-secondary-bg rounded-xl"
-            >
-              <div>
-                <p className="font-medium">{parent.name}</p>
-                {parent.phone && (
-                  <p className="text-sm text-tg-hint">{parent.phone}</p>
+          parents.map((parent) => {
+            const isEditing = editingId === parent.id
+            return (
+              <div
+                key={parent.id}
+                className="p-4 bg-tg-secondary-bg rounded-xl"
+              >
+                {!isEditing ? (
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{parent.name}</p>
+                      {parent.phone && (
+                        <p className="text-sm text-tg-hint">{parent.phone}</p>
+                      )}
+                      {parent.telegram_username ? (
+                        <p className="text-sm text-tg-link">@{parent.telegram_username}</p>
+                      ) : (
+                        <p className="text-sm text-tg-hint italic">kein Telegram-Tag</p>
+                      )}
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={() => startEdit(parent)}
+                        className="text-tg-link p-2"
+                        aria-label="Bearbeiten"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => deleteParent(parent.id, parent.name)}
+                        className="text-red-500 p-2"
+                        aria-label="Löschen"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="font-medium">{parent.name}</p>
+                    <input
+                      type="tel"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      placeholder="Telefon (optional)"
+                      className="w-full px-3 py-2 bg-tg-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={editTag}
+                      onChange={(e) => setEditTag(e.target.value)}
+                      placeholder="Telegram-Tag, z.B. @muellerfamily"
+                      className="w-full px-3 py-2 bg-tg-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button text-sm"
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={cancelEdit}
+                        className="px-3 py-1.5 text-sm text-tg-hint"
+                      >
+                        Abbrechen
+                      </button>
+                      <button
+                        onClick={() => saveEdit(parent.id)}
+                        className="px-3 py-1.5 text-sm bg-tg-button text-tg-button-text rounded-lg font-medium"
+                      >
+                        Speichern
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
-              <button
-                onClick={() => deleteParent(parent.id, parent.name)}
-                className="text-red-500 p-2"
-              >
-                🗑️
-              </button>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </main>
