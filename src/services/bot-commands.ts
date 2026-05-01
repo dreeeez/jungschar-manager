@@ -3,7 +3,6 @@ import { formatDate } from '@/utils/format'
 import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './helpers'
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { getSupabase } from './database'
-import { generateIdeaForEvent, sendIdeaToUser } from './ai-ideas'
 import { recordVote } from './attendance'
 
 // Track pending registrations (in-memory, resets on cold start)
@@ -48,22 +47,6 @@ function rebuildHtml(text: string, entities: any[]): string {
   result += escapeHtml(text.slice(pos))
   return result
 }
-
-// Aktivitäts-Ideen für /idee Command
-const ACTIVITY_IDEAS = [
-  '🎨 **Kreativ-Werkstatt**: Malt gemeinsam ein großes Bild zum Thema "Gottes Schöpfung"',
-  '🏃 **Schnitzeljagd**: Versteckt Hinweise im Gemeindehaus mit Bibelversen',
-  '🎭 **Theaterspiel**: Spielt eine Geschichte aus der Bibel nach (z.B. David & Goliath)',
-  '🧩 **Escape Room**: Löst Rätsel um eine "Schatztruhe" zu öffnen',
-  '🍪 **Back-Aktion**: Backt gemeinsam Kekse für Senioren in der Gemeinde',
-  '🎵 **Musik-Session**: Lernt ein neues Lied mit Bewegungen',
-  '⚽ **Sport-Olympiade**: Verschiedene Stationen mit kleinen Wettkämpfen',
-  '🔬 **Experimente**: Einfache Experimente die Gottes Wunder zeigen',
-  '📖 **Bibelquiz**: Teams treten gegeneinander an',
-  '🌳 **Natur-Rallye**: Erkundet die Natur und sammelt Schätze',
-  '🎲 **Spieleabend**: Brettspiele und Gemeinschaft',
-  '✉️ **Briefaktion**: Schreibt ermutigende Briefe an Gemeindemitglieder',
-]
 
 /**
  * Richtet alle Bot Commands ein
@@ -135,15 +118,6 @@ Registriere dich mit /register um loszulegen!
 
 👥 Team: ${getHelperNames(event)}
     `.trim())
-  })
-
-  // /idee - Aktivitäts-Idee
-  bot.command('idee', async (ctx) => {
-    const randomIdea = ACTIVITY_IDEAS[Math.floor(Math.random() * ACTIVITY_IDEAS.length)]
-    await ctx.reply(
-      `💡 **Idee für heute:**\n\n${randomIdea}\n\n_Nochmal /idee für eine neue Idee!_`,
-      { parse_mode: 'Markdown' }
-    )
   })
 
   // /mystatus - Meine Einsätze
@@ -224,7 +198,6 @@ Befehle:
 /status - Status für nächste Jungschar
 /next - Nächste Termine anzeigen
 /mystatus - Meine Einsätze
-/idee - Aktivitäts-Idee
 /kannnicht - Vertretung anfragen
 /help - Diese Hilfe anzeigen
 
@@ -346,30 +319,6 @@ Fragen? Sprich einen Admin an!
           await ctx.answerCallbackQuery({
             text: isYes ? '✅ Du bist dabei!' : '❌ Notiert!',
           })
-          break
-        }
-
-        case 'idea': {
-          // AI-Idee generieren und als PN senden
-          await ctx.answerCallbackQuery({ text: '💡 Idee wird generiert...' })
-
-          try {
-            const idea = await generateIdeaForEvent(event?.event_date || '')
-            const sent = await sendIdeaToUser(
-              telegramUserId,
-              `💡 <b>Idee für ${eventInfo}:</b>\n\n${idea}`
-            )
-
-            if (!sent) {
-              await ctx.reply(
-                `⚠️ ${userName}, ich kann dir keine Privatnachricht senden. ` +
-                `Bitte starte zuerst eine Unterhaltung mit mir (klicke auf meinen Namen und drücke /start).`
-              )
-            }
-          } catch (error) {
-            console.error('Error generating idea:', error)
-            await ctx.reply('Fehler beim Generieren der Idee. Versuche /idee im Chat.')
-          }
           break
         }
 

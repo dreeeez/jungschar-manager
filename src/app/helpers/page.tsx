@@ -17,7 +17,6 @@ export default function HelpersPage() {
   const { showAlert, showConfirm } = useTelegram()
   const [helpers, setHelpers] = useState<Helper[]>([])
   const [loading, setLoading] = useState(true)
-  const [newName, setNewName] = useState('')
 
   useEffect(() => {
     fetchHelpers()
@@ -35,24 +34,6 @@ export default function HelpersPage() {
       setHelpers(data || [])
     }
     setLoading(false)
-  }
-
-  async function addHelper() {
-    if (!newName.trim()) {
-      showAlert('Bitte einen Namen eingeben')
-      return
-    }
-
-    const { error } = await supabase
-      .from('helpers')
-      .insert({ name: newName.trim() } as any)
-
-    if (error) {
-      showAlert('Fehler beim Hinzufügen: ' + error.message)
-    } else {
-      setNewName('')
-      fetchHelpers()
-    }
   }
 
   async function deleteHelper(id: string, name: string) {
@@ -86,22 +67,10 @@ export default function HelpersPage() {
         <h1 className="text-xl font-bold">Helfer verwalten</h1>
       </div>
 
-      {/* Add new helper */}
-      <div className="flex gap-2 mb-6">
-        <input
-          type="text"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="Neuer Helfer..."
-          className="flex-1 px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
-        />
-        <button
-          onClick={addHelper}
-          className="px-4 py-2 bg-tg-button text-tg-button-text rounded-lg font-medium"
-        >
-          +
-        </button>
-      </div>
+      {/* Hinweis: neue Helfer registrieren sich selbst per /register im Bot */}
+      <p className="text-sm text-tg-hint mb-6">
+        Neue Helfer registrieren sich selbst im Bot mit <b>/register</b>.
+      </p>
 
       {/* Helper list */}
       <div className="space-y-2">

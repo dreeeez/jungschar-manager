@@ -161,6 +161,19 @@ function formatWeatherLine(weather: WeatherForecast | null): string {
 }
 
 /**
+ * Wetter als Inline-Suffix für die Datumszeile (Stage 2),
+ * z.B. " · Teilweise bewölkt, 25°C".
+ */
+function formatWeatherInline(weather: WeatherForecast | null): string {
+  if (!weather) return ''
+  const min = Math.round(weather.temperature_min)
+  const max = Math.round(weather.temperature_max)
+  const tempStr = min === max ? `${max}°C` : `${min}–${max}°C`
+  return ` · ${weather.weather_description}, ${tempStr}` +
+    (weather.precipitation_probability > 30 ? ` (Regen ${weather.precipitation_probability}%)` : '')
+}
+
+/**
  * Holt die Wettervorhersage für ein Event-Datum
  */
 async function fetchWeatherForEvent(eventDate: string): Promise<WeatherForecast | null> {
@@ -203,17 +216,20 @@ function generateStage2Message(
   birthdays: string[]
 ): ReminderMessage {
   const teamTags = getHelperTags(event)
+  const dayWord = daysUntil === 1 ? 'Tag' : 'Tage'
+  const weatherSuffix = formatWeatherInline(weather)
 
   return {
-    message: `🔥 <b>Countdown: ${daysUntil} Tage</b>\n\n` +
-      `📆 ${formatDate(event.event_date)}\n` +
-      `${formatWeatherLine(weather)}` +
-      `👥 Team: ${teamTags}\n` +
+    message: `+++ 🔥 <b>Countdown: ${daysUntil} ${dayWord}</b> 🔥 +++\n` +
+      `${formatDate(event.event_date)}${weatherSuffix}\n` +
+      `Team: ${teamTags}\n` +
       `${formatBirthdayLine(birthdays)}` +
-      `\n📋 <b>Checkliste:</b>\n` +
-      `⚠️ Eltern (Essen) — <b>Frist HEUTE!</b>\n` +
-      `☑️ Programm · Material · Kinderstunde · Eltern-Chat\n` +
-      `\n📊 <b>Wer ist dabei?</b>\n\n` +
+      `\n📋 <b>Checkliste</b> — Eltern (Essen) heute!\n` +
+      `☐ Programm\n` +
+      `☐ Material\n` +
+      `☐ Kinderstunde\n` +
+      `☐ Eltern-Chat\n` +
+      `\n📊 <b>Wer ist dabei?</b>\n` +
       `✅ Dabei: —\n` +
       `❌ Absagen: —`,
     replyMarkup: {
@@ -221,9 +237,6 @@ function generateStage2Message(
         [
           { text: '✅ Bin dabei!', callback_data: `votey_${event.id}` },
           { text: '❌ Kann nicht', callback_data: `voten_${event.id}` },
-        ],
-        [
-          { text: '💡 Wir brauchen eine Idee!', callback_data: `idea_${event.id}` },
         ],
       ],
     },
