@@ -277,7 +277,7 @@ export async function processReminders(chatId: string, testStage?: number) {
     let reminderType: string | null = null
 
     // Stufe 1: Sonntag, 6-8 Tage vorher
-    if (testStage === 1 || (dayOfWeek === 0 && daysUntil >= 6 && daysUntil <= 8)) {
+    if (testStage === 1 || (!isTest && dayOfWeek === 0 && daysUntil >= 6 && daysUntil <= 8)) {
       reminderType = STAGE_SUNDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         const [weather, birthdays] = await Promise.all([
@@ -289,7 +289,7 @@ export async function processReminders(chatId: string, testStage?: number) {
     }
 
     // Stufe 2: Mittwoch, 3-4 Tage vorher
-    if (testStage === 2 || (dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4)) {
+    if (testStage === 2 || (!isTest && dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4)) {
       reminderType = STAGE_WEDNESDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         const [weather, birthdays] = await Promise.all([
@@ -301,7 +301,7 @@ export async function processReminders(chatId: string, testStage?: number) {
     }
 
     // Stufe 3: Freitag, 1-2 Tage vorher
-    if (testStage === 3 || (dayOfWeek === 5 && daysUntil >= 1 && daysUntil <= 2)) {
+    if (testStage === 3 || (!isTest && dayOfWeek === 5 && daysUntil >= 1 && daysUntil <= 2)) {
       reminderType = STAGE_FRIDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         reminder = generateStage3Message(event, daysUntil)
