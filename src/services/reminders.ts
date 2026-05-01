@@ -291,11 +291,13 @@ function pickStage1Template(): (c: Stage1Ctx) => string {
 }
 
 // Top-Header für Stage 1 — rotiert unabhängig vom Theme.
+// Bewusst etwas länger gehalten, sonst wirken kurze Titel im "+++ X +++"
+// Wrap visuell unausgewogen.
 const STAGE1_TOP_HEADERS = [
-  'NEWS',
+  'JUNGSCHAR NEWS',
   'JUNGSCHAR INTEL',
-  'HEADS-UP',
-  'NÄCHSTE WOCHE',
+  'HEADS-UP — NÄCHSTE WOCHE',
+  'NÄCHSTE WOCHE JUNGSCHAR',
   '📣 ANKÜNDIGUNG',
 ]
 
@@ -383,14 +385,15 @@ function pickBibleVerse() {
   return BIBLE_VERSES[Math.floor(Math.random() * BIBLE_VERSES.length)]
 }
 
-// Top-Header für Stage 3 — rotiert.
+// Top-Header für Stage 3 — rotiert. Längere Titel wegen visueller
+// Balance im "+++ X +++" Wrap.
 const STAGE3_TOP_HEADERS = [
-  'HEUTE',
-  'JUNGSCHAR-DAY',
-  'GAME ON',
-  'SHOWTIME',
-  'T-0',
-  'DER TAG',
+  'HEUTE IST JUNGSCHAR',
+  'JUNGSCHAR-DAY IS HERE',
+  'GAME ON — JUNGSCHAR HEUTE',
+  'SHOWTIME — JUNGSCHAR HEUTE',
+  'T-0 — JETZT IST ES SOWEIT',
+  'DER GROSSE JUNGSCHAR-TAG',
 ]
 
 function pickStage3TopHeader(): string {
@@ -398,58 +401,47 @@ function pickStage3TopHeader(): string {
 }
 
 type Stage3Ctx = {
-  team: string
   verse: string
   reference: string
 }
 
 // 6 themed Stage-3-Greetings für Samstag morgen (Tag des Events).
+// Kompakt — kein Team, keine Sekundär-Greeting-Zeile, nur Theme +
+// Bibelvers + Closing.
 const STAGE3_TEMPLATES: Array<(c: Stage3Ctx) => string> = [
   // 1. Klassisch
   (c) =>
     `🌅 <b>Heute ist es soweit — Jungschar!</b>\n\n` +
-    `Gut geschlafen, Helfer-Team? Heute zählen die Kids auf euch.\n` +
-    `Team: ${c.team}\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
     `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
 
   // 2. Coffee Mode
   (c) =>
     `☕ <b>Espresso doppelt — Jungschar-Modus on!</b>\n\n` +
-    `Heute heißt es: wach werden, Kinderaugen leuchten lassen.\n` +
-    `Team: ${c.team}\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
     `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
 
   // 3. Showtime
   (c) =>
     `🎬 <b>Showtime!</b>\n\n` +
-    `Vorhang auf, Bühne frei. Eure Show beginnt heute.\n` +
-    `Team: ${c.team}\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
     `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
 
   // 4. Aufwachen-Crew
   (c) =>
     `🌅 <b>Aufstehen, Helfer-Crew!</b>\n\n` +
-    `Heute geht's los — die Kids freuen sich auf euch.\n` +
-    `Team: ${c.team}\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
     `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
 
   // 5. Mission Control
   (c) =>
     `🚀 <b>Mission Control: Heute ist der Tag!</b>\n\n` +
-    `Treibstoff prüfen, Lächeln aufsetzen, Countdown läuft.\n` +
-    `Team: ${c.team}\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
     `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
 
   // 6. Powerwecker
   (c) =>
     `⏰ <b>Powerwecker — 3, 2, 1, JUNGSCHAR!</b>\n\n` +
-    `Augen auf, Herz an. Heute ist euer Tag.\n` +
-    `Team: ${c.team}\n\n` +
     `📖 „${c.verse}"\n— ${c.reference}\n\n` +
     `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
 ]
@@ -462,10 +454,9 @@ function pickStage3Template(): (c: Stage3Ctx) => string {
  * STUFE 3 — Samstag morgen (Tag des Events)
  * Aufwacher-Gruß mit themed Greeting + rotierendem Bibelvers.
  */
-function generateStage3Message(event: any): ReminderMessage {
+function generateStage3Message(_event: any): ReminderMessage {
   const verse = pickBibleVerse()
   const ctx: Stage3Ctx = {
-    team: getHelperTags(event),
     verse: verse.text,
     reference: verse.ref,
   }
