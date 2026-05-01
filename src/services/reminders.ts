@@ -12,7 +12,7 @@ interface ReminderMessage {
 // Reminder-Typen für Duplikat-Schutz
 const STAGE_SUNDAY = 'stage1_sunday'
 const STAGE_WEDNESDAY = 'stage2_wednesday'
-const STAGE_FRIDAY = 'stage3_friday'
+const STAGE_SATURDAY = 'stage3_saturday'
 
 /**
  * Sendet eine Nachricht an Telegram
@@ -102,13 +102,15 @@ async function logReminder(
     )
 }
 
+type Birthday = { name: string; dayMonth: string; age: number }
+
 /**
- * Findet Kinder mit Geburtstag in der Woche des Events (Mo-So)
+ * Findet Kinder mit Geburtstag im Zeitraum ±3 Tage um das Event und
+ * gibt strukturierte Daten zurück (Name, Tag/Monat, Alter).
  */
-async function getBirthdaysAroundEvent(eventDate: string): Promise<string[]> {
+async function getBirthdaysAroundEvent(eventDate: string): Promise<Birthday[]> {
   try {
     const event = new Date(eventDate)
-    // Woche um das Event: 3 Tage vorher bis 3 Tage nachher
     const from = new Date(event)
     from.setDate(from.getDate() - 3)
     const to = new Date(event)
@@ -125,14 +127,18 @@ async function getBirthdaysAroundEvent(eventDate: string): Promise<string[]> {
     return data
       .filter((child: any) => {
         const bday = new Date(child.birthday)
-        // Geburtstag im selben Zeitraum prüfen (Monat + Tag)
         const bdayThisYear = new Date(event.getFullYear(), bday.getMonth(), bday.getDate())
         return bdayThisYear >= from && bdayThisYear <= to
       })
       .map((child: any) => {
         const bday = new Date(child.birthday)
         const age = event.getFullYear() - bday.getFullYear()
-        return `${child.name} (wird ${age})`
+        const bdayThisYear = new Date(event.getFullYear(), bday.getMonth(), bday.getDate())
+        return {
+          name: child.name,
+          dayMonth: bdayThisYear.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
+          age,
+        }
       })
   } catch {
     return []
@@ -140,11 +146,13 @@ async function getBirthdaysAroundEvent(eventDate: string): Promise<string[]> {
 }
 
 /**
- * Formatiert die Geburtstags-Zeile
+ * Geburtstags-Block: ein Header + eine Zeile pro Kind mit
+ * Kind-Emoji, Name, Datum und Alter.
  */
-function formatBirthdayLine(birthdays: string[]): string {
+function formatBirthdayLine(birthdays: Birthday[]): string {
   if (birthdays.length === 0) return ''
-  return `🎂 Geburtstag diese Woche: ${birthdays.join(', ')}\n`
+  const lines = birthdays.map((b) => `🧒 ${b.name} — ${b.dayMonth} (wird ${b.age})`).join('\n')
+  return `🎂 <b>Geburtstag diese Woche:</b>\n${lines}\n`
 }
 
 /**
@@ -282,7 +290,20 @@ function pickStage1Template(): (c: Stage1Ctx) => string {
   return STAGE1_TEMPLATES[Math.floor(Math.random() * STAGE1_TEMPLATES.length)]
 }
 
-function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: string[]): ReminderMessage {
+// Top-Header für Stage 1 — rotiert unabhängig vom Theme.
+const STAGE1_TOP_HEADERS = [
+  'NEWS',
+  'JUNGSCHAR INTEL',
+  'HEADS-UP',
+  'NÄCHSTE WOCHE',
+  '📣 ANKÜNDIGUNG',
+]
+
+function pickStage1TopHeader(): string {
+  return STAGE1_TOP_HEADERS[Math.floor(Math.random() * STAGE1_TOP_HEADERS.length)]
+}
+
+function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: Birthday[]): ReminderMessage {
   const ctx: Stage1Ctx = {
     date: formatDate(event.event_date),
     emoji: weatherEmoji(weather),
@@ -292,7 +313,9 @@ function generateStage1Message(event: any, weather: WeatherForecast | null, birt
     parent: getParentDutyDisplay(event),
     birthdayLine: formatBirthdayLine(birthdays),
   }
-  return { message: pickStage1Template()(ctx) }
+  return {
+    message: `+++ ${pickStage1TopHeader()} +++\n\n${pickStage1Template()(ctx)}`,
+  }
 }
 
 /**
@@ -303,7 +326,7 @@ function generateStage2Message(
   event: any,
   daysUntil: number,
   weather: WeatherForecast | null,
-  birthdays: string[]
+  birthdays: Birthday[]
 ): ReminderMessage {
   const teamTags = getHelperTags(event)
   const dayWord = daysUntil === 1 ? 'Tag' : 'Tage'
@@ -332,19 +355,122 @@ function generateStage2Message(
   }
 }
 
-/**
- * STUFE 3 — Freitag (1-2 Tage vorher)
- * Final Reminder, kurz und ermutigend
- */
-function generateStage3Message(event: any, daysUntil: number): ReminderMessage {
-  const teamTags = getHelperTags(event)
-  const dayWord = daysUntil === 1 ? 'morgen' : 'übermorgen'
+// Bibelvers-Pool für Stage 3 (Samstag morgen). Mix aus Helfer-Kontext
+// (Kinder, Dienst, Weisheit) und allgemein motivierenden Versen.
+// Schlachter/Luther-nah übersetzt.
+const BIBLE_VERSES: Array<{ ref: string; text: string }> = [
+  { ref: 'Josua 1,9', text: 'Sei stark und mutig! Hab keine Angst und verzage nicht; denn der HERR, dein Gott, ist mit dir überall, wo du hingehst.' },
+  { ref: 'Philipper 4,13', text: 'Ich vermag alles durch den, der mich kräftig macht, Christus.' },
+  { ref: 'Kolosser 3,23', text: 'Alles, was ihr tut, das tut von Herzen als dem Herrn und nicht den Menschen.' },
+  { ref: 'Matthäus 19,14', text: 'Lasst die Kinder zu mir kommen und hindert sie nicht; denn solchen wie ihnen gehört das Reich Gottes.' },
+  { ref: '2. Timotheus 1,7', text: 'Gott hat uns nicht gegeben den Geist der Furcht, sondern der Kraft und der Liebe und der Besonnenheit.' },
+  { ref: '1. Korinther 16,14', text: 'Alles, was ihr tut, das tut in Liebe!' },
+  { ref: 'Sprüche 3,5–6', text: 'Verlass dich auf den HERRN von ganzem Herzen … so wird er deine Pfade ebnen.' },
+  { ref: 'Matthäus 5,16', text: 'Lasst euer Licht leuchten vor den Leuten, damit sie eure guten Werke sehen und euren Vater im Himmel preisen.' },
+  { ref: 'Jesaja 41,10', text: 'Fürchte dich nicht, ich bin mit dir … Ich stärke dich, ich helfe dir auch.' },
+  { ref: 'Jakobus 1,5', text: 'Wenn aber jemandem unter euch Weisheit mangelt, so bitte er Gott, der allen gern und ohne Vorwurf gibt.' },
+  { ref: 'Galater 6,9', text: 'Lasst uns aber Gutes tun und nicht müde werden; denn zu seiner Zeit werden wir ernten, wenn wir nicht nachlassen.' },
+  { ref: 'Sprüche 16,3', text: 'Befiehl dem HERRN deine Werke, so wird er deine Pläne festigen.' },
+  { ref: 'Psalm 16,11', text: 'Vor dir ist Freude die Fülle und Wonne zu deiner Rechten ewiglich.' },
+  { ref: 'Epheser 4,32', text: 'Seid aber untereinander freundlich und herzlich und vergebt einander.' },
+  { ref: '5. Mose 31,6', text: 'Seid stark und mutig! … denn der HERR, dein Gott, geht selbst mit dir.' },
+  { ref: 'Hebräer 12,1', text: 'Lasst uns mit Geduld laufen in dem Kampf, der uns bestimmt ist.' },
+  { ref: 'Römer 12,11', text: 'Seid nicht träge in dem, was ihr tun sollt. Seid brennend im Geist. Dient dem Herrn.' },
+  { ref: 'Psalm 118,24', text: 'Dies ist der Tag, den der HERR gemacht hat; lasst uns freuen und fröhlich an ihm sein.' },
+]
 
+function pickBibleVerse() {
+  return BIBLE_VERSES[Math.floor(Math.random() * BIBLE_VERSES.length)]
+}
+
+// Top-Header für Stage 3 — rotiert.
+const STAGE3_TOP_HEADERS = [
+  'HEUTE',
+  'JUNGSCHAR-DAY',
+  'GAME ON',
+  'SHOWTIME',
+  'T-0',
+  'DER TAG',
+]
+
+function pickStage3TopHeader(): string {
+  return STAGE3_TOP_HEADERS[Math.floor(Math.random() * STAGE3_TOP_HEADERS.length)]
+}
+
+type Stage3Ctx = {
+  team: string
+  verse: string
+  reference: string
+}
+
+// 6 themed Stage-3-Greetings für Samstag morgen (Tag des Events).
+const STAGE3_TEMPLATES: Array<(c: Stage3Ctx) => string> = [
+  // 1. Klassisch
+  (c) =>
+    `🌅 <b>Heute ist es soweit — Jungschar!</b>\n\n` +
+    `Gut geschlafen, Helfer-Team? Heute zählen die Kids auf euch.\n` +
+    `Team: ${c.team}\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+
+  // 2. Coffee Mode
+  (c) =>
+    `☕ <b>Espresso doppelt — Jungschar-Modus on!</b>\n\n` +
+    `Heute heißt es: wach werden, Kinderaugen leuchten lassen.\n` +
+    `Team: ${c.team}\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+
+  // 3. Showtime
+  (c) =>
+    `🎬 <b>Showtime!</b>\n\n` +
+    `Vorhang auf, Bühne frei. Eure Show beginnt heute.\n` +
+    `Team: ${c.team}\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+
+  // 4. Aufwachen-Crew
+  (c) =>
+    `🌅 <b>Aufstehen, Helfer-Crew!</b>\n\n` +
+    `Heute geht's los — die Kids freuen sich auf euch.\n` +
+    `Team: ${c.team}\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+
+  // 5. Mission Control
+  (c) =>
+    `🚀 <b>Mission Control: Heute ist der Tag!</b>\n\n` +
+    `Treibstoff prüfen, Lächeln aufsetzen, Countdown läuft.\n` +
+    `Team: ${c.team}\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+
+  // 6. Powerwecker
+  (c) =>
+    `⏰ <b>Powerwecker — 3, 2, 1, JUNGSCHAR!</b>\n\n` +
+    `Augen auf, Herz an. Heute ist euer Tag.\n` +
+    `Team: ${c.team}\n\n` +
+    `📖 „${c.verse}"\n— ${c.reference}\n\n` +
+    `Ihr schafft das! Viel Spaß und Gottes Segen 🙏`,
+]
+
+function pickStage3Template(): (c: Stage3Ctx) => string {
+  return STAGE3_TEMPLATES[Math.floor(Math.random() * STAGE3_TEMPLATES.length)]
+}
+
+/**
+ * STUFE 3 — Samstag morgen (Tag des Events)
+ * Aufwacher-Gruß mit themed Greeting + rotierendem Bibelvers.
+ */
+function generateStage3Message(event: any): ReminderMessage {
+  const verse = pickBibleVerse()
+  const ctx: Stage3Ctx = {
+    team: getHelperTags(event),
+    verse: verse.text,
+    reference: verse.ref,
+  }
   return {
-    message: `🔔 <b>Jungschar ist ${dayWord}!</b>\n\n` +
-      `📆 ${formatDate(event.event_date)}\n` +
-      `👥 Team: ${teamTags}\n\n` +
-      `Ihr schafft das! Viel Spaß und Gottes Segen! 🙏`,
+    message: `+++ ${pickStage3TopHeader()} +++\n\n${pickStage3Template()(ctx)}`,
   }
 }
 
@@ -393,11 +519,11 @@ export async function processReminders(chatId: string, testStage?: number) {
       }
     }
 
-    // Stufe 3: Freitag, 1-2 Tage vorher
-    if (testStage === 3 || (!isTest && dayOfWeek === 5 && daysUntil >= 1 && daysUntil <= 2)) {
-      reminderType = STAGE_FRIDAY
+    // Stufe 3: Tag des Events (Samstag morgen)
+    if (testStage === 3 || (!isTest && daysUntil === 0)) {
+      reminderType = STAGE_SATURDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
-        reminder = generateStage3Message(event, daysUntil)
+        reminder = generateStage3Message(event)
       }
     }
 
