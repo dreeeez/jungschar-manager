@@ -5,6 +5,7 @@ export interface WeatherForecast {
   temperature_max: number
   temperature_min: number
   precipitation_probability: number
+  weather_code: number
   weather_description: string
 }
 
@@ -78,6 +79,7 @@ export async function getWeatherForecast(
       temperature_max: Math.max(...temps),
       temperature_min: Math.min(...temps),
       precipitation_probability: precs.length ? Math.max(...precs) : 0,
+      weather_code: weatherCode,
       weather_description: WEATHER_CODES[weatherCode] || 'Unbekannt',
     }
   } catch (error) {

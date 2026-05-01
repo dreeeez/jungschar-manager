@@ -148,28 +148,38 @@ function formatBirthdayLine(birthdays: string[]): string {
 }
 
 /**
- * Formatiert eine Wetter-Zeile für die Nachricht
+ * Wählt ein passendes Emoji für die Wetterlage. Open-Meteo liefert
+ * WMO-Codes, die wir hier in einzelne Emojis übersetzen. Bei <=2°C
+ * gewinnt das Frost-Emoji (sonst sieht eine sonnige Eiseskälte falsch aus).
  */
-function formatWeatherLine(weather: WeatherForecast | null): string {
-  if (!weather) return ''
+function weatherEmoji(weather: WeatherForecast | null): string {
+  if (!weather) return '🌤️'
+  if (weather.temperature_max <= 2) return '🥶'
+  const code = weather.weather_code
+  if (code === 0) return '☀️'
+  if (code === 1) return '🌤️'
+  if (code === 2) return '⛅'
+  if (code === 3) return '☁️'
+  if (code === 45 || code === 48) return '🌫️'
+  if ([51, 53, 55].includes(code)) return '🌦️'
+  if ([61, 63, 65, 80, 81, 82].includes(code)) return '🌧️'
+  if ([71, 73, 75, 85, 86].includes(code)) return '🌨️'
+  if ([95, 96, 99].includes(code)) return '⛈️'
+  return '🌤️'
+}
+
+function weatherTempStr(weather: WeatherForecast): string {
   const min = Math.round(weather.temperature_min)
   const max = Math.round(weather.temperature_max)
-  const tempStr = min === max ? `${max}°C` : `${min}–${max}°C`
-  return `🌤️ Wetter: ${weather.weather_description}, ${tempStr}` +
-    (weather.precipitation_probability > 30 ? ` (☔ ${weather.precipitation_probability}%)` : '') +
-    '\n'
+  return min === max ? `${max}°C` : `${min}–${max}°C`
 }
 
 /**
- * Wetter als Inline-Suffix für die Datumszeile (Stage 2),
- * z.B. " · Teilweise bewölkt, 25°C".
+ * Standalone-Wetterzeile für Stage 2: "⛅ Teilweise bewölkt, 25°C [(Regen 60%)]".
  */
-function formatWeatherInline(weather: WeatherForecast | null): string {
+function formatWeatherStandalone(weather: WeatherForecast | null): string {
   if (!weather) return ''
-  const min = Math.round(weather.temperature_min)
-  const max = Math.round(weather.temperature_max)
-  const tempStr = min === max ? `${max}°C` : `${min}–${max}°C`
-  return ` · ${weather.weather_description}, ${tempStr}` +
+  return `${weatherEmoji(weather)} ${weather.weather_description}, ${weatherTempStr(weather)}` +
     (weather.precipitation_probability > 30 ? ` (Regen ${weather.precipitation_probability}%)` : '')
 }
 
@@ -190,19 +200,99 @@ async function fetchWeatherForEvent(eventDate: string): Promise<WeatherForecast 
  * STUFE 1 — Sonntag (6-8 Tage vorher)
  * Event-Ankündigung mit Team und Elterndienst
  */
-function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: string[]): ReminderMessage {
-  const teamTags = getHelperTags(event)
-  const parentDisplay = getParentDutyDisplay(event)
+type Stage1Ctx = {
+  date: string
+  emoji: string
+  desc: string
+  temp: string
+  team: string
+  parent: string
+  birthdayLine: string
+}
 
-  return {
-    message: `📅 <b>Nächste Woche ist Jungschar!</b>\n\n` +
-      `📆 ${formatDate(event.event_date)}\n` +
-      `${formatWeatherLine(weather)}` +
-      `👥 Team: ${teamTags} - ihr seid dran!\n` +
-      `🍽️ Essen: ${parentDisplay}\n` +
-      `${formatBirthdayLine(birthdays)}` +
-      `\nFangt an zu planen!`,
+// Pool an themed Stage-1-Templates. Eines pro Send wird zufällig gezogen.
+// Jedes muss klar Datum, Wetter, Team, Eltern-Essen kommunizieren — nur
+// die "Verkleidung" wechselt.
+const STAGE1_TEMPLATES: Array<(c: Stage1Ctx) => string> = [
+  // 1. Spy / Mission Impossible
+  (c) =>
+    `🗺️ <b>Eure Mission, falls ihr sie annehmt:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Agenten: ${c.team}\n` +
+    `🍽️ Verpflegung: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nDiese Nachricht zerstört sich nicht selbst — fangt schon mal an zu planen 🙌`,
+
+  // 2. Wahrsager / Glaskugel
+  (c) =>
+    `🔮 <b>Die Glaskugel hat gesprochen:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Auserwählte: ${c.team}\n` +
+    `🍽️ Am Herd: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nSchicksal akzeptiert — fangt an zu planen 🚀`,
+
+  // 3. Wettervorhersage parodiert
+  (c) =>
+    `📡 <b>Vorhersage für ${c.date}:</b>\n\n` +
+    `${c.emoji} ${c.desc}, ${c.temp}\n` +
+    `👥 mit hoher Wahrscheinlichkeit ${c.team}\n` +
+    `🍽️ und einer kräftigen Brise ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nAussichten: ihr seid dran. Planen anfangen 🌦️`,
+
+  // 4. Spotify Wrapped
+  (c) =>
+    `🎵 <b>Jungschar Wrapped — eure nächste Schicht:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Top-Acts: ${c.team}\n` +
+    `🍽️ Featured: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nPress play in einer Woche ▶️`,
+
+  // 5. Stadion-Ansage
+  (c) =>
+    `📣 <b>Achtung Achtung — die nächste Aufstellung:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Mannschaft: ${c.team}\n` +
+    `🍽️ Catering: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nAufwärmen darf beginnen 🏃`,
+
+  // 6. Festival-Plakat
+  (c) =>
+    `🎤 <b>Festival-Lineup für ${c.date}:</b>\n\n` +
+    `${c.emoji} Wetterprognose: ${c.temp}, ${c.desc}\n` +
+    `👥 Headliner: ${c.team}\n` +
+    `🍽️ Foodtruck: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nSoundcheck in einer Woche 🎸`,
+
+  // 7. Mission Control / Space
+  (c) =>
+    `🚀 <b>Mission Briefing — T-minus 7 Tage:</b>\n\n` +
+    `${c.date} · ${c.emoji} ${c.temp}\n` +
+    `👥 Astronauten: ${c.team}\n` +
+    `🍽️ Bord-Verpflegung: ${c.parent}\n` +
+    `${c.birthdayLine}` +
+    `\nAlle Systeme bereit machen 🛰️`,
+]
+
+function pickStage1Template(): (c: Stage1Ctx) => string {
+  return STAGE1_TEMPLATES[Math.floor(Math.random() * STAGE1_TEMPLATES.length)]
+}
+
+function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: string[]): ReminderMessage {
+  const ctx: Stage1Ctx = {
+    date: formatDate(event.event_date),
+    emoji: weatherEmoji(weather),
+    desc: weather?.weather_description ?? 'Wetter unbekannt',
+    temp: weather ? weatherTempStr(weather) : '?°C',
+    team: getHelperTags(event),
+    parent: getParentDutyDisplay(event),
+    birthdayLine: formatBirthdayLine(birthdays),
   }
+  return { message: pickStage1Template()(ctx) }
 }
 
 /**
@@ -217,11 +307,10 @@ function generateStage2Message(
 ): ReminderMessage {
   const teamTags = getHelperTags(event)
   const dayWord = daysUntil === 1 ? 'Tag' : 'Tage'
-  const weatherSuffix = formatWeatherInline(weather)
 
   return {
     message: `+++ 🔥 <b>Countdown: ${daysUntil} ${dayWord}</b> 🔥 +++\n` +
-      `${formatDate(event.event_date)}${weatherSuffix}\n` +
+      `${formatWeatherStandalone(weather)}\n` +
       `Team: ${teamTags}\n` +
       `${formatBirthdayLine(birthdays)}` +
       `\n📋 <b>Checkliste</b> — Eltern (Essen) heute!\n` +
