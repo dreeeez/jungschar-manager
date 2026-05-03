@@ -466,14 +466,56 @@ export interface ExecuteRotationResult {
  * pinnen → DB-Writes (außer im Test-Mode). Wird sowohl von der API-Route
  * als auch vom Daily-Cron aufgerufen.
  */
+/**
+ * Baut Proposals aus bereits eingeteilten Events (für den Fall, dass
+ * nichts Neues mehr zu generieren ist, aber wir die aktuelle Einteilung
+ * trotzdem als Übersichts-Nachricht posten wollen).
+ */
+async function buildProposalsFromExisting(untilDate?: string | null): Promise<RotationProposal[]> {
+  const db = getSupabase()
+  const today = new Date()
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+  let query: any = (db as any)
+    .from('events')
+    .select('id, event_date, assignments(helper_id, helper:helpers(id, name, telegram_username, is_senior))')
+    .gte('event_date', todayIso)
+    .order('event_date', { ascending: true })
+  if (untilDate) query = query.lte('event_date', untilDate)
+  const { data } = await query
+
+  return (data ?? [])
+    .filter((e: any) => (e.assignments?.length ?? 0) > 0)
+    .map((e: any) => ({
+      eventId: e.id,
+      eventDate: e.event_date,
+      helpers: (e.assignments ?? [])
+        .filter((a: any) => a.helper)
+        .map((a: any) => ({
+          id: a.helper.id,
+          name: a.helper.name,
+          username: a.helper.telegram_username ?? null,
+          isSenior: !!a.helper.is_senior,
+          count: 0,
+          lastAssigned: null,
+        })),
+    }))
+}
+
 export async function executeRotation(opts: ExecuteRotationOptions): Promise<ExecuteRotationResult> {
   const { chatId, isTest, splitAt, untilDate } = opts
   const rotation = await generateRotation()
 
   // untilDate: nur Termine bis inklusive dieses Datums posten/persistieren
-  const filteredProposals = untilDate
+  let filteredProposals = untilDate
     ? rotation.proposals.filter(p => p.eventDate <= untilDate)
     : rotation.proposals
+
+  // Fallback: wenn es nichts Neues zu posten gibt, aber bestehende
+  // Einteilungen im Fenster vorhanden sind, posten wir die als Übersicht.
+  if (filteredProposals.length === 0) {
+    filteredProposals = await buildProposalsFromExisting(untilDate)
+  }
 
   const result: ExecuteRotationResult = {
     proposals: filteredProposals,
