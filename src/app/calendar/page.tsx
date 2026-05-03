@@ -353,8 +353,15 @@ export default function CalendarPage() {
   async function commitRotation(testMode: boolean) {
     setRotationCommitting(true)
     try {
-      const url = testMode ? '/api/rotation/commit?test=1' : '/api/rotation/commit'
-      const res = await fetch(url, { method: 'POST' })
+      // Split-Datum: heute + 6 Monate. Termine davor in 1. Nachricht,
+      // Rest in 2. Nachricht — damit lange Listen nicht erschlagen.
+      const splitDate = new Date()
+      splitDate.setMonth(splitDate.getMonth() + 6)
+      const splitAt = `${splitDate.getFullYear()}-${String(splitDate.getMonth() + 1).padStart(2, '0')}-${String(splitDate.getDate()).padStart(2, '0')}`
+      const params = new URLSearchParams()
+      if (testMode) params.set('test', '1')
+      params.set('splitAt', splitAt)
+      const res = await fetch('/api/rotation/commit?' + params.toString(), { method: 'POST' })
       const body = await res.json()
       if (!res.ok) {
         showAlert('Fehler: ' + (body.error ?? 'unbekannt'))

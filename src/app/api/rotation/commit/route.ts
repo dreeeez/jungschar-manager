@@ -9,16 +9,17 @@ import { sendTelegramMessage } from '@/services/reminders'
 export const dynamic = 'force-dynamic'
 
 /**
- * Generiert die Rotation, postet die Einteilungs-Nachricht in den Chat und
- * (sofern nicht test-Mode) schreibt die Assignments in die DB.
+ * Generiert die Rotation, postet die Einteilungs-Nachricht(en) in den Chat
+ * und (sofern nicht test-Mode) schreibt die Assignments in die DB.
  *
  * Query-Params:
- *   ?test=1   → posted in TELEGRAM_TEST_CHAT_ID, KEINE DB-Writes
- *   (default) → posted in TELEGRAM_CHAT_ID, schreibt assignments
+ *   ?test=1                  → TELEGRAM_TEST_CHAT_ID, KEINE DB-Writes
+ *   ?splitAt=YYYY-MM-DD      → 2 Nachrichten: Termine vor splitAt + ab splitAt
  */
 export async function POST(req: NextRequest) {
   try {
     const isTest = req.nextUrl.searchParams.get('test') === '1'
+    const splitAt = req.nextUrl.searchParams.get('splitAt')
 
     const chatId = isTest
       ? process.env.TELEGRAM_TEST_CHAT_ID
@@ -36,12 +37,23 @@ export async function POST(req: NextRequest) {
         mode: isTest ? 'test' : 'live',
         proposals: [],
         skipped: rotation.skipped,
-        message: 'Nichts zu posten — keine offenen Slots im 12-Wochen-Fenster.',
+        message: 'Nichts zu posten — keine offenen Slots im Planungsfenster.',
       })
     }
 
-    const text = formatRotationMessage(rotation.proposals)
-    const sendResult = await sendTelegramMessage(chatId, text)
+    const batches = splitAt
+      ? [
+          rotation.proposals.filter(p => p.eventDate < splitAt),
+          rotation.proposals.filter(p => p.eventDate >= splitAt),
+        ].filter(b => b.length > 0)
+      : [rotation.proposals]
+
+    const sendResults: any[] = []
+    for (const batch of batches) {
+      const text = formatRotationMessage(batch)
+      const result = await sendTelegramMessage(chatId, text)
+      sendResults.push(result)
+    }
 
     let inserted = 0
     if (!isTest) {
@@ -54,7 +66,7 @@ export async function POST(req: NextRequest) {
       proposals: rotation.proposals,
       skipped: rotation.skipped,
       inserted,
-      telegram: sendResult,
+      telegram: sendResults,
     })
   } catch (e: any) {
     console.error('rotation commit failed:', e)
