@@ -9,6 +9,6 @@ WHERE name IN (
   'Henrik Fächner',
   'Jens Müller',
   'Marco Schneider',
-  'Marcus Schneider',
-  'Tobi Schneider'
+  'Marcus',
+  'Tobias Schneider'
 );
