@@ -426,7 +426,6 @@ export function formatRotationMessage(proposals: RotationProposal[]): string {
 
   const lines: string[] = []
   lines.push('📅 <b>Jungschar-Einteilung</b>')
-  lines.push(`<i>${proposals.length} Termine</i>`)
   lines.push('')
 
   for (const [, ps] of groups) {
