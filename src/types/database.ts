@@ -19,6 +19,7 @@ export interface Database {
           telegram_user_id: number | null
           telegram_username: string | null
           is_admin: boolean
+          is_senior: boolean
           created_at: string
         }
         Insert: {
@@ -27,6 +28,7 @@ export interface Database {
           telegram_user_id?: number | null
           telegram_username?: string | null
           is_admin?: boolean
+          is_senior?: boolean
           created_at?: string
         }
         Update: {
@@ -35,6 +37,7 @@ export interface Database {
           telegram_user_id?: number | null
           telegram_username?: string | null
           is_admin?: boolean
+          is_senior?: boolean
           created_at?: string
         }
       }
