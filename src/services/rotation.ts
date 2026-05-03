@@ -1,7 +1,6 @@
 import { getSupabase } from './database'
 
 const ROTATION_WINDOW_DAYS = 84 // 12 Wochen
-const HISTORY_WINDOW_DAYS = 180 // letzte 6 Monate für Fairness-Score
 const HELPERS_PER_EVENT = 2
 
 export interface RotationCandidate {
@@ -87,11 +86,9 @@ export async function generateRotation(): Promise<RotationResult> {
   const db = getSupabase()
   const today = todayLocal()
   const horizon = new Date(today.getTime() + ROTATION_WINDOW_DAYS * 24 * 3600 * 1000)
-  const historyStart = new Date(today.getTime() - HISTORY_WINDOW_DAYS * 24 * 3600 * 1000)
 
   const todayIso = localDateString(today)
   const horizonIso = localDateString(horizon)
-  const historyStartIso = localDateString(historyStart)
 
   // 1. Helfer laden
   const { data: helpersData, error: helpersErr } = await db
@@ -111,13 +108,13 @@ export async function generateRotation(): Promise<RotationResult> {
     return { proposals: [], skipped: [] }
   }
 
-  // 2. Events im Score-Fenster [history-start, horizon] laden, dann
-  //    Assignments separat nach event_id filtern (Postgrest filter-on-join
-  //    ist umständlich).
+  // 2. Score: NUR bestehende Assignments im Planungs-Fenster zählen.
+  //    Historie wird ignoriert — User-Intent: "alle 9 gleich oft" für die
+  //    kommende Runde, unabhängig von dem was vorher war.
   const { data: scopeEvents, error: scopeErr } = await db
     .from('events')
     .select('id, event_date')
-    .gte('event_date', historyStartIso)
+    .gte('event_date', todayIso)
     .lte('event_date', horizonIso)
   if (scopeErr) throw scopeErr
 
@@ -131,7 +128,6 @@ export async function generateRotation(): Promise<RotationResult> {
     ? (await db.from('assignments').select('helper_id, event_id').in('event_id', eventIds)).data
     : []
 
-  // 3. Score pro Helfer (Anzahl Einsätze + jüngstes Einsatz-Datum)
   const counts = new Map<string, number>()
   const lastAssigned = new Map<string, string>()
   for (const a of (scopeAssign ?? []) as any[]) {
