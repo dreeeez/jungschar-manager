@@ -434,12 +434,12 @@ export function formatRotationMessage(proposals: RotationProposal[]): string {
     const emoji = MONTH_EMOJI[num] ?? '📅'
     lines.push(`${emoji} <b>${name}</b>`)
     for (const p of ps) {
-      lines.push(`   ${fmtDay(p.eventDate)} — ${p.helpers.map(tag).join(' &amp; ')}`)
+      lines.push(`➡️ ${fmtDay(p.eventDate)} - ${p.helpers.map(tag).join(' &amp; ')}`)
     }
-    lines.push('')
   }
 
-  lines.push('👍 Nehmt euch bitte kurz Zeit zu schauen, ob es bei euch passt — gerne mit Daumen hoch reacten.')
+  lines.push('')
+  lines.push('👍 Nehmt euch bitte kurz Zeit zu schauen, ob es bei euch passt - gerne mit Daumen hoch reacten.')
   lines.push('')
   lines.push('🤝 Falls es nicht passt: Hier melden! Dann tauschen wir!')
 
