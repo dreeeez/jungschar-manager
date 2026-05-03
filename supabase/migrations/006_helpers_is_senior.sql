@@ -9,6 +9,6 @@ WHERE name IN (
   '<redacted-name>',
   '<redacted-name>',
   '<redacted-name>',
-  'Marcus Schneider',
+  '<redacted-name>',
   '<redacted-name>'
 );
