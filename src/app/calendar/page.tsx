@@ -48,6 +48,12 @@ interface IdeaRecord {
   created_at: string
 }
 
+interface RotationProposal {
+  eventId: string
+  eventDate: string
+  helpers: { id: string; name: string; username: string | null; isSenior: boolean }[]
+}
+
 export default function CalendarPage() {
   const { showAlert } = useTelegram()
   const [events, setEvents] = useState<Event[]>([])
@@ -61,6 +67,11 @@ export default function CalendarPage() {
   const [newActivityText, setNewActivityText] = useState('')
   const [savingActivity, setSavingActivity] = useState(false)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
+  const [rotationLoading, setRotationLoading] = useState(false)
+  const [rotationPreview, setRotationPreview] = useState<RotationProposal[] | null>(null)
+  const [rotationSkipped, setRotationSkipped] = useState<{ eventDate: string; reason: string }[]>([])
+  const [rotationCommitting, setRotationCommitting] = useState(false)
+  const [rotationTestMode, setRotationTestMode] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -322,6 +333,46 @@ export default function CalendarPage() {
     setSavingActivity(false)
   }
 
+  async function loadRotationPreview() {
+    setRotationLoading(true)
+    try {
+      const res = await fetch('/api/rotation/preview', { method: 'POST' })
+      const body = await res.json()
+      if (!res.ok) {
+        showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
+        return
+      }
+      setRotationPreview(body.proposals ?? [])
+      setRotationSkipped(body.skipped ?? [])
+    } catch (e: any) {
+      showAlert('Fehler: ' + e.message)
+    }
+    setRotationLoading(false)
+  }
+
+  async function commitRotation(testMode: boolean) {
+    setRotationCommitting(true)
+    try {
+      const url = testMode ? '/api/rotation/commit?test=1' : '/api/rotation/commit'
+      const res = await fetch(url, { method: 'POST' })
+      const body = await res.json()
+      if (!res.ok) {
+        showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
+        return
+      }
+      if (testMode) {
+        showAlert(`Test-Nachricht in den Test-Chat gesendet (${body.proposals?.length ?? 0} Termine).`)
+      } else {
+        showAlert(`✅ Einteilung gepostet. ${body.inserted ?? 0} Helfer-Slots eingetragen.`)
+        setRotationPreview(null)
+        await fetchData()
+      }
+    } catch (e: any) {
+      showAlert('Fehler: ' + e.message)
+    }
+    setRotationCommitting(false)
+  }
+
   async function refreshSelectedEvent() {
     if (!selectedEvent) return
 
@@ -365,6 +416,14 @@ export default function CalendarPage() {
             })
           : 'noch nie — bitte in Einstellungen synchronisieren'}
       </p>
+
+      <button
+        onClick={loadRotationPreview}
+        disabled={rotationLoading}
+        className="w-full py-3 mb-6 bg-tg-button text-tg-button-text rounded-lg font-medium disabled:opacity-50"
+      >
+        {rotationLoading ? 'Berechne…' : '🔄 Einteilung für 12 Wochen vorschlagen'}
+      </button>
 
       {/* Upcoming Events */}
       <div className="mb-8">
@@ -577,6 +636,93 @@ export default function CalendarPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rotation-Vorschlag Modal */}
+      {rotationPreview && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end"
+          onClick={() => !rotationCommitting && setRotationPreview(null)}
+        >
+          <div
+            className="bg-tg-bg w-full rounded-t-2xl p-4 pb-8 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold">Einteilungs-Vorschlag</h2>
+              <button
+                onClick={() => setRotationPreview(null)}
+                disabled={rotationCommitting}
+                className="p-2 text-tg-hint disabled:opacity-50"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-tg-hint mb-4">
+              Algorithmus: weniger eingesetzte Helfer zuerst, Senior+Junior bevorzugt.
+              Bestehende Zuweisungen bleiben unangetastet.
+            </p>
+
+            {rotationPreview.length === 0 ? (
+              <p className="text-tg-hint text-center py-6">
+                Keine offenen Slots im 12-Wochen-Fenster.
+              </p>
+            ) : (
+              <div className="space-y-2 mb-5">
+                {rotationPreview.map(p => (
+                  <div key={p.eventId} className="p-3 bg-tg-secondary-bg rounded-lg">
+                    <p className="text-sm font-medium">
+                      📅 {new Date(p.eventDate + 'T12:00:00').toLocaleDateString('de-DE', {
+                        weekday: 'short', day: '2-digit', month: '2-digit',
+                      })}
+                    </p>
+                    <p className="text-sm mt-1">
+                      {p.helpers.map(h => (
+                        <span key={h.id} className="inline-block mr-2">
+                          {h.isSenior ? '👴 ' : ''}{h.name}
+                        </span>
+                      ))}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {rotationSkipped.length > 0 && (
+              <div className="mb-5 text-xs text-tg-hint">
+                <p className="font-medium mb-1">Übersprungen:</p>
+                {rotationSkipped.map((s, i) => (
+                  <p key={i}>• {s.eventDate}: {s.reason}</p>
+                ))}
+              </div>
+            )}
+
+            {rotationPreview.length > 0 && (
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={rotationTestMode}
+                    onChange={(e) => setRotationTestMode(e.target.checked)}
+                  />
+                  Test-Modus (Nachricht nur in Test-Chat, keine DB-Änderung)
+                </label>
+                <button
+                  onClick={() => commitRotation(rotationTestMode)}
+                  disabled={rotationCommitting}
+                  className="w-full py-3 bg-tg-button text-tg-button-text rounded-lg font-medium disabled:opacity-50"
+                >
+                  {rotationCommitting
+                    ? 'Sende…'
+                    : rotationTestMode
+                      ? '🧪 Test in Test-Chat senden'
+                      : '✅ Bestätigen & in Gruppe posten'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
