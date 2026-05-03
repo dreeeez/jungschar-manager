@@ -318,7 +318,9 @@ export function formatRotationMessage(proposals: RotationProposal[]): string {
     lines.push('')
   }
 
-  lines.push('🤝 Falls etwas nicht passt: einfach hier melden, dann tauschen wir.')
+  lines.push('👍 Nehmt euch bitte kurz Zeit zu schauen, ob es bei euch passt — gerne mit Daumen hoch reacten.')
+  lines.push('')
+  lines.push('🤝 Falls es nicht passt: Hier melden! Dann tauschen wir!')
 
   return lines.join('\n')
 }
