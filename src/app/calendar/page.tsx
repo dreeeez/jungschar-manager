@@ -54,11 +54,25 @@ interface RotationProposal {
   helpers: { id: string; name: string; username: string | null; isSenior: boolean }[]
 }
 
+interface Child {
+  id: string
+  name: string
+  birthday: string | null
+  active: boolean
+}
+
+interface Birthday {
+  name: string
+  dayMonth: string
+  age: number
+}
+
 export default function CalendarPage() {
   const { showAlert, showConfirm } = useTelegram()
   const [events, setEvents] = useState<Event[]>([])
   const [helpers, setHelpers] = useState<Helper[]>([])
   const [parents, setParents] = useState<Parent[]>([])
+  const [children, setChildren] = useState<Child[]>([])
   const [ideasMap, setIdeasMap] = useState<Map<string, IdeaRecord>>(new Map())
   const [loading, setLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
@@ -78,7 +92,7 @@ export default function CalendarPage() {
   }, [])
 
   async function fetchData() {
-    const [eventsResult, helpersResult, parentsResult] = await Promise.all([
+    const [eventsResult, helpersResult, parentsResult, childrenResult] = await Promise.all([
       supabase
         .from('events')
         .select('*, assignments(id, helper_id, helper:helpers(id, name)), parent_duties(id, parent_id, parent:parents(id, name))')
@@ -92,7 +106,15 @@ export default function CalendarPage() {
         .select('id, name')
         .eq('active', true)
         .order('name', { ascending: true }),
+      (supabase as any)
+        .from('children')
+        .select('id, name, birthday, active')
+        .eq('active', true),
     ])
+
+    if (childrenResult.data) {
+      setChildren(childrenResult.data)
+    }
 
     const loadedEvents = eventsResult.data as any[] || []
 
@@ -181,6 +203,43 @@ export default function CalendarPage() {
     const event = new Date(dateString)
     event.setHours(0, 0, 0, 0)
     return event.getTime() < today.getTime()
+  }
+
+  // Geburtstage in einem ±3-Tage-Fenster (insgesamt 7 Tage) um das Event.
+  function getBirthdaysNearEvent(eventDateStr: string): Birthday[] {
+    const event = new Date(eventDateStr + 'T12:00:00')
+    const eventTime = event.getTime()
+    const dayMs = 1000 * 60 * 60 * 24
+    const out: Birthday[] = []
+
+    for (const c of children) {
+      if (!c.active || !c.birthday) continue
+      const bday = new Date(c.birthday + 'T12:00:00')
+      const month = bday.getMonth()
+      const day = bday.getDate()
+      const birthYear = bday.getFullYear()
+      const eventYear = event.getFullYear()
+
+      // Geburtstag im Event-Jahr — und falls Event nahe Jahresgrenze auch
+      // ±1 Jahr testen, damit z.B. 30.12. ↔ 02.01. korrekt erkannt wird.
+      const candidates = [
+        new Date(eventYear, month, day, 12, 0, 0),
+        new Date(eventYear - 1, month, day, 12, 0, 0),
+        new Date(eventYear + 1, month, day, 12, 0, 0),
+      ]
+      const closest = candidates.reduce((best, cur) =>
+        Math.abs(cur.getTime() - eventTime) < Math.abs(best.getTime() - eventTime) ? cur : best,
+      )
+      const diffDays = Math.abs(closest.getTime() - eventTime) / dayMs
+      if (diffDays <= 3) {
+        out.push({
+          name: c.name,
+          dayMonth: `${day}.${month + 1}.`,
+          age: closest.getFullYear() - birthYear,
+        })
+      }
+    }
+    return out
   }
 
   function getAssignedHelperIds(event: Event): string[] {
@@ -457,6 +516,7 @@ export default function CalendarPage() {
           <div className="space-y-3">
             {upcomingEvents.slice(0, 5).map((event) => {
               const idea = ideasMap.get(event.id)
+              const birthdays = getBirthdaysNearEvent(event.event_date)
               return (
                 <div
                   key={event.id}
@@ -468,6 +528,11 @@ export default function CalendarPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-lg">📅</span>
                         <span className="font-medium">{formatDate(event.event_date)}</span>
+                        {birthdays.length > 0 && (
+                          <span className="text-xs bg-pink-500/20 text-pink-600 px-2 py-0.5 rounded-full font-medium">
+                            🎂 {birthdays.length}
+                          </span>
+                        )}
                         {idea && (
                           <span className="text-xs bg-green-500/20 text-green-600 px-2 py-0.5 rounded-full font-medium">
                             📋 Log
@@ -481,6 +546,13 @@ export default function CalendarPage() {
                         <p className="text-xs text-tg-hint mt-1">
                           🍽️ {getParentDutyName(event)}
                         </p>
+                      )}
+                      {birthdays.length > 0 && (
+                        <div className="text-xs text-pink-600 mt-1.5 space-y-0.5">
+                          {birthdays.map((b, i) => (
+                            <p key={i}>🎂 {b.name} — {b.dayMonth} (wird {b.age})</p>
+                          ))}
+                        </div>
                       )}
                     </div>
                     <span className="text-tg-hint">›</span>
