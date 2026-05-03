@@ -60,6 +60,7 @@ export default function CalendarPage() {
   const [saving, setSaving] = useState(false)
   const [newActivityText, setNewActivityText] = useState('')
   const [savingActivity, setSavingActivity] = useState(false)
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -101,6 +102,19 @@ export default function CalendarPage() {
       console.error('Error fetching parents:', parentsResult.error)
     } else {
       setParents(parentsResult.data || [])
+    }
+
+    // Last iCal sync timestamp for the header
+    const { data: syncRow } = await (supabase as any)
+      .from('settings')
+      .select('value')
+      .eq('key', 'last_ical_sync')
+      .maybeSingle()
+    if (syncRow?.value) {
+      try {
+        const parsed = JSON.parse(syncRow.value)
+        if (parsed.at) setLastSyncAt(parsed.at)
+      } catch {}
     }
 
     // Load ideas for all events (for badges)
@@ -337,10 +351,20 @@ export default function CalendarPage() {
 
   return (
     <main className="p-4 safe-area-top safe-area-bottom">
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center gap-2 mb-2">
         <Link href="/" className="text-tg-link">←</Link>
         <h1 className="text-xl font-bold">Kalender</h1>
       </div>
+
+      <p className="text-xs text-tg-hint mb-6">
+        Letzte Aktualisierung:{' '}
+        {lastSyncAt
+          ? new Date(lastSyncAt).toLocaleString('de-DE', {
+              day: '2-digit', month: '2-digit', year: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+            })
+          : 'noch nie — bitte in Einstellungen synchronisieren'}
+      </p>
 
       {/* Upcoming Events */}
       <div className="mb-8">
