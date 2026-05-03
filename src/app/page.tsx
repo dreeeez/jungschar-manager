@@ -49,8 +49,8 @@ export default function Home() {
         <NavCard
           href="/ideas"
           icon="📋"
-          title="Aktivitäten"
-          description="Was wir gemacht haben"
+          title="Archiv"
+          description="Vergangene Termine & Logs"
         />
         <NavCard
           href="/settings"

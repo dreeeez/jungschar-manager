@@ -1,29 +1,33 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 
-interface Activity {
+interface Helper { id: string; name: string }
+interface Parent { id: string; name: string }
+
+interface PastEvent {
   id: string
+  event_date: string
+  title: string | null
+  assignments: { helper: Helper | null }[]
+  parent_duties: { parent: Parent | null }[]
+}
+
+interface IdeaRecord {
+  id: string
+  event_id: string
   title: string
   description: string | null
-  was_used: boolean
   source: string
   created_at: string
-  event: {
-    id: string
-    event_date: string
-    title: string | null
-  } | null
 }
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('de-DE', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+    weekday: 'short', day: 'numeric', month: 'long', year: 'numeric',
   })
 }
 
@@ -35,23 +39,88 @@ function sourceLabel(source: string): string {
   }
 }
 
-export default function IdeasPage() {
-  const [activities, setActivities] = useState<Activity[]>([])
+export default function ArchivePage() {
+  const { showAlert } = useTelegram()
+  const [events, setEvents] = useState<PastEvent[]>([])
+  const [ideasMap, setIdeasMap] = useState<Map<string, IdeaRecord>>(new Map())
   const [loading, setLoading] = useState(true)
+  const [activeEntryId, setActiveEntryId] = useState<string | null>(null)
+  const [entryText, setEntryText] = useState('')
+  const [savingId, setSavingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchActivities()
-  }, [])
+  useEffect(() => { fetchData() }, [])
 
-  async function fetchActivities() {
+  async function fetchData() {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayIso = today.toISOString().slice(0, 10)
+
     const { data, error } = await (supabase as any)
-      .from('ideas')
-      .select('*, event:events(id, event_date, title)')
-      .eq('was_used', true)
-      .order('created_at', { ascending: false })
+      .from('events')
+      .select('id, event_date, title, assignments(helper:helpers(id, name)), parent_duties(parent:parents(id, name))')
+      .lt('event_date', todayIso)
+      .order('event_date', { ascending: false })
 
-    if (!error) setActivities(data || [])
+    if (error) {
+      console.error('Error loading past events:', error)
+      setLoading(false)
+      return
+    }
+
+    const list: PastEvent[] = data || []
+    setEvents(list)
+
+    if (list.length > 0) {
+      const ids = list.map(e => e.id)
+      const { data: ideas } = await (supabase as any)
+        .from('ideas')
+        .select('*')
+        .in('event_id', ids)
+        .eq('was_used', true)
+        .order('created_at', { ascending: false })
+
+      const map = new Map<string, IdeaRecord>()
+      for (const idea of (ideas || [])) {
+        if (!map.has(idea.event_id)) map.set(idea.event_id, idea)
+      }
+      setIdeasMap(map)
+    }
+
     setLoading(false)
+  }
+
+  async function saveLog(eventId: string) {
+    if (!entryText.trim()) return
+    setSavingId(eventId)
+    try {
+      const { data, error } = await (supabase as any)
+        .from('ideas')
+        .insert({
+          event_id: eventId,
+          title: entryText.trim().slice(0, 200),
+          description: entryText.trim(),
+          was_used: true,
+          source: 'manual',
+        })
+        .select('*')
+        .single()
+      if (error) throw error
+      setIdeasMap(prev => new Map(prev).set(eventId, data))
+      setActiveEntryId(null)
+      setEntryText('')
+    } catch (e: any) {
+      showAlert('Fehler: ' + e.message)
+    }
+    setSavingId(null)
+  }
+
+  function getHelperNames(event: PastEvent): string {
+    const names = event.assignments?.map(a => a.helper?.name).filter(Boolean) as string[]
+    return names.length ? names.join(' & ') : '—'
+  }
+
+  function getParentName(event: PastEvent): string {
+    return event.parent_duties?.[0]?.parent?.name || ''
   }
 
   if (loading) {
@@ -66,36 +135,74 @@ export default function IdeasPage() {
     <main className="p-4 safe-area-top safe-area-bottom">
       <div className="flex items-center gap-2 mb-6">
         <Link href="/" className="text-tg-link">←</Link>
-        <h1 className="text-xl font-bold">Aktivitäten</h1>
+        <h1 className="text-xl font-bold">Vergangene Termine</h1>
       </div>
 
       <p className="text-sm text-tg-hint mb-5">
-        {activities.length} {activities.length === 1 ? 'Aktivität' : 'Aktivitäten'} erfasst
+        {events.length} {events.length === 1 ? 'Termin' : 'Termine'} im Archiv
       </p>
 
       <div className="space-y-3">
-        {activities.length === 0 ? (
+        {events.length === 0 ? (
           <p className="text-tg-hint text-center py-8">
-            Noch keine Aktivitäten erfasst.{'\n'}
-            Füge den Bot zur Elterngruppe hinzu oder trage Aktivitäten manuell im Kalender ein.
+            Noch keine vergangenen Termine.
           </p>
         ) : (
-          activities.map((activity) => (
-            <div
-              key={activity.id}
-              className="p-4 bg-tg-secondary-bg rounded-xl border-l-4 border-green-500"
-            >
-              <p className="font-medium leading-snug">✅ {activity.title}</p>
-              {activity.event && (
-                <p className="text-xs text-tg-hint mt-1">
-                  📅 {formatDate(activity.event.event_date)}
-                </p>
-              )}
-              <p className="text-xs text-tg-hint mt-1">
-                {sourceLabel(activity.source)}
-              </p>
-            </div>
-          ))
+          events.map((event) => {
+            const idea = ideasMap.get(event.id)
+            const isAddingLog = activeEntryId === event.id
+            const parentName = getParentName(event)
+            return (
+              <div key={event.id} className="p-4 bg-tg-secondary-bg rounded-xl">
+                <p className="font-medium">📅 {formatDate(event.event_date)}</p>
+                <p className="text-xs text-tg-hint mt-1">👥 {getHelperNames(event)}</p>
+                {parentName && (
+                  <p className="text-xs text-tg-hint mt-0.5">🍽️ {parentName}</p>
+                )}
+
+                {idea ? (
+                  <div className="mt-3 pt-3 border-t border-tg-hint/10">
+                    <p className="text-sm">✅ {idea.title}</p>
+                    <p className="text-xs text-tg-hint mt-1">{sourceLabel(idea.source)}</p>
+                  </div>
+                ) : isAddingLog ? (
+                  <div className="mt-3 pt-3 border-t border-tg-hint/10">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={entryText}
+                        onChange={(e) => setEntryText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && saveLog(event.id)}
+                        placeholder="Was habt ihr gemacht?"
+                        className="flex-1 px-3 py-2 bg-tg-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => saveLog(event.id)}
+                        disabled={savingId === event.id || !entryText.trim()}
+                        className="px-4 py-2 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
+                      >
+                        {savingId === event.id ? '...' : '✓'}
+                      </button>
+                      <button
+                        onClick={() => { setActiveEntryId(null); setEntryText('') }}
+                        className="px-3 py-2 text-tg-hint text-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setActiveEntryId(event.id); setEntryText('') }}
+                    className="mt-3 pt-3 border-t border-tg-hint/10 w-full text-left text-sm text-tg-link"
+                  >
+                    + Aktivität nachtragen
+                  </button>
+                )}
+              </div>
+            )
+          })
         )}
       </div>
     </main>

@@ -392,45 +392,21 @@ export default function CalendarPage() {
         )}
       </div>
 
-      {/* Past Events */}
       {pastEvents.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Vergangene Termine</h2>
-          <div className="space-y-3">
-            {pastEvents.slice(-5).reverse().map((event) => {
-              const idea = ideasMap.get(event.id)
-              return (
-                <div
-                  key={event.id}
-                  onClick={() => openModal(event)}
-                  className="p-4 bg-tg-secondary-bg rounded-xl cursor-pointer active:opacity-80 transition-opacity opacity-70"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-lg">📅</span>
-                        <span className="font-medium">{formatDate(event.event_date)}</span>
-                        {idea ? (
-                          <span className="text-xs bg-green-500/20 text-green-600 px-2 py-0.5 rounded-full font-medium">
-                            📋 Log
-                          </span>
-                        ) : (
-                          <span className="text-xs bg-tg-hint/10 text-tg-hint px-2 py-0.5 rounded-full">
-                            kein Log
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-tg-hint mt-2">
-                        👥 {getAssignedHelperNames(event)}
-                      </p>
-                    </div>
-                    <span className="text-tg-hint">›</span>
-                  </div>
-                </div>
-              )
-            })}
+        <Link
+          href="/ideas"
+          className="block p-4 bg-tg-secondary-bg rounded-xl active:opacity-70 transition-opacity"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">📋 Vergangene Termine</p>
+              <p className="text-xs text-tg-hint mt-1">
+                {pastEvents.length} {pastEvents.length === 1 ? 'Termin' : 'Termine'} im Archiv
+              </p>
+            </div>
+            <span className="text-tg-hint">→</span>
           </div>
-        </div>
+        </Link>
       )}
 
       {/* Assignment Modal */}
