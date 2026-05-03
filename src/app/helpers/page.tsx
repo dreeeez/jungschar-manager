@@ -11,6 +11,7 @@ interface Helper {
   telegram_user_id: number | null
   telegram_username: string | null
   is_admin: boolean
+  is_senior: boolean
 }
 
 export default function HelpersPage() {
@@ -34,6 +35,19 @@ export default function HelpersPage() {
       setHelpers(data || [])
     }
     setLoading(false)
+  }
+
+  async function toggleSenior(helper: Helper) {
+    const next = !helper.is_senior
+    setHelpers(prev => prev.map(h => h.id === helper.id ? { ...h, is_senior: next } : h))
+    const { error } = await (supabase as any)
+      .from('helpers')
+      .update({ is_senior: next })
+      .eq('id', helper.id)
+    if (error) {
+      showAlert('Fehler: ' + error.message)
+      setHelpers(prev => prev.map(h => h.id === helper.id ? { ...h, is_senior: helper.is_senior } : h))
+    }
   }
 
   async function deleteHelper(id: string, name: string) {
@@ -84,16 +98,28 @@ export default function HelpersPage() {
               key={helper.id}
               className="flex items-center justify-between p-4 bg-tg-secondary-bg rounded-xl"
             >
-              <div>
+              <div className="flex-1">
                 <p className="font-medium">{helper.name}</p>
                 {helper.telegram_username && (
                   <p className="text-sm text-tg-hint">@{helper.telegram_username}</p>
                 )}
-                {helper.is_admin && (
-                  <span className="text-xs bg-tg-button text-tg-button-text px-2 py-0.5 rounded">
-                    Admin
-                  </span>
-                )}
+                <div className="flex gap-1.5 mt-1 flex-wrap">
+                  {helper.is_admin && (
+                    <span className="text-xs bg-tg-button text-tg-button-text px-2 py-0.5 rounded">
+                      Admin
+                    </span>
+                  )}
+                  <button
+                    onClick={() => toggleSenior(helper)}
+                    className={`text-xs px-2 py-0.5 rounded ${
+                      helper.is_senior
+                        ? 'bg-amber-500/20 text-amber-700'
+                        : 'bg-tg-bg text-tg-hint border border-tg-hint/20'
+                    }`}
+                  >
+                    {helper.is_senior ? '👴 Senior' : '+ Senior'}
+                  </button>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {helper.telegram_user_id ? (
