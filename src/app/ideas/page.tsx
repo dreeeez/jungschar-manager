@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
+import { ARCHIVE_START_DATE } from '@/utils/format'
 import Link from 'next/link'
 
 interface Helper { id: string; name: string }
@@ -62,6 +63,7 @@ export default function ArchivePage() {
       .from('events')
       .select('id, event_date, title, assignments(helper:helpers(id, name)), parent_duties(parent:parents(id, name))')
       .lt('event_date', todayIso)
+      .gte('event_date', ARCHIVE_START_DATE)
       .order('event_date', { ascending: false })
 
     if (error) {

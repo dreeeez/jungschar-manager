@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
+import { ARCHIVE_START_DATE } from '@/utils/format'
 import Link from 'next/link'
 
 interface Helper {
@@ -332,7 +333,7 @@ export default function CalendarPage() {
   }
 
   const upcomingEvents = events.filter(e => isUpcoming(e.event_date))
-  const pastEvents = events.filter(e => !isUpcoming(e.event_date))
+  const pastEvents = events.filter(e => !isUpcoming(e.event_date) && e.event_date >= ARCHIVE_START_DATE)
 
   return (
     <main className="p-4 safe-area-top safe-area-bottom">

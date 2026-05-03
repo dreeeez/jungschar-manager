@@ -1,3 +1,6 @@
+// Archiv startet ab diesem Datum — alles davor wird ausgeblendet (Frischstart).
+export const ARCHIVE_START_DATE = '2026-05-02'
+
 /**
  * Formatiert ein Datum in deutschem Format
  * Beispiel: "Samstag, 24. Januar"
