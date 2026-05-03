@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processReminders } from '@/services/reminders'
 import { syncJungscharEvents } from '@/services/ical-sync'
+import { maybeAutoRotate } from '@/services/rotation'
 
 export async function GET(req: NextRequest) {
   // Verify cron secret to prevent unauthorized access
@@ -36,8 +37,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `${missing} not configured` }, { status: 500 })
     }
 
+    // Auto-Rotation: wenn die letzte gepinnte Rotation durch ist und es
+    // zukünftige Events ohne Rotation gibt, neue Einteilung posten + pinnen.
+    let autoRotation = null
+    if (!isTest) {
+      const liveChatId = process.env.TELEGRAM_CHAT_ID
+      if (liveChatId) {
+        try {
+          autoRotation = await maybeAutoRotate(liveChatId)
+        } catch (e: any) {
+          console.error('Auto-rotation failed:', e)
+          autoRotation = { triggered: false, error: e.message }
+        }
+      }
+    }
+
     const result = await processReminders(chatId, isTest ? parseInt(testStage!) : undefined)
-    return NextResponse.json({ ...result, icalSync })
+    return NextResponse.json({ ...result, icalSync, autoRotation })
   } catch (error) {
     console.error('Error in reminder cron:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

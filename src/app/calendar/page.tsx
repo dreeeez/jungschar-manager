@@ -258,6 +258,8 @@ export default function CalendarPage() {
       }
 
       await refreshSelectedEvent()
+      // Rotation-Nachricht in Telegram aktualisieren (no-op wenn nicht verlinkt)
+      fetch('/api/rotation/rerender?event_id=' + selectedEvent.id, { method: 'POST' }).catch(() => {})
     } catch (error: any) {
       showAlert('Fehler: ' + error.message)
     }
