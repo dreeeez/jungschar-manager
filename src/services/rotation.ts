@@ -1,6 +1,6 @@
 import { getSupabase } from './database'
 
-const ROTATION_WINDOW_DAYS = 84 // 12 Wochen
+const ROTATION_WINDOW_DAYS = 240 // ~8 Monate, deckt alle aktuellen iCal-Termine
 const HELPERS_PER_EVENT = 2
 
 export interface RotationCandidate {
@@ -51,9 +51,10 @@ function pickPartner(
     return a.name.localeCompare(b.name)
   }
 
-  // Bevorzuge anderen Tier (Senior+Junior). 2 gleiche Tier nur, wenn der
-  // beste gleiche Tier mindestens 2 Einsätze weniger hat als der beste
-  // andere Tier.
+  // Bevorzuge anderen Tier (Senior+Junior). 2 gleiche Tier wenn der beste
+  // gleiche Tier mindestens 1 Einsatz weniger hat als der beste andere Tier
+  // — sorgt für gelegentliche 2-Senior- (oder 2-Junior-) Pärchen, wenn
+  // die Verteilung das verlangt.
   const oppositeTier = others.filter(h => h.isSenior !== picked.isSenior).sort(sortByScore)
   const sameTier = others.filter(h => h.isSenior === picked.isSenior).sort(sortByScore)
 
@@ -62,7 +63,7 @@ function pickPartner(
 
   const bestOpp = oppositeTier[0]
   const bestSame = sameTier[0]
-  if (bestSame.count + 2 <= bestOpp.count) return bestSame
+  if (bestSame.count + 1 <= bestOpp.count) return bestSame
   return bestOpp
 }
 
@@ -268,40 +269,56 @@ export async function commitRotation(proposals: RotationProposal[]): Promise<{ i
   return { inserted }
 }
 
+const MONTH_EMOJI: Record<number, string> = {
+  1: '❄️', 2: '❄️', 3: '🌱', 4: '🌷', 5: '🌸',
+  6: '☀️', 7: '☀️', 8: '🏖️', 9: '🍂', 10: '🎃', 11: '🍁', 12: '🎄',
+}
+const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
+
 /**
  * Baut den Telegram-Nachrichten-Text für die Einteilung.
+ * Gruppiert nach Monat mit Emoji-Header.
  */
 export function formatRotationMessage(proposals: RotationProposal[]): string {
   if (proposals.length === 0) return 'Keine Termine im Planungsfenster.'
 
-  const fmt = (iso: string) => {
+  const fmtDay = (iso: string) => {
     const d = new Date(iso + 'T12:00:00')
-    return new Intl.DateTimeFormat('de-DE', {
-      weekday: 'short', day: '2-digit', month: '2-digit',
-    }).format(d)
+    return `${WEEKDAYS[d.getDay()]} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`
+  }
+  const monthLabel = (iso: string) => {
+    const d = new Date(iso + 'T12:00:00')
+    const name = new Intl.DateTimeFormat('de-DE', { month: 'long' }).format(d)
+    const year = d.getFullYear()
+    return { name, year, num: d.getMonth() + 1 }
+  }
+  const tag = (h: RotationCandidate) =>
+    h.username ? `@${h.username}` : `<i>${h.name}</i>`
+
+  const groups = new Map<string, RotationProposal[]>()
+  for (const p of proposals) {
+    const { name, year } = monthLabel(p.eventDate)
+    const key = `${year}-${name}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(p)
   }
 
-  const tag = (h: RotationCandidate) =>
-    h.username ? `@${h.username}` : h.name
+  const lines: string[] = []
+  lines.push('📅 <b>Jungschar-Einteilung</b>')
+  lines.push(`<i>${proposals.length} Termine — Senior + Junior Pärchen</i>`)
+  lines.push('')
 
-  const monthRange = (() => {
-    const first = new Date(proposals[0].eventDate + 'T12:00:00')
-    const last = new Date(proposals[proposals.length - 1].eventDate + 'T12:00:00')
-    const monthFmt = new Intl.DateTimeFormat('de-DE', { month: 'long' })
-    const a = monthFmt.format(first)
-    const b = monthFmt.format(last)
-    return a === b ? a : `${a}–${b}`
-  })()
+  for (const [, ps] of groups) {
+    const { name, num } = monthLabel(ps[0].eventDate)
+    const emoji = MONTH_EMOJI[num] ?? '📅'
+    lines.push(`${emoji} <b>${name}</b>`)
+    for (const p of ps) {
+      lines.push(`   ${fmtDay(p.eventDate)} — ${p.helpers.map(tag).join(' &amp; ')}`)
+    }
+    lines.push('')
+  }
 
-  const lines = proposals.map(p =>
-    `• ${fmt(p.eventDate)} — ${p.helpers.map(tag).join(' &amp; ')}`,
-  )
+  lines.push('🤝 Falls etwas nicht passt: einfach hier melden, dann tauschen wir.')
 
-  return [
-    `📅 <b>Jungschar-Einteilung ${monthRange}</b>`,
-    '',
-    ...lines,
-    '',
-    'Falls etwas nicht passt: einfach hier melden, dann tauschen wir.',
-  ].join('\n')
+  return lines.join('\n')
 }
