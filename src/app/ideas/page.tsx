@@ -52,6 +52,8 @@ export default function ArchivePage() {
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null)
   const [entryText, setEntryText] = useState('')
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
 
   useEffect(() => { fetchData() }, [])
 
@@ -132,6 +134,17 @@ export default function ArchivePage() {
     }
   }
 
+  async function saveEdit(idea: IdeaRecord) {
+    const text = editText.trim()
+    if (!text) return
+    await updateIdea(idea, {
+      title: text.slice(0, 200),
+      description: text,
+    })
+    setEditingId(null)
+    setEditText('')
+  }
+
   function toggleStar(idea: IdeaRecord, star: number) {
     const newRating = idea.rating === star ? null : star
     updateIdea(idea, { rating: newRating })
@@ -193,10 +206,49 @@ export default function ArchivePage() {
 
                 {idea ? (
                   <div className="mt-3 pt-3 border-t border-tg-hint/10 space-y-3">
-                    <div>
-                      <p className="text-sm">✅ {idea.title}</p>
-                      <p className="text-xs text-tg-hint mt-1">{sourceLabel(idea.source)}</p>
-                    </div>
+                    {editingId === idea.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault()
+                              saveEdit(idea)
+                            }
+                          }}
+                          rows={3}
+                          className="w-full px-3 py-2 bg-tg-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button resize-y"
+                          autoFocus
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => { setEditingId(null); setEditText('') }}
+                            className="px-3 py-1 text-tg-hint text-sm"
+                          >
+                            Abbrechen
+                          </button>
+                          <button
+                            onClick={() => saveEdit(idea)}
+                            disabled={!editText.trim()}
+                            className="px-4 py-1 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
+                          >
+                            Speichern
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setEditingId(idea.id); setEditText(idea.description || idea.title) }}
+                        className="text-left w-full group"
+                      >
+                        <div className="flex items-start gap-2">
+                          <p className="text-sm whitespace-pre-wrap flex-1">✅ {idea.description || idea.title}</p>
+                          <span className="text-xs text-tg-hint mt-0.5 opacity-50">✏️</span>
+                        </div>
+                        <p className="text-xs text-tg-hint mt-1">{sourceLabel(idea.source)}</p>
+                      </button>
+                    )}
 
                     <div className="flex items-center gap-1">
                       {[1, 2, 3, 4, 5].map(star => (
@@ -231,29 +283,34 @@ export default function ArchivePage() {
                     </div>
                   </div>
                 ) : isAddingLog ? (
-                  <div className="mt-3 pt-3 border-t border-tg-hint/10">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={entryText}
-                        onChange={(e) => setEntryText(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && saveLog(event.id)}
-                        placeholder="Was habt ihr gemacht?"
-                        className="flex-1 px-3 py-2 bg-tg-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button"
-                        autoFocus
-                      />
+                  <div className="mt-3 pt-3 border-t border-tg-hint/10 space-y-2">
+                    <textarea
+                      value={entryText}
+                      onChange={(e) => setEntryText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          saveLog(event.id)
+                        }
+                      }}
+                      placeholder="Was habt ihr gemacht? (Shift+Enter für Absatz)"
+                      rows={3}
+                      className="w-full px-3 py-2 bg-tg-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button resize-y"
+                      autoFocus
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => { setActiveEntryId(null); setEntryText('') }}
+                        className="px-3 py-1 text-tg-hint text-sm"
+                      >
+                        Abbrechen
+                      </button>
                       <button
                         onClick={() => saveLog(event.id)}
                         disabled={savingId === event.id || !entryText.trim()}
-                        className="px-4 py-2 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
+                        className="px-4 py-1 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
                       >
-                        {savingId === event.id ? '...' : '✓'}
-                      </button>
-                      <button
-                        onClick={() => { setActiveEntryId(null); setEntryText('') }}
-                        className="px-3 py-2 text-tg-hint text-sm"
-                      >
-                        ✕
+                        {savingId === event.id ? '...' : 'Speichern'}
                       </button>
                     </div>
                   </div>

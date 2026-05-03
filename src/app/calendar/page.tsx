@@ -518,27 +518,36 @@ export default function CalendarPage() {
                 </div>
               ) : selectedEventIdea ? (
                 <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
-                  <p className="font-medium text-sm">✅ {selectedEventIdea.title}</p>
-                  <p className="text-xs text-tg-hint mt-1">{sourceLabel(selectedEventIdea.source)}</p>
+                  <p className="font-medium text-sm whitespace-pre-wrap">
+                    ✅ {selectedEventIdea.description || selectedEventIdea.title}
+                  </p>
+                  <p className="text-xs text-tg-hint mt-1">
+                    {sourceLabel(selectedEventIdea.source)} · im Archiv bearbeitbar
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <p className="text-sm text-tg-hint">Noch keine Aktivität erfasst.</p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newActivityText}
-                      onChange={(e) => setNewActivityText(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && saveManualActivity()}
-                      placeholder="Was habt ihr gemacht?"
-                      className="flex-1 px-3 py-2 bg-tg-secondary-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button"
-                    />
+                  <textarea
+                    value={newActivityText}
+                    onChange={(e) => setNewActivityText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        saveManualActivity()
+                      }
+                    }}
+                    placeholder="Was habt ihr gemacht? (Shift+Enter für Absatz)"
+                    rows={3}
+                    className="w-full px-3 py-2 bg-tg-secondary-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button resize-y"
+                  />
+                  <div className="flex justify-end">
                     <button
                       onClick={saveManualActivity}
                       disabled={savingActivity || !newActivityText.trim()}
-                      className="px-4 py-2 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
+                      className="px-4 py-1 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
                     >
-                      {savingActivity ? '...' : '✓'}
+                      {savingActivity ? '...' : 'Speichern'}
                     </button>
                   </div>
                 </div>
