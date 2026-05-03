@@ -96,7 +96,7 @@ export async function generateRotation(): Promise<RotationResult> {
   // 1. Helfer laden
   const { data: helpersData, error: helpersErr } = await db
     .from('helpers')
-    .select('id, name, telegram_username, is_admin')
+    .select('id, name, telegram_username, is_admin, is_senior')
   if (helpersErr) throw helpersErr
 
   // is_senior ist über Migration 006 hinzugekommen — als any lesen.
