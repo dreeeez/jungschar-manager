@@ -23,7 +23,11 @@ interface IdeaRecord {
   description: string | null
   source: string
   created_at: string
+  rating: number | null
+  tags: string[] | null
 }
+
+const AVAILABLE_TAGS = ['drinnen', 'draußen'] as const
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('de-DE', {
@@ -114,6 +118,32 @@ export default function ArchivePage() {
     setSavingId(null)
   }
 
+  async function updateIdea(idea: IdeaRecord, patch: Partial<IdeaRecord>) {
+    const optimistic = { ...idea, ...patch }
+    setIdeasMap(prev => new Map(prev).set(idea.event_id, optimistic))
+    const { error } = await (supabase as any)
+      .from('ideas')
+      .update(patch)
+      .eq('id', idea.id)
+    if (error) {
+      showAlert('Fehler: ' + error.message)
+      setIdeasMap(prev => new Map(prev).set(idea.event_id, idea))
+    }
+  }
+
+  function toggleStar(idea: IdeaRecord, star: number) {
+    const newRating = idea.rating === star ? null : star
+    updateIdea(idea, { rating: newRating })
+  }
+
+  function toggleTag(idea: IdeaRecord, tag: string) {
+    const current = idea.tags || []
+    const next = current.includes(tag)
+      ? current.filter(t => t !== tag)
+      : [...current, tag]
+    updateIdea(idea, { tags: next })
+  }
+
   function getHelperNames(event: PastEvent): string {
     const names = event.assignments?.map(a => a.helper?.name).filter(Boolean) as string[]
     return names.length ? names.join(' & ') : '—'
@@ -161,9 +191,43 @@ export default function ArchivePage() {
                 )}
 
                 {idea ? (
-                  <div className="mt-3 pt-3 border-t border-tg-hint/10">
-                    <p className="text-sm">✅ {idea.title}</p>
-                    <p className="text-xs text-tg-hint mt-1">{sourceLabel(idea.source)}</p>
+                  <div className="mt-3 pt-3 border-t border-tg-hint/10 space-y-3">
+                    <div>
+                      <p className="text-sm">✅ {idea.title}</p>
+                      <p className="text-xs text-tg-hint mt-1">{sourceLabel(idea.source)}</p>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <button
+                          key={star}
+                          onClick={() => toggleStar(idea, star)}
+                          className="text-xl leading-none active:scale-90 transition-transform"
+                          aria-label={`${star} Sterne`}
+                        >
+                          {(idea.rating ?? 0) >= star ? '⭐' : '☆'}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {AVAILABLE_TAGS.map(tag => {
+                        const active = (idea.tags || []).includes(tag)
+                        return (
+                          <button
+                            key={tag}
+                            onClick={() => toggleTag(idea, tag)}
+                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                              active
+                                ? 'bg-tg-button text-tg-button-text'
+                                : 'bg-tg-bg text-tg-hint border border-tg-hint/20'
+                            }`}
+                          >
+                            {tag === 'drinnen' ? '🏠' : '🌳'} {tag}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 ) : isAddingLog ? (
                   <div className="mt-3 pt-3 border-t border-tg-hint/10">
