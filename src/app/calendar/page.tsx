@@ -149,6 +149,14 @@ export default function CalendarPage() {
     return new Date(dateString) >= new Date()
   }
 
+  function isPastEvent(dateString: string) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const event = new Date(dateString)
+    event.setHours(0, 0, 0, 0)
+    return event.getTime() < today.getTime()
+  }
+
   function getAssignedHelperIds(event: Event): string[] {
     return event.assignments?.map(a => a.helper_id) || []
   }
@@ -197,6 +205,7 @@ export default function CalendarPage() {
 
   async function toggleHelper(helperId: string) {
     if (!selectedEvent || saving) return
+    if (isPastEvent(selectedEvent.event_date)) return
 
     setSaving(true)
     const assignedIds = getAssignedHelperIds(selectedEvent)
@@ -232,6 +241,7 @@ export default function CalendarPage() {
 
   async function toggleParentDuty(parentId: string) {
     if (!selectedEvent || saving) return
+    if (isPastEvent(selectedEvent.event_date)) return
 
     setSaving(true)
     const currentParentId = getAssignedParentId(selectedEvent)
@@ -340,7 +350,7 @@ export default function CalendarPage() {
           </p>
         ) : (
           <div className="space-y-3">
-            {upcomingEvents.map((event) => {
+            {upcomingEvents.slice(0, 5).map((event) => {
               const idea = ideasMap.get(event.id)
               return (
                 <div
@@ -373,6 +383,11 @@ export default function CalendarPage() {
                 </div>
               )
             })}
+            {upcomingEvents.length > 5 && (
+              <p className="text-xs text-tg-hint text-center pt-1">
+                + {upcomingEvents.length - 5} weitere folgen
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -445,6 +460,12 @@ export default function CalendarPage() {
               </p>
             </div>
 
+            {isPastEvent(selectedEvent.event_date) && (
+              <div className="bg-tg-hint/10 border border-tg-hint/20 rounded-xl p-3 mb-6 text-sm text-tg-hint">
+                🔒 Termin abgeschlossen — Helfer- und Eltern-Zuweisungen sind eingefroren. Aktivität kannst du weiterhin nachtragen.
+              </div>
+            )}
+
             {/* Helfer zuweisen */}
             <p className="text-sm text-tg-hint mb-3">
               👥 Helfer zuweisen:
@@ -453,16 +474,17 @@ export default function CalendarPage() {
             <div className="space-y-2 mb-6">
               {helpers.map((helper) => {
                 const isAssigned = getAssignedHelperIds(selectedEvent).includes(helper.id)
+                const locked = isPastEvent(selectedEvent.event_date)
                 return (
                   <button
                     key={helper.id}
                     onClick={() => toggleHelper(helper.id)}
-                    disabled={saving}
+                    disabled={saving || locked}
                     className={`w-full p-4 rounded-xl text-left flex items-center justify-between transition-colors ${
                       isAssigned
                         ? 'bg-green-500/20 border-2 border-green-500'
                         : 'bg-tg-secondary-bg border-2 border-transparent'
-                    } ${saving ? 'opacity-50' : ''}`}
+                    } ${saving || locked ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span className="font-medium">{helper.name}</span>
                     {isAssigned && <span className="text-green-500">✓</span>}
@@ -484,16 +506,17 @@ export default function CalendarPage() {
             <div className="space-y-2 mb-6">
               {parents.map((parent) => {
                 const isAssigned = getAssignedParentId(selectedEvent) === parent.id
+                const locked = isPastEvent(selectedEvent.event_date)
                 return (
                   <button
                     key={parent.id}
                     onClick={() => toggleParentDuty(parent.id)}
-                    disabled={saving}
+                    disabled={saving || locked}
                     className={`w-full p-4 rounded-xl text-left flex items-center justify-between transition-colors ${
                       isAssigned
                         ? 'bg-orange-500/20 border-2 border-orange-500'
                         : 'bg-tg-secondary-bg border-2 border-transparent'
-                    } ${saving ? 'opacity-50' : ''}`}
+                    } ${saving || locked ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span className="font-medium">{parent.name}</span>
                     {isAssigned && <span className="text-orange-500">🍽️</span>}
