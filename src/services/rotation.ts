@@ -426,7 +426,7 @@ export function formatRotationMessage(proposals: RotationProposal[]): string {
 
   const lines: string[] = []
   lines.push('📅 <b>Jungschar-Einteilung</b>')
-  lines.push(`<i>${proposals.length} Termine — Senior + Junior Pärchen</i>`)
+  lines.push(`<i>${proposals.length} Termine</i>`)
   lines.push('')
 
   for (const [, ps] of groups) {
@@ -534,11 +534,14 @@ export async function executeRotation(opts: ExecuteRotationOptions): Promise<Exe
       ].filter(b => b.length > 0)
     : [filteredProposals]
 
-  if (!isTest) {
+  // Alte Rotations-Pins in dem Ziel-Chat unpinnen (sowohl Test als auch Live).
+  {
     const db = getSupabase()
+    const targetChatId = typeof chatId === 'string' ? parseInt(chatId) : chatId
     const { data: oldMsgs } = await db
       .from('events')
       .select('rotation_message_id, rotation_chat_id')
+      .eq('rotation_chat_id', targetChatId)
       .not('rotation_message_id', 'is', null)
     const seen = new Set<string>()
     for (const row of (oldMsgs ?? []) as any[]) {
@@ -558,13 +561,13 @@ export async function executeRotation(opts: ExecuteRotationOptions): Promise<Exe
     const resolvedChatId = sendResult?.result?.chat?.id ?? chatId
     if (messageId) {
       result.messageIds.push(messageId)
-      if (!isTest) {
-        await tagEventsWithRotationMessage(
-          batch.map(p => p.eventId),
-          messageId,
-          typeof resolvedChatId === 'string' ? parseInt(resolvedChatId) : resolvedChatId,
-        )
-      }
+      // Auch im Test-Modus taggen, damit Auto-Edit-Funktion testbar ist.
+      // Beim späteren Live-Post wird das Tagging sauber überschrieben.
+      await tagEventsWithRotationMessage(
+        batch.map(p => p.eventId),
+        messageId,
+        typeof resolvedChatId === 'string' ? parseInt(resolvedChatId) : resolvedChatId,
+      )
       await pinTelegramMessage(resolvedChatId, messageId)
     }
   }
