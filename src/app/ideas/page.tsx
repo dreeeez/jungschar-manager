@@ -56,8 +56,7 @@ export default function ArchivePage() {
 
   async function fetchData() {
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayIso = today.toISOString().slice(0, 10)
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
     const { data, error } = await (supabase as any)
       .from('events')
