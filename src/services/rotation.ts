@@ -450,6 +450,7 @@ export interface ExecuteRotationOptions {
   chatId: string | number
   isTest: boolean
   splitAt?: string | null
+  untilDate?: string | null
 }
 
 export interface ExecuteRotationResult {
@@ -466,25 +467,30 @@ export interface ExecuteRotationResult {
  * als auch vom Daily-Cron aufgerufen.
  */
 export async function executeRotation(opts: ExecuteRotationOptions): Promise<ExecuteRotationResult> {
-  const { chatId, isTest, splitAt } = opts
+  const { chatId, isTest, splitAt, untilDate } = opts
   const rotation = await generateRotation()
 
+  // untilDate: nur Termine bis inklusive dieses Datums posten/persistieren
+  const filteredProposals = untilDate
+    ? rotation.proposals.filter(p => p.eventDate <= untilDate)
+    : rotation.proposals
+
   const result: ExecuteRotationResult = {
-    proposals: rotation.proposals,
+    proposals: filteredProposals,
     skipped: rotation.skipped,
     inserted: 0,
     messageIds: [],
     telegram: [],
   }
 
-  if (rotation.proposals.length === 0) return result
+  if (filteredProposals.length === 0) return result
 
   const batches = splitAt
     ? [
-        rotation.proposals.filter(p => p.eventDate < splitAt),
-        rotation.proposals.filter(p => p.eventDate >= splitAt),
+        filteredProposals.filter(p => p.eventDate < splitAt),
+        filteredProposals.filter(p => p.eventDate >= splitAt),
       ].filter(b => b.length > 0)
-    : [rotation.proposals]
+    : [filteredProposals]
 
   if (!isTest) {
     const db = getSupabase()
@@ -522,7 +528,7 @@ export async function executeRotation(opts: ExecuteRotationOptions): Promise<Exe
   }
 
   if (!isTest) {
-    const commit = await commitRotation(rotation.proposals)
+    const commit = await commitRotation(filteredProposals)
     result.inserted = commit.inserted
   }
 

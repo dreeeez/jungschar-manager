@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
   try {
     const isTest = req.nextUrl.searchParams.get('test') === '1'
     const splitAt = req.nextUrl.searchParams.get('splitAt')
+    const untilDate = req.nextUrl.searchParams.get('until')
 
     const chatId = isTest
       ? process.env.TELEGRAM_TEST_CHAT_ID
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `${missing} not configured` }, { status: 500 })
     }
 
-    const result = await executeRotation({ chatId, isTest, splitAt })
+    const result = await executeRotation({ chatId, isTest, splitAt, untilDate })
 
     return NextResponse.json({
       mode: isTest ? 'test' : 'live',
