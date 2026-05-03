@@ -55,7 +55,7 @@ interface RotationProposal {
 }
 
 export default function CalendarPage() {
-  const { showAlert } = useTelegram()
+  const { showAlert, showConfirm } = useTelegram()
   const [events, setEvents] = useState<Event[]>([])
   const [helpers, setHelpers] = useState<Helper[]>([])
   const [parents, setParents] = useState<Parent[]>([])
@@ -71,7 +71,7 @@ export default function CalendarPage() {
   const [rotationPreview, setRotationPreview] = useState<RotationProposal[] | null>(null)
   const [rotationSkipped, setRotationSkipped] = useState<{ eventDate: string; reason: string }[]>([])
   const [rotationCommitting, setRotationCommitting] = useState(false)
-  const [rotationTestMode, setRotationTestMode] = useState(false)
+  const [rotationTestMode, setRotationTestMode] = useState(true)
 
   useEffect(() => {
     fetchData()
@@ -708,26 +708,29 @@ export default function CalendarPage() {
             )}
 
             {rotationPreview.length > 0 && (
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={rotationTestMode}
-                    onChange={(e) => setRotationTestMode(e.target.checked)}
-                  />
-                  Test-Modus (Nachricht nur in Test-Chat, keine DB-Änderung)
-                </label>
+              <div className="space-y-3">
                 <button
-                  onClick={() => commitRotation(rotationTestMode)}
+                  onClick={() => commitRotation(true)}
                   disabled={rotationCommitting}
                   className="w-full py-3 bg-tg-button text-tg-button-text rounded-lg font-medium disabled:opacity-50"
                 >
-                  {rotationCommitting
-                    ? 'Sende…'
-                    : rotationTestMode
-                      ? '🧪 Test in Test-Chat senden'
-                      : '✅ Bestätigen & in Gruppe posten'}
+                  {rotationCommitting ? 'Sende…' : '🧪 Test in Test-Chat senden'}
                 </button>
+                <details>
+                  <summary className="text-xs text-tg-hint cursor-pointer">
+                    🔴 Live in Hauptgruppe posten (nur nach erfolgreichem Test)
+                  </summary>
+                  <button
+                    onClick={async () => {
+                      const ok = await showConfirm('Wirklich LIVE in die Hauptgruppe posten und Assignments speichern?')
+                      if (ok) commitRotation(false)
+                    }}
+                    disabled={rotationCommitting}
+                    className="mt-2 w-full py-3 bg-red-500 text-white rounded-lg font-medium disabled:opacity-50"
+                  >
+                    {rotationCommitting ? 'Sende…' : '✅ LIVE bestätigen'}
+                  </button>
+                </details>
               </div>
             )}
           </div>
