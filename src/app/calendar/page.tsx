@@ -426,13 +426,25 @@ export default function CalendarPage() {
           : 'noch nie — bitte in Einstellungen synchronisieren'}
       </p>
 
-      <button
-        onClick={loadRotationPreview}
-        disabled={rotationLoading}
-        className="w-full py-3 mb-6 bg-tg-button text-tg-button-text rounded-lg font-medium disabled:opacity-50"
-      >
-        {rotationLoading ? 'Berechne…' : '🔄 Einteilung für 12 Wochen vorschlagen'}
-      </button>
+      <details className="mb-6">
+        <summary className="text-xs text-tg-hint cursor-pointer py-2">
+          ⚙️ Erweitert: Einteilung manuell neu generieren
+        </summary>
+        <p className="text-xs text-tg-hint mt-2 mb-3">
+          ⚠️ Auto-Modus läuft täglich automatisch. Nur drücken wenn du die aktuelle gepinnte Einteilung
+          ersetzen willst (z.B. neuer Helfer dazu) — alte Pin wird entfernt, neue erstellt.
+        </p>
+        <button
+          onClick={async () => {
+            const ok = await showConfirm('Aktuelle gepinnte Einteilung wirklich ersetzen?')
+            if (ok) loadRotationPreview()
+          }}
+          disabled={rotationLoading}
+          className="w-full py-3 bg-tg-secondary-bg text-tg-text rounded-lg font-medium disabled:opacity-50 border border-tg-hint/20"
+        >
+          {rotationLoading ? 'Berechne…' : '🔄 Einteilung neu generieren'}
+        </button>
+      </details>
 
       {/* Upcoming Events */}
       <div className="mb-8">
