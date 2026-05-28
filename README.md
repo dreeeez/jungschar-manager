@@ -2,6 +2,11 @@
 
 A Telegram bot + admin web app for running a weekly youth-group ("Jungschar"). Plans the helper rotation, polls attendance, syncs the iCal calendar, posts weather-aware reminders, collects ideas — and keeps the parent contact list at hand.
 
+<p align="center">
+  <img src="docs/screenshot-admin.jpg" alt="Admin home" width="46%" />
+  <img src="docs/screenshot-calendar.jpg" alt="Calendar with rotation" width="46%" />
+</p>
+
 ## Features
 
 - **Helper rotation** — 12+ week schedule with senior + junior pairings, manual override, drag-to-reorder
