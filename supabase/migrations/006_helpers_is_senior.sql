@@ -1,14 +1,8 @@
--- Migration 006: Senior-Flag für Helfer-Rotation
--- Markiert die "älteren" Helfer, damit der Rotations-Algorithmus
--- Senior+Junior-Pärchen bevorzugen kann.
+-- Migration 006: Senior flag for the helper rotation
+-- Marks "senior" helpers so the rotation algorithm can prefer
+-- Senior + Junior pairings.
 
 ALTER TABLE helpers ADD COLUMN IF NOT EXISTS is_senior BOOLEAN NOT NULL DEFAULT FALSE;
 
-UPDATE helpers SET is_senior = TRUE
-WHERE name IN (
-  '<redacted-name>',
-  '<redacted-name>',
-  '<redacted-name>',
-  '<redacted-name>',
-  '<redacted-name>'
-);
+-- After running this migration, flag senior helpers via Supabase Studio:
+--   UPDATE helpers SET is_senior = TRUE WHERE name IN ('Helper A', 'Helper B', ...);
