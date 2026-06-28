@@ -26,10 +26,38 @@ export default function SettingsPage() {
   const [icalUrl, setIcalUrl] = useState('')
   const [lastSync, setLastSync] = useState<LastSync | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [botStatus, setBotStatus] = useState<any>(null)
+  const [statusLoading, setStatusLoading] = useState(true)
 
   useEffect(() => {
     fetchSettings()
+    fetchBotStatus()
   }, [])
+
+  async function fetchBotStatus() {
+    setStatusLoading(true)
+    try {
+      const res = await fetch('/api/status')
+      const body = await res.json()
+      if (res.ok) setBotStatus(body)
+    } catch {
+      // Status ist optional — bei Fehler bleibt die Karte leer.
+    }
+    setStatusLoading(false)
+  }
+
+  function fmtShort(iso: string): string {
+    const d = new Date(iso + 'T12:00:00')
+    const wd = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][d.getDay()]
+    return `${wd} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`
+  }
+
+  function stageLabel(t: string): string {
+    if (t === 'stage1_sunday') return 'So'
+    if (t === 'stage2_wednesday') return 'Mi'
+    if (t === 'stage3_saturday') return 'Sa'
+    return t
+  }
 
   async function fetchSettings() {
     const { data } = await (supabase as any)
@@ -141,6 +169,93 @@ export default function SettingsPage() {
       <div className="flex items-center gap-2 mb-6">
         <Link href="/" className="text-tg-link">←</Link>
         <h1 className="text-xl font-bold">Einstellungen</h1>
+      </div>
+
+      {/* Bot-Status (read-only) */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold">Bot-Status</h2>
+          <button
+            onClick={fetchBotStatus}
+            disabled={statusLoading}
+            className="text-xs text-tg-link disabled:opacity-50"
+          >
+            {statusLoading ? '…' : '↻ Aktualisieren'}
+          </button>
+        </div>
+        <p className="text-sm text-tg-hint mb-4">
+          Überblick — kommende Termine, Abgleich mit dem Kalender-Feed und
+          Reminder-Status. Sendet nichts.
+        </p>
+
+        {!botStatus && statusLoading && (
+          <p className="text-xs text-tg-hint">Lädt…</p>
+        )}
+
+        {botStatus && (
+          <>
+            {/* Feed-Status */}
+            <p className="text-xs mb-3">
+              {botStatus.calendar.feedReachable ? (
+                <span className="text-tg-hint">
+                  📡 Feed erreichbar — {botStatus.calendar.feedJungscharCount} Jungschar-Termine
+                </span>
+              ) : (
+                <span className="text-red-500">
+                  📡 Feed nicht erreichbar (Reminder laufen fail-safe normal weiter)
+                </span>
+              )}
+            </p>
+
+            {/* Drift-Warnung */}
+            {botStatus.calendar.feedReachable &&
+              (botStatus.drift.staleInDb.length === 0 &&
+              botStatus.drift.missingFromDb.length === 0 ? (
+                <p className="text-xs text-green-600 mb-3">✅ Kalender &amp; DB im Einklang</p>
+              ) : (
+                <div className="text-xs mb-3 bg-tg-secondary-bg p-2 rounded space-y-1">
+                  {botStatus.drift.staleInDb.length > 0 && (
+                    <p className="text-red-500">
+                      ⚠️ {botStatus.drift.staleInDb.length} Termin(e) in der DB, aber nicht (mehr) im Feed:{' '}
+                      {botStatus.drift.staleInDb.map(fmtShort).join(', ')}
+                    </p>
+                  )}
+                  {botStatus.drift.missingFromDb.length > 0 && (
+                    <p className="text-amber-600">
+                      ➕ {botStatus.drift.missingFromDb.length} Feed-Termin(e) noch nicht in der DB:{' '}
+                      {botStatus.drift.missingFromDb.map(fmtShort).join(', ')}
+                    </p>
+                  )}
+                </div>
+              ))}
+
+            {/* Kommende Termine */}
+            <div className="space-y-2">
+              {botStatus.upcoming.length === 0 && (
+                <p className="text-xs text-tg-hint">Keine kommenden Termine.</p>
+              )}
+              {botStatus.upcoming.map((ev: any) => (
+                <div key={ev.date} className="text-xs bg-tg-secondary-bg p-2 rounded">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">
+                      {ev.inFeed === false ? '❌' : ev.inFeed === null ? '·' : '✅'} {fmtShort(ev.date)}{' '}
+                      <span className="text-tg-hint font-normal">· in {ev.daysUntil} T</span>
+                    </span>
+                    {ev.pinned && <span className="text-tg-hint">📌</span>}
+                  </div>
+                  <div className="text-tg-hint mt-0.5">
+                    {ev.duo.length ? ev.duo.join(' + ') : '— keine Einteilung —'}
+                  </div>
+                  {ev.remindersSent.length > 0 && (
+                    <div className="text-tg-hint mt-0.5">
+                      📨 {ev.remindersSent.map(stageLabel).join(' · ')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* iCal-Sync */}
