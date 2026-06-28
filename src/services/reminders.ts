@@ -3,6 +3,7 @@ import { getUpcomingEvents, getHelperTags } from './events'
 import { getParentDutyDisplay } from './parents'
 import { getSupabase } from './database'
 import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './weather'
+import { fetchJungscharDatesFromIcs, insertNewFutureDates } from './ical-sync'
 
 interface ReminderMessage {
   message: string
@@ -13,6 +14,8 @@ interface ReminderMessage {
 const STAGE_SUNDAY = 'stage1_sunday'
 const STAGE_WEDNESDAY = 'stage2_wednesday'
 const STAGE_SATURDAY = 'stage3_saturday'
+// Markiert einen bereits angekündigten Ausfall — verhindert tägliche Wiederholung.
+const CANCELLED_NOTICE = 'cancelled_notice'
 
 /**
  * Sendet eine Nachricht an Telegram
@@ -100,6 +103,58 @@ async function logReminder(
       } as any,
       { onConflict: 'event_id,reminder_type' }
     )
+}
+
+/**
+ * True, wenn für das Event bereits irgendein Stage-Reminder geloggt wurde.
+ * Entscheidet, ob ein Ausfall still übersprungen (noch nichts gesendet) oder
+ * im Channel angekündigt wird (schon Reminder draußen).
+ */
+async function hasAnyReminderSent(eventId: string): Promise<boolean> {
+  const { data } = await getSupabase()
+    .from('reminder_log')
+    .select('id')
+    .eq('event_id', eventId)
+    .in('reminder_type', [STAGE_SUNDAY, STAGE_WEDNESDAY, STAGE_SATURDAY])
+    .limit(1)
+  return (data?.length ?? 0) > 0
+}
+
+/**
+ * Behandelt einen Termin, der nicht mehr im Kalender steht (Jungschar fällt aus).
+ * - Schon angekündigt (CANCELLED_NOTICE geloggt) -> nichts tun.
+ * - Noch kein Reminder gesendet -> still überspringen (z.B. Sonntag vor dem
+ *   ersten Ping), KEINE Nachricht.
+ * - Schon Reminder gesendet -> einmalig Channel-Hinweis + Slot-Shift der
+ *   Einteilung; CANCELLED_NOTICE verhindert die Wiederholung am nächsten Tag.
+ * liveChatId muss der Live-Chat sein (Gate läuft nur im Nicht-Test-Modus).
+ */
+async function handleCancelledEvent(
+  event: any,
+  liveChatId: string,
+): Promise<{ announced: boolean; shifted: number }> {
+  if (await wasReminderSent(event.id, CANCELLED_NOTICE)) {
+    return { announced: false, shifted: 0 }
+  }
+  if (!(await hasAnyReminderSent(event.id))) {
+    return { announced: false, shifted: 0 }
+  }
+
+  // Lazy-Import bricht den Zirkel reminders <-> rotation auf.
+  const { shiftRotationOnCancellation } = await import('./rotation')
+  const shift = await shiftRotationOnCancellation(event.id)
+
+  const lines = [
+    '⚠️ <b>Kalender-Update</b>',
+    `Der Kalendereintrag wurde geändert — am <b>${formatDate(event.event_date)}</b> findet keine Jungschar statt. Bitte Kalender checken.`,
+  ]
+  if (shift && shift.shifted > 0) {
+    lines.push('Die Einteilung rückt automatisch nach 📌')
+  }
+  await sendTelegramMessage(liveChatId, lines.join('\n'))
+  await logReminder(event.id, CANCELLED_NOTICE)
+
+  return { announced: true, shifted: shift?.shifted ?? 0 }
 }
 
 type Birthday = { name: string; dayMonth: string; age: number }
@@ -463,7 +518,33 @@ export async function processReminders(chatId: string, testStage?: number) {
   const results: any[] = []
   const isTest = testStage !== undefined
 
+  // Kalender-Frische-Check (nur live): Set aller aktuellen Jungschar-Daten aus
+  // dem iCal-Feed. null = Feed nicht erreichbar -> fail-safe, Gate wird übersprungen.
+  // Gleichzeitig verschobene/neue Termine nachziehen.
+  let calendarDates: Set<string> | null = null
+  if (!isTest) {
+    calendarDates = await fetchJungscharDatesFromIcs()
+    if (calendarDates) {
+      await insertNewFutureDates(calendarDates)
+    }
+  }
+
   for (const event of events) {
+    // Gate: Steht der Termin nicht mehr im Kalender, fällt die Jungschar aus.
+    // Im Test-Modus oder bei nicht erreichbarem Feed (null) wird normal gesendet.
+    if (!isTest && calendarDates && !calendarDates.has(event.event_date)) {
+      const handled = await handleCancelledEvent(event, chatId)
+      if (handled.announced) {
+        results.push({
+          event_id: event.id,
+          event_date: event.event_date,
+          cancelled: true,
+          shifted: handled.shifted,
+        })
+      }
+      continue // niemals einen Reminder für einen ausgefallenen Termin senden
+    }
+
     const eventDate = new Date(event.event_date)
     const daysUntil = getDaysUntil(eventDate)
     let reminder: ReminderMessage | null = null

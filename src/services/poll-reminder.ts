@@ -1,5 +1,6 @@
 import { formatDate } from '@/utils/format'
 import { getSupabase, getTodayISO } from './database'
+import { fetchJungscharDatesFromIcs } from './ical-sync'
 
 const STAGE_WEDNESDAY = 'stage2_wednesday'
 
@@ -104,6 +105,18 @@ export async function processPollReminder(chatId: string, isTest = false) {
   const wednesday = await getLatestWednesdayReminder()
   if (!wednesday) {
     return { message: 'Kein offener Mittwochs-Reminder gefunden.' }
+  }
+
+  // Kalender-Frische-Check (nur live): Fällt der Termin aus, keinen Nicht-Voter-
+  // Ping senden. Die Absage-Ankündigung + Slot-Shift übernimmt der reminder-Cron.
+  if (!isTest) {
+    const calendarDates = await fetchJungscharDatesFromIcs()
+    if (calendarDates && !calendarDates.has(wednesday.eventDate)) {
+      return {
+        message: 'Termin nicht mehr im Kalender — Poll-Reminder übersprungen.',
+        eventId: wednesday.eventId,
+      }
+    }
   }
 
   const nonVoters = await getNonVoters(wednesday.eventId)

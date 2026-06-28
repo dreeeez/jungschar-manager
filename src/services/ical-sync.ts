@@ -213,3 +213,60 @@ export async function syncJungscharEvents(): Promise<SyncResult> {
 
   return result
 }
+
+/**
+ * Holt den iCal-Feed (URL aus settings) frisch und liefert die Menge aller
+ * "Jungschar"-Termine als YYYY-MM-DD (Berlin-Zeit). Bei Konfig-, Netzwerk-
+ * oder HTTP-Fehler -> null, damit Caller fail-safe weitermachen können
+ * (lieber ein Reminder zu viel als eine fälschliche Absage bei kurz nicht
+ * erreichbarem Feed).
+ */
+export async function fetchJungscharDatesFromIcs(): Promise<Set<string> | null> {
+  const db = getSupabase()
+
+  const { data: setting, error } = await db
+    .from('settings')
+    .select('value')
+    .eq('key', 'ical_url')
+    .single()
+  if (error || !setting?.value) return null
+
+  let response: Response
+  try {
+    response = await fetch(setting.value, { cache: 'no-store' })
+  } catch {
+    return null
+  }
+  if (!response.ok) return null
+
+  const ics = await response.text()
+  const dates = new Set<string>()
+  for (const e of parseIcs(ics)) {
+    if (e.summary.trim().toLowerCase() === JUNGSCHAR_SUMMARY.toLowerCase()) {
+      dates.add(localDateString(e.dtstart))
+    }
+  }
+  return dates
+}
+
+/**
+ * Legt zukünftige Jungschar-Termine aus {dates} an, die noch nicht in der
+ * events-Tabelle stehen. Spiegelt die Insert-Logik von syncJungscharEvents,
+ * damit verschobene/neu hinzugekommene Termine sofort Reminder bekommen.
+ * Gibt die Anzahl neu angelegter Termine zurück.
+ */
+export async function insertNewFutureDates(dates: Set<string>): Promise<number> {
+  const db = getSupabase()
+  const todayIso = localDateString(new Date())
+
+  const { data: existing } = await db.from('events').select('event_date')
+  const existingDates = new Set((existing ?? []).map((e: any) => e.event_date))
+
+  const rows = [...dates]
+    .filter(d => d >= todayIso && !existingDates.has(d))
+    .map(d => ({ event_date: d, title: JUNGSCHAR_SUMMARY, description: null }))
+
+  if (rows.length === 0) return 0
+  const { error } = await db.from('events').insert(rows as any)
+  return error ? 0 : rows.length
+}

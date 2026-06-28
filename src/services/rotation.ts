@@ -390,6 +390,81 @@ export async function rerenderRotationMessage(messageId: number): Promise<{ ok: 
   }
 }
 
+/**
+ * Rückt die Einteilung nach, wenn der Termin {cancelledEventId} ausfällt:
+ * Jeder spätere Termin im selben Pin-Batch übernimmt das Duo des vorherigen
+ * (Slot-Shift — geplante Paarungen bleiben erhalten, nur um einen Platz
+ * verschoben). Das frei werdende letzte Duo geht zurück in den Pool. Der
+ * ausgefallene Termin verlässt den Pin (rotation_message_id -> null), damit
+ * keine leere Zeile bleibt, danach wird die Nachricht neu gerendert.
+ *
+ * Liefert null, wenn der Termin keinem Pin-Batch angehört (nichts zu shiften).
+ */
+export async function shiftRotationOnCancellation(
+  cancelledEventId: string,
+): Promise<{ shifted: number; messageId: number } | null> {
+  const db = getSupabase()
+
+  const { data: cancelled } = await (db as any)
+    .from('events')
+    .select('event_date, rotation_message_id')
+    .eq('id', cancelledEventId)
+    .maybeSingle()
+
+  const messageId: number | null = cancelled?.rotation_message_id ?? null
+  if (!cancelled || !messageId) return null
+
+  // Alle Termine dieses Pins ab dem Ausfall-Datum (inklusive), chronologisch.
+  const { data: batch } = await (db as any)
+    .from('events')
+    .select('id, event_date')
+    .eq('rotation_message_id', messageId)
+    .gte('event_date', cancelled.event_date)
+    .order('event_date', { ascending: true })
+
+  const events = (batch ?? []) as { id: string; event_date: string }[]
+  const ids = events.map(e => e.id)
+
+  // Aktuelle Duos je Termin laden — VOR dem Löschen.
+  const { data: assigns } = await db
+    .from('assignments')
+    .select('event_id, helper_id')
+    .in('event_id', ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000'])
+  const duoByEvent = new Map<string, string[]>()
+  for (const a of (assigns ?? []) as any[]) {
+    const arr = duoByEvent.get(a.event_id) ?? []
+    arr.push(a.helper_id)
+    duoByEvent.set(a.event_id, arr)
+  }
+
+  // Slot-Shift: event[i] erbt das Duo von event[i-1]. event[0] (Ausfall)
+  // bleibt leer, das letzte Duo der Kette wird freigesetzt.
+  const newAssign: { event_id: string; helper_id: string }[] = []
+  for (let i = 1; i < events.length; i++) {
+    for (const hid of duoByEvent.get(events[i - 1].id) ?? []) {
+      newAssign.push({ event_id: events[i].id, helper_id: hid })
+    }
+  }
+
+  // Schreiben: alte Zuweisungen der Batch-Termine weg, neue setzen.
+  if (ids.length > 0) {
+    await db.from('assignments').delete().in('event_id', ids)
+  }
+  if (newAssign.length > 0) {
+    await db.from('assignments').insert(newAssign as any)
+  }
+
+  // Ausgefallenen Termin aus dem Pin nehmen (sonst leere Zeile im Pin).
+  await (db as any)
+    .from('events')
+    .update({ rotation_message_id: null, rotation_chat_id: null })
+    .eq('id', cancelledEventId)
+
+  await rerenderRotationMessage(messageId)
+
+  return { shifted: Math.max(0, events.length - 1), messageId }
+}
+
 const MONTH_EMOJI: Record<number, string> = {
   1: '❄️', 2: '❄️', 3: '🌱', 4: '🌷', 5: '🌸',
   6: '☀️', 7: '☀️', 8: '🏖️', 9: '🍂', 10: '🎃', 11: '🍁', 12: '🎄',
