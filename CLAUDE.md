@@ -41,7 +41,7 @@ supabase/
   migrations/       SQL-Migrations (manuell im Supabase-Studio ausführen)
   seed/ideenpool.json  Ideenpool aus dem Elternchat-Export (2020–2026)
 scripts/
-  import-ideenpool.mjs  Einmal-Import der Seed-Datei in `ideas` (idempotent, --dry-run)
+  import-ideenpool.mjs  Import der Seed-Datei in `ideas` (Upsert nach Titel, --dry-run)
 ```
 
 ## Reminder-System
@@ -192,7 +192,7 @@ parent_duties (event_id, parent_id)
 event_status (event_id UNIQUE, idea_ready, food_communicated, ...)
 reminder_log (event_id, reminder_type, sent_at, message_id) UNIQUE(event_id, reminder_type)
 attendance_votes (event_id, helper_id, attending, voted_at) UNIQUE(event_id, helper_id)
-ideas (event_id, title, description, material, was_used, source, rating, tags[], weather_description, temperature) — Archiv (event_id gesetzt, was_used=true) UND Ideenpool (event_id NULL, was_used=false, source='elterngruppe'|'manual'; tags = drinnen/draußen + Kategorien)
+ideas (event_id, title, description, material, was_used, source, rating, tags[], suggested_by, weather_description, temperature) — Archiv (event_id gesetzt, was_used=true) UND Ideenpool (event_id NULL, was_used=false, source='elterngruppe'|'manual'; tags = drinnen/draußen + Kategorien; suggested_by + created_at = wer/wann die Idee eingebracht hat, beim Import das Datum der ersten Chat-Nachricht)
 review_pings (event_id, telegram_user_id, chat_id, message_id, state, stars, place, is_test) UNIQUE(event_id, telegram_user_id)
 children (id, name, birthday, active)
 settings (key UNIQUE, value)

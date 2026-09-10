@@ -41,3 +41,4 @@ coverage/
 .vercel
 .env*
 .claude/
+node_modules

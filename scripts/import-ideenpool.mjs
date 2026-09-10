@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 /*
- * Einmaliger Import des Ideenpools aus supabase/seed/ideenpool.json in die
- * ideas-Tabelle (source='elterngruppe', was_used=false, ohne Termin).
+ * Import des Ideenpools aus supabase/seed/ideenpool.json in die ideas-Tabelle
+ * (source='elterngruppe', was_used=false, ohne Termin).
  *
  * Liest SUPABASE_URL und SUPABASE_SERVICE_KEY aus .env.local.
- * Idempotent: Titel, die mit source='elterngruppe' schon existieren, werden
- * übersprungen. Mit --dry-run wird nur gezählt, nichts geschrieben.
+ * Upsert nach Titel: vorhandene Elternchat-Ideen werden aktualisiert
+ * (Beschreibung, Mitbringen, Tags, Herkunft), neue eingefügt. Manuell in der
+ * App angelegte Ideen (source='manual') bleiben unberührt.
+ * Mit --dry-run wird nur gezählt, nichts geschrieben.
  *
  *   node scripts/import-ideenpool.mjs [--dry-run]
+ *
+ * Voraussetzung: Migration 011 (Spalte suggested_by) ist eingespielt.
  */
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
@@ -41,36 +45,54 @@ function formatDone(done) {
   return `Bisher gemacht (${done.length}×): ${list.join(', ')}.`
 }
 
+function toRow(idea) {
+  return {
+    title: idea.title.slice(0, 200),
+    description: `${idea.description.trim()} ${formatDone(idea.done)}`,
+    material: idea.material || null,
+    tags: idea.tags ?? [],
+    suggested_by: idea.suggested_by || null,
+    // Datum der ersten Chat-Nachricht, 18:00 lokale Zeit als neutraler Zeitpunkt
+    created_at: idea.proposed_at ? `${idea.proposed_at}T18:00:00+02:00` : undefined,
+  }
+}
+
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY, { auth: { persistSession: false } })
 
 const { data: existing, error: readError } = await db
   .from('ideas')
-  .select('title')
+  .select('id, title')
   .eq('source', 'elterngruppe')
 if (readError) {
   console.error('Lesen fehlgeschlagen:', readError.message)
   process.exit(1)
 }
-const have = new Set((existing ?? []).map((r) => r.title))
+const idByTitle = new Map((existing ?? []).map((r) => [r.title, r.id]))
 
-const rows = seed
-  .filter((idea) => !have.has(idea.title))
-  .map((idea) => ({
-    event_id: null,
-    title: idea.title.slice(0, 200),
-    description: `${idea.description.trim()} ${formatDone(idea.done)}`,
-    material: idea.material || null,
-    was_used: false,
-    source: 'elterngruppe',
-    tags: idea.tags ?? [],
-  }))
-
-console.log(`${seed.length} Ideen in der Seed-Datei, ${have.size} bereits vorhanden, ${rows.length} neu.`)
-if (dryRun || rows.length === 0) process.exit(0)
-
-const { error } = await db.from('ideas').insert(rows)
-if (error) {
-  console.error('Insert fehlgeschlagen:', error.message)
-  process.exit(1)
+const updates = []
+const inserts = []
+for (const idea of seed) {
+  const row = toRow(idea)
+  const id = idByTitle.get(row.title)
+  if (id) updates.push({ id, ...row })
+  else inserts.push({ ...row, event_id: null, was_used: false, source: 'elterngruppe' })
 }
-console.log(`${rows.length} Ideen importiert.`)
+
+console.log(`${seed.length} Ideen in der Seed-Datei: ${updates.length} aktualisieren, ${inserts.length} neu.`)
+if (dryRun) process.exit(0)
+
+for (const { id, ...patch } of updates) {
+  const { error } = await db.from('ideas').update(patch).eq('id', id)
+  if (error) {
+    console.error(`Update fehlgeschlagen (${patch.title}):`, error.message)
+    process.exit(1)
+  }
+}
+if (inserts.length > 0) {
+  const { error } = await db.from('ideas').insert(inserts)
+  if (error) {
+    console.error('Insert fehlgeschlagen:', error.message)
+    process.exit(1)
+  }
+}
+console.log(`Fertig: ${updates.length} aktualisiert, ${inserts.length} eingefügt.`)

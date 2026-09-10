@@ -3,588 +3,1347 @@
     "title": "Nerf-Gun-Schlacht im Saal",
     "description": "Der Klassiker: fast jede Familie hat eine Nerf. Gut kombinierbar: vorher Geländespiele draußen, danach Brettspiele, zum Abschluss Nuggets und Pommes.",
     "material": "Nerf Guns und Munition beschriftet mitbringen, Schutzbrillen (liegen in der oberen Hütte)",
-    "tags": ["drinnen", "sport"],
-    "done": ["2022-04", "2022-10", "2024-01", "2025-03", "2025-11", "2026-06"]
+    "tags": [
+      "drinnen",
+      "sport"
+    ],
+    "done": [
+      "2022-04",
+      "2022-10",
+      "2024-01",
+      "2025-03",
+      "2025-11",
+      "2026-06"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-03-17",
+    "chat_message_id": 346
   },
   {
     "title": "Nerf-Schlacht in der Burg am Eberg mit Punsch",
     "description": "Treffpunkt am Saal, zu Fuß zum Eberg, in der Burg mit den Nerfs spielen. Zum Aufwärmen gibt es Punsch. Winter-Variante der Nerf-Schlacht.",
     "material": "Nerf Guns, Schutzbrillen, warme Kleidung, Punsch",
-    "tags": ["draußen", "winter", "sport"],
-    "done": ["2024-11"]
+    "tags": [
+      "draußen",
+      "winter",
+      "sport"
+    ],
+    "done": [
+      "2024-11"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2024-11-30",
+    "chat_message_id": 714
   },
   {
     "title": "Lasertag in Göppingen",
     "description": "Fester Termin vor Ort, deshalb früher losfahren (Abfahrt 16:00 für Termin 17:00). Einverständniserklärung der Erziehungsberechtigten wird gebraucht, leere Formulare zur Jungschar mitbringen.",
     "material": "Einverständniserklärung pro Kind ausgefüllt mitbringen",
-    "tags": ["drinnen", "ausflug", "sport"],
-    "done": ["2022-06", "2023-03", "2024-02", "2026-03"]
+    "tags": [
+      "drinnen",
+      "ausflug",
+      "sport"
+    ],
+    "done": [
+      "2022-06",
+      "2023-03",
+      "2024-02",
+      "2026-03"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-06-23",
+    "chat_message_id": 408
   },
   {
     "title": "Spieleland Adelberg",
     "description": "Indoor-Spielplatz. Bewährte Schlechtwetter-Alternative, wurde 2024 spontan statt Schelmenklinge gemacht. Start 17:00 am Saal, Ende 20:00.",
     "material": null,
-    "tags": ["drinnen", "ausflug"],
-    "done": ["2022-01", "2023-02", "2024-06", "2026-01"]
+    "tags": [
+      "drinnen",
+      "ausflug"
+    ],
+    "done": [
+      "2022-01",
+      "2023-02",
+      "2024-06",
+      "2026-01"
+    ],
+    "suggested_by": "Felix Schniepp",
+    "proposed_at": "2022-01-15",
+    "chat_message_id": 324
   },
   {
     "title": "Sprungbude Trampolinhalle Stuttgart",
     "description": "Längere Anfahrt, deshalb pünktlich 17:20 am Saal zur Abfahrt. Einverständniserklärung vorab online unter waiver.roller.app ausfüllen.",
     "material": "Online-Waiver pro Kind, Sprungsocken falls vorhanden",
-    "tags": ["drinnen", "ausflug", "sport"],
-    "done": ["2022-11", "2024-03"]
+    "tags": [
+      "drinnen",
+      "ausflug",
+      "sport"
+    ],
+    "done": [
+      "2022-11",
+      "2024-03"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-11-03",
+    "chat_message_id": 463
   },
   {
     "title": "Kegeln",
     "description": "Kegelbahn im UG. Treffpunkt wie immer, Abholung am Saal.",
     "material": null,
-    "tags": ["drinnen"],
-    "done": ["2021-11"]
+    "tags": [
+      "drinnen"
+    ],
+    "done": [
+      "2021-11"
+    ],
+    "suggested_by": "Felix Schniepp",
+    "proposed_at": "2021-11-25",
+    "chat_message_id": 312
   },
   {
     "title": "Kinoabend",
     "description": "Gemütlicher Filmabend im Saal, davor 10 bis 20 Minuten raus zum Austoben.",
     "material": "Warme Kleidung für die Runde draußen",
-    "tags": ["drinnen", "winter"],
-    "done": ["2024-01"]
+    "tags": [
+      "drinnen",
+      "winter"
+    ],
+    "done": [
+      "2024-01"
+    ],
+    "suggested_by": "Wing",
+    "proposed_at": "2024-01-12",
+    "chat_message_id": 624
   },
   {
     "title": "Brettspiele-Abend",
     "description": "Ruhiger Ausklang nach Action, z. B. nach der Nerf-Schlacht.",
     "material": "Brettspiele",
-    "tags": ["drinnen"],
-    "done": ["2024-01"]
+    "tags": [
+      "drinnen"
+    ],
+    "done": [
+      "2024-01"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2024-01-19",
+    "chat_message_id": 629
   },
   {
     "title": "Soccerhalle (Göppingen oder MC Arena Schorndorf)",
     "description": "Kunstrasen, Indoor in Göppingen oder überdacht in der MC Arena Schorndorf. Halle kann kühl sein. Noppen- oder Hartplatzschuhe reichen, keine Stollen.",
     "material": "Sportkleidung, Noppenschuhe oder Hallenschuhe",
-    "tags": ["drinnen", "sport", "ausflug"],
-    "done": ["2020-09", "2021-11", "2022-10"]
+    "tags": [
+      "drinnen",
+      "sport",
+      "ausflug"
+    ],
+    "done": [
+      "2020-09",
+      "2021-11",
+      "2022-10"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-09-26",
+    "chat_message_id": 84
   },
   {
     "title": "Sport im Saal",
     "description": "Bewegungsprogramm im großen Saal, geht auch nach dem Adventskalender-Basteln.",
     "material": "Hallenschuhe",
-    "tags": ["drinnen", "sport"],
-    "done": ["2020-11", "2025-11"]
+    "tags": [
+      "drinnen",
+      "sport"
+    ],
+    "done": [
+      "2020-11",
+      "2025-11"
+    ],
+    "suggested_by": "Wing",
+    "proposed_at": "2020-11-06",
+    "chat_message_id": 116
   },
   {
     "title": "Sport und Spiele auf dem Hartplatz",
     "description": "Fußball, Brennball, Verstecken. Hartplatz in Plüderhausen. Danach eine Kleinigkeit drinnen oder weiter auf ein Grundstück. Schnell organisiert, wenn kein Programm steht.",
     "material": "Sportkleidung, etwas Wärmeres für danach",
-    "tags": ["draußen", "sport"],
-    "done": ["2023-02", "2023-11", "2024-10", "2025-04", "2025-11"]
+    "tags": [
+      "draußen",
+      "sport"
+    ],
+    "done": [
+      "2023-02",
+      "2023-11",
+      "2024-10",
+      "2025-04",
+      "2025-11"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2023-02-04",
+    "chat_message_id": 524
   },
   {
     "title": "Jungschar-Fußballturnier",
     "description": "Turnier über die Jungschargruppen. War für Juni 2026 geplant und wurde wegen Hitze auf einen Sonntag verschoben. Bei Hitze auf Uhrzeit und Schatten achten.",
     "material": "Bälle, Leibchen, Getränke",
-    "tags": ["draußen", "sport"],
-    "done": []
+    "tags": [
+      "draußen",
+      "sport"
+    ],
+    "done": [],
+    "suggested_by": "Johanne N. Maier",
+    "proposed_at": "2026-06-24",
+    "chat_message_id": 1180
   },
   {
     "title": "Badminton",
     "description": "Auf dem Sandbühl in Plüderhausen zusammen mit Fußball und Grillen gespielt.",
     "material": "Badminton-Schläger und Bälle",
-    "tags": ["draußen", "sport"],
-    "done": ["2025-07"]
+    "tags": [
+      "draußen",
+      "sport"
+    ],
+    "done": [
+      "2025-07"
+    ],
+    "suggested_by": "Marcus Schneider",
+    "proposed_at": "2025-07-11",
+    "chat_message_id": 816
   },
   {
     "title": "Hallenbad Oskar-Frech-Bad Schorndorf",
     "description": "Vorher im Elternchat fragen, wer nicht schwimmen kann. Mehrere Kinder brauchen Schwimmflügel, ziehen sie aber nur an, wenn andere auch welche tragen. Kein Ausweis nötig.",
     "material": "Badesachen, Schwimmflügel für Nichtschwimmer",
-    "tags": ["drinnen", "wasser"],
-    "done": ["2022-02", "2022-09", "2023-01", "2023-10", "2024-02", "2026-02"]
+    "tags": [
+      "drinnen",
+      "wasser"
+    ],
+    "done": [
+      "2022-02",
+      "2022-09",
+      "2023-01",
+      "2023-10",
+      "2024-02",
+      "2026-02"
+    ],
+    "suggested_by": "Felix Schniepp",
+    "proposed_at": "2022-02-04",
+    "chat_message_id": 334
   },
   {
     "title": "Freibad (Bud-Spencer-Bad oder Gmünd)",
     "description": "Sommer-Variante vom Schwimmen. Nichtschwimmer vorher abfragen.",
     "material": "Badesachen, Sonnencreme, Schwimmflügel",
-    "tags": ["draußen", "wasser"],
-    "done": ["2022-07", "2023-07", "2025-06"]
+    "tags": [
+      "draußen",
+      "wasser"
+    ],
+    "done": [
+      "2022-07",
+      "2023-07",
+      "2025-06"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-07-14",
+    "chat_message_id": 416
   },
   {
     "title": "Kanu fahren (Brenz)",
     "description": "Als normale Jungschar mit Start um 15:00 oder als Tagesausflug ab 10:00 auf der Brenz. Abgerundet mit Eis, Döner und viel Gemeinschaft. Die Jungs haben es laut Eltern richtig gefeiert. Rückkehr wird später als geplant, Kinder heimfahren.",
     "material": "Badesachen, Wechselkleider, Sonnencreme eingeschmiert, Schwimmwesten sind vorhanden und Pflicht",
-    "tags": ["draußen", "wasser", "ausflug"],
-    "done": ["2025-06", "2026-08"]
+    "tags": [
+      "draußen",
+      "wasser",
+      "ausflug"
+    ],
+    "done": [
+      "2025-06",
+      "2026-08"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2025-06-20",
+    "chat_message_id": 771
   },
   {
     "title": "Tretboot am Ebnisee mit Grillen",
     "description": "Start 16:00 am Saal, Tretboot fahren, danach Grillen an der Jungscharhütte mit Würsten am Stecken. Ein Helfer pro Boot. Ebnisee ist tief, Eltern wünschen Schwimmwesten, dort gibt es welche zum Leihen. Feuer früh genug anzünden.",
     "material": "Badesachen, Spritzpistolen, Schwimmwesten, Messer zum Stecken schnitzen, Grillwürste",
-    "tags": ["draußen", "wasser", "essen"],
-    "done": ["2026-07"]
+    "tags": [
+      "draußen",
+      "wasser",
+      "essen"
+    ],
+    "done": [
+      "2026-07"
+    ],
+    "suggested_by": "Tobias Schneider",
+    "proposed_at": "2026-07-08",
+    "chat_message_id": 1204
   },
   {
     "title": "Bachwanderung",
     "description": "Im Bach entlang laufen, Kleidung und Schuhe dürfen nass werden.",
     "material": "Wasserfeste Schuhe, Wechselkleider und Wechselschuhe",
-    "tags": ["draußen", "wasser", "wald"],
-    "done": ["2024-07"]
+    "tags": [
+      "draußen",
+      "wasser",
+      "wald"
+    ],
+    "done": [
+      "2024-07"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2024-07-13",
+    "chat_message_id": 673
   },
   {
     "title": "Wald und Bach mit Schnitzen",
     "description": "Raus in den Wald, am Bach spielen, Kinder dürfen Schnitzwerkzeug mitbringen. Auch als Waldabend mit Messer und kleiner Handsäge zum Bauen.",
     "material": "Taschenmesser, kleine Handsäge, Outdoor-Kleidung",
-    "tags": ["draußen", "wald", "kreativ"],
-    "done": ["2020-06", "2026-07"]
+    "tags": [
+      "draußen",
+      "wald",
+      "kreativ"
+    ],
+    "done": [
+      "2020-06",
+      "2026-07"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-06-11",
+    "chat_message_id": 49
   },
   {
     "title": "Pool-Abschluss bei einer Familie",
     "description": "Kurze Fahrradtour, Eisdiele, dann Abschluss mit Pool und Essen bei Familie Maier. Pool ist 110 cm tief, Schwimmflügel mitgeben. An dem Tag keine Macheten oder Messer.",
     "material": "Badesachen, Schwimmflügel, Fahrrad, Helm",
-    "tags": ["draußen", "wasser", "essen"],
-    "done": ["2026-06"]
+    "tags": [
+      "draußen",
+      "wasser",
+      "essen"
+    ],
+    "done": [
+      "2026-06"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2026-06-19",
+    "chat_message_id": 1163
   },
   {
     "title": "Fahrradtour zur Eisdiele",
     "description": "Radtour nach Urbach oder Waldhausen mit Eis. Start meist 17:00 am Saal. Vorher prüfen, dass die Räder funktionieren. Bei Regenrisiko Regenjacke mitgeben.",
     "material": "Funktionsfähiges Fahrrad, Helm, Regenjacke",
-    "tags": ["draußen", "sport"],
-    "done": ["2023-06", "2024-06", "2026-06"]
+    "tags": [
+      "draußen",
+      "sport"
+    ],
+    "done": [
+      "2023-06",
+      "2024-06",
+      "2026-06"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2023-06-17",
+    "chat_message_id": 566
   },
   {
     "title": "Fahrradtour in Kleingruppen",
     "description": "Gemütliche Radtour, ca. 2 Stunden. In Corona-Zeiten mit max. 5 Personen pro Gruppe und Treffpunkten bei Familien zuhause. Kinder vorher im Chat anmelden lassen.",
     "material": "Fahrrad, Helm, Rucksack mit Trinken",
-    "tags": ["draußen", "sport"],
-    "done": ["2020-05", "2021-07", "2023-04", "2025-03"]
+    "tags": [
+      "draußen",
+      "sport"
+    ],
+    "done": [
+      "2020-05",
+      "2021-07",
+      "2023-04",
+      "2025-03"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-05-18",
+    "chat_message_id": 18
   },
   {
     "title": "Pumptrack Göppingen mit Spielplatz",
     "description": "Fahrrad oder Roller auf dem Pumptrack, nebenan ist ein Spielplatz. Roller passen besser in den Kofferraum als Fahrräder.",
     "material": "Fahrrad oder Roller/Scooter, Helm Pflicht",
-    "tags": ["draußen", "sport", "ausflug"],
-    "done": ["2024-06", "2024-10", "2026-04"]
+    "tags": [
+      "draußen",
+      "sport",
+      "ausflug"
+    ],
+    "done": [
+      "2024-06",
+      "2024-10",
+      "2026-04"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2024-06-28",
+    "chat_message_id": 668
   },
   {
     "title": "Schleppertour",
     "description": "Mit dem Traktor unterwegs. 2021 geplant, aus Sicherheitsgründen kurzfristig durch eine Fahrradtour ersetzt. Nur mit klarem Sicherheitskonzept angehen.",
     "material": null,
-    "tags": ["draußen", "ausflug"],
-    "done": []
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [],
+    "suggested_by": "Felix Schniepp",
+    "proposed_at": "2021-07-09",
+    "chat_message_id": 246
   },
   {
     "title": "Einachser-Wanderung zum Sandbühl",
     "description": "Einachser fahren und wandern zum Sandbühl in Plüderhausen. Oben Fußball, Badminton und Grillen. Kürzere Jungschar von 16:00 bis 18:30.",
     "material": "Grillzeug, Bälle, Badminton",
-    "tags": ["draußen", "essen", "sport"],
-    "done": ["2025-07"]
+    "tags": [
+      "draußen",
+      "essen",
+      "sport"
+    ],
+    "done": [
+      "2025-07"
+    ],
+    "suggested_by": "Marcus Schneider",
+    "proposed_at": "2025-07-11",
+    "chat_message_id": 816
   },
   {
     "title": "Schlittenfahren in Treffelhausen",
     "description": "Spontan, sobald Schnee liegt. Früher starten (14:30 oder 15:00), damit es noch hell ist, Ende gegen 18:00. Kinder direkt heimfahren. Schlitten lassen sich im Anhänger transportieren. Eltern-Feedback: die Jungs waren überglücklich.",
     "material": "Schlitten, Schneehose, Handschuhe, warme Kleidung",
-    "tags": ["draußen", "winter"],
-    "done": ["2022-04", "2025-01", "2026-01"]
+    "tags": [
+      "draußen",
+      "winter"
+    ],
+    "done": [
+      "2022-04",
+      "2025-01",
+      "2026-01"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-04-01",
+    "chat_message_id": 363
   },
   {
     "title": "Sommerrodelbahn Kaisersbach mit Grillen",
     "description": "Rodelbahn in Kaisersbach, danach Grillen am Saal, Eltern können zum Grillen dazukommen.",
     "material": null,
-    "tags": ["draußen", "ausflug", "essen"],
-    "done": ["2022-05"]
+    "tags": [
+      "draußen",
+      "ausflug",
+      "essen"
+    ],
+    "done": [
+      "2022-05"
+    ],
+    "suggested_by": "Hafriba",
+    "proposed_at": "2022-05-20",
+    "chat_message_id": 396
   },
   {
     "title": "Steinschleudern bauen",
     "description": "Plan B für den Winter, wenn kein Schnee zum Schlittenfahren liegt. Noch nie umgesetzt.",
     "material": "Astgabeln, Gummi, Leder, Messer",
-    "tags": ["draußen", "kreativ", "wald"],
-    "done": []
+    "tags": [
+      "draußen",
+      "kreativ",
+      "wald"
+    ],
+    "done": [],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2026-01-09",
+    "chat_message_id": 929
   },
   {
     "title": "Raketen bauen",
     "description": "Bastel-Jungschar im Winter, Raketen bauen und starten lassen.",
     "material": "Bausätze oder Flaschen, Pumpe",
-    "tags": ["drinnen", "kreativ"],
-    "done": ["2025-01"]
+    "tags": [
+      "drinnen",
+      "kreativ"
+    ],
+    "done": [
+      "2025-01"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2025-01-11",
+    "chat_message_id": 723
   },
   {
     "title": "Rennbahn bauen",
     "description": "Im Bürogebäude eine Rennbahn bauen und Rennen fahren.",
     "material": "Bahn-Material, kleine Autos",
-    "tags": ["drinnen", "kreativ"],
-    "done": ["2024-02"]
+    "tags": [
+      "drinnen",
+      "kreativ"
+    ],
+    "done": [
+      "2024-02"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2024-02-23",
+    "chat_message_id": 649
   },
   {
     "title": "Papierfliegerwettbewerb",
     "description": "In der oberen Hütte falten, draußen fliegen lassen. Kategorien wie Weite und Flugzeit.",
     "material": "Papier, Maßband",
-    "tags": ["drinnen", "draußen", "kreativ"],
-    "done": ["2023-11"]
+    "tags": [
+      "drinnen",
+      "draußen",
+      "kreativ"
+    ],
+    "done": [
+      "2023-11"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2023-11-16",
+    "chat_message_id": 616
   },
   {
     "title": "Murmelbahn im Wald",
     "description": "Im Wald bei Adelberg, im Bärenbachtal oder Kaisersbach gibt es Murmelbahnen. Kinder bringen Murmeln mit. Bewährter Programmpunkt, vier Mal gemacht.",
     "material": "Murmeln, Outdoor-Kleidung",
-    "tags": ["draußen", "wald"],
-    "done": ["2023-09", "2025-04", "2025-09", "2026-04"]
+    "tags": [
+      "draußen",
+      "wald"
+    ],
+    "done": [
+      "2023-09",
+      "2025-04",
+      "2025-09",
+      "2026-04"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2023-09-14",
+    "chat_message_id": 605
   },
   {
     "title": "Bärenbachtal",
     "description": "Vorschlag aus dem Elternchat (Prisca): 'Bärenbachtal ist auch mega'. Draußen mit Murmelbahn, Treffpunkt und Ende am Saal.",
     "material": "Murmel, Outdoor-Kleidung",
-    "tags": ["draußen", "wald"],
-    "done": ["2025-09"]
+    "tags": [
+      "draußen",
+      "wald"
+    ],
+    "done": [
+      "2025-09"
+    ],
+    "suggested_by": "Prisca Kolb",
+    "proposed_at": "2026-07-01",
+    "chat_message_id": 1183
   },
   {
     "title": "Mooswald Weitmars mit Abschluss im Garten",
     "description": "Vorschlag aus dem Elternchat (Maris): in Weitmars in den Mooswald, danach direkt in den Garten der Familie Nitsche zum Essen. Familie stellt Essen, Grill kann besorgt werden.",
     "material": "Grill",
-    "tags": ["draußen", "wald", "essen"],
-    "done": ["2026-07"]
+    "tags": [
+      "draußen",
+      "wald",
+      "essen"
+    ],
+    "done": [
+      "2026-07"
+    ],
+    "suggested_by": "Maris Nitsche",
+    "proposed_at": "2026-07-01",
+    "chat_message_id": 1182
   },
   {
     "title": "Schelmenklinge",
     "description": "Wanderung durch die Klamm. Wetterabhängig, bei Regen wurde auf das Spieleland ausgewichen. Lässt sich mit Eberg-Programm des A-Teams ab 19:00 kombinieren.",
     "material": "Feste Schuhe, Outdoor-Kleidung",
-    "tags": ["draußen", "wald"],
-    "done": ["2025-05"]
+    "tags": [
+      "draußen",
+      "wald"
+    ],
+    "done": [
+      "2025-05"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2024-06-21",
+    "chat_message_id": 663
   },
   {
     "title": "Wental bei Bartholomä",
     "description": "Felsenmeer im Wental. Längere Anfahrt, Rückkehr wurde 20:15.",
     "material": "Outdoor-Kleidung",
-    "tags": ["draußen", "ausflug", "wald"],
-    "done": ["2021-10"]
+    "tags": [
+      "draußen",
+      "ausflug",
+      "wald"
+    ],
+    "done": [
+      "2021-10"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2021-10-01",
+    "chat_message_id": 287
   },
   {
     "title": "Hohenstaufen",
     "description": "Outdoor-Programm auf dem Berg. Kürzere Jungschar von 17:00 bis 19:30.",
     "material": "Outdoor-Kleidung",
-    "tags": ["draußen", "ausflug"],
-    "done": ["2023-02"]
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2023-02"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2023-02-11",
+    "chat_message_id": 529
   },
   {
     "title": "Burg Rechberg",
     "description": "Burgruine erkunden. Fazit im Chat: 'Burg wurde erobert'. Entstand, nachdem Eltern im Chat nach Ideen gefragt wurden.",
     "material": "Outdoor-Kleidung",
-    "tags": ["draußen", "ausflug"],
-    "done": ["2025-05"]
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2025-05"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2025-05-02",
+    "chat_message_id": 758
   },
   {
     "title": "Weinberge",
     "description": "Programm in den Weinbergen im Herbst.",
     "material": "Outdoor-Kleidung",
-    "tags": ["draußen"],
-    "done": ["2023-10"]
+    "tags": [
+      "draußen"
+    ],
+    "done": [
+      "2023-10"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2023-10-13",
+    "chat_message_id": 610
   },
   {
     "title": "Höhlentour",
     "description": "Als erste Jungschar für die neuen Kinder gemacht, früher Start um 16:00 bis 19:00.",
     "material": "Taschenlampen, Kleidung die dreckig werden darf",
-    "tags": ["draußen", "ausflug"],
-    "done": ["2024-09"]
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2024-09"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2024-09-12",
+    "chat_message_id": 691
   },
   {
     "title": "Geocaching-Schatzsuche im Winter",
     "description": "GPS-gestützte Schatzsuche, 2,5 Stunden in Wald und Wiese bei Dunkelheit. Von Tobias organisiert.",
     "material": "Kopflampe oder Taschenlampe, winterfeste Kleidung",
-    "tags": ["draußen", "wald", "winter"],
-    "done": ["2026-01"]
+    "tags": [
+      "draußen",
+      "wald",
+      "winter"
+    ],
+    "done": [
+      "2026-01"
+    ],
+    "suggested_by": "Tobias Schneider",
+    "proposed_at": "2026-01-23",
+    "chat_message_id": 974
   },
   {
     "title": "Trimm-dich-Pfad im Dunkeln",
     "description": "Trimm-dich-Pfad in Lorch mit Taschenlampen, im Winter fast die ganze Zeit draußen. Lässt sich mit Grillen kombinieren.",
     "material": "Taschenlampe oder Kopflampe, warme Kleidung",
-    "tags": ["draußen", "winter", "sport"],
-    "done": ["2023-01", "2023-11", "2025-02"]
+    "tags": [
+      "draußen",
+      "winter",
+      "sport"
+    ],
+    "done": [
+      "2023-01",
+      "2023-11",
+      "2025-02"
+    ],
+    "suggested_by": "Wing",
+    "proposed_at": "2023-01-27",
+    "chat_message_id": 517
   },
   {
     "title": "Nacht-Action im Wald mit Kopflampen",
     "description": "Raus in den Wald bei Dunkelheit, 'Stimmung und Action'. Gute Winter-Alternative ohne Anfahrt.",
     "material": "Kopflampe, warme Kleidung",
-    "tags": ["draußen", "wald", "winter"],
-    "done": ["2026-02"]
+    "tags": [
+      "draußen",
+      "wald",
+      "winter"
+    ],
+    "done": [
+      "2026-02"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2026-02-28",
+    "chat_message_id": 1018
   },
   {
     "title": "Geländespiele",
     "description": "Geländespiele draußen, danach Nerf-Schlacht im Saal.",
     "material": "Spielmaterial, Leibchen",
-    "tags": ["draußen", "sport"],
-    "done": ["2025-03"]
+    "tags": [
+      "draußen",
+      "sport"
+    ],
+    "done": [
+      "2025-03"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2025-03-08",
+    "chat_message_id": 737
   },
   {
     "title": "Stadtrallye Schorndorf",
     "description": "Rallye durch die Stadt in Gruppen, auch im Winter machbar. Endete einmal früher um 19:45.",
     "material": "Aufgabenzettel, Stifte, warme Kleidung",
-    "tags": ["draußen"],
-    "done": ["2022-01", "2026-05"]
+    "tags": [
+      "draußen"
+    ],
+    "done": [
+      "2022-01",
+      "2026-05"
+    ],
+    "suggested_by": "Felix Schniepp",
+    "proposed_at": "2022-01-20",
+    "chat_message_id": 330
   },
   {
     "title": "Minigolf Plüderhausen mit Spielplatz",
     "description": "Minigolf in Plüderhausen, danach noch auf den Spielplatz.",
     "material": null,
-    "tags": ["draußen", "ausflug"],
-    "done": ["2024-09"]
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2024-09"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2024-09-20",
+    "chat_message_id": 697
   },
   {
     "title": "Waldspaziergang und McDonald's",
     "description": "Spaziergang im Wald, danach zum Essen zu McDonald's. Dauert eher länger, Kinder heimfahren.",
     "material": null,
-    "tags": ["draußen", "wald", "essen"],
-    "done": ["2023-06"]
+    "tags": [
+      "draußen",
+      "wald",
+      "essen"
+    ],
+    "done": [
+      "2023-06"
+    ],
+    "suggested_by": "Meini Mihai",
+    "proposed_at": "2023-06-30",
+    "chat_message_id": 572
   },
   {
     "title": "Action-Waldwanderung mit Stockbrot",
     "description": "Actiongeladene Wanderung im Wald, danach Stockbrot am Feuer. Stockbrot-Teig von der Essens-Familie. Bei wenig Helfern sind Eltern eingesprungen.",
     "material": "Stockbrot-Teig, Messer und kleine Handsäge, Outdoor-Kleidung",
-    "tags": ["draußen", "wald", "essen"],
-    "done": ["2026-04", "2026-07"]
+    "tags": [
+      "draußen",
+      "wald",
+      "essen"
+    ],
+    "done": [
+      "2026-04",
+      "2026-07"
+    ],
+    "suggested_by": "Marcus Schneider",
+    "proposed_at": "2026-04-06",
+    "chat_message_id": 1040
   },
   {
     "title": "Grillen an der Jungscharhütte",
     "description": "Abschluss oben an der Hütte mit Feuer. Feuer früh genug machen, sonst wird es spät.",
     "material": "Grillgut, Feuerholz",
-    "tags": ["draußen", "essen"],
-    "done": ["2023-11", "2026-07"]
+    "tags": [
+      "draußen",
+      "essen"
+    ],
+    "done": [
+      "2023-11",
+      "2026-07"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2023-11-24",
+    "chat_message_id": 617
   },
   {
     "title": "Abend auf einem Grundstück (Stückle)",
     "description": "Nach Sport auf dem Hartplatz weiter auf das Stückle von Marcus. Etwas Wärmeres für danach mitbringen.",
     "material": "Warme Kleidung",
-    "tags": ["draußen"],
-    "done": ["2024-10"]
+    "tags": [
+      "draußen"
+    ],
+    "done": [
+      "2024-10"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2024-10-26",
+    "chat_message_id": 706
   },
   {
     "title": "Kürbisse schnitzen",
     "description": "Oktober-Klassiker. Eltern können Ausstecher (Gutsle-Förmchen) mitgeben. Braucht eine halbe Stunde länger. Einmal mit Mosten kombiniert.",
     "material": "Kürbisse, Ausstecher, Schnitzmesser, Löffel",
-    "tags": ["drinnen", "kreativ", "herbst"],
-    "done": ["2021-10", "2022-09"]
+    "tags": [
+      "drinnen",
+      "kreativ",
+      "herbst"
+    ],
+    "done": [
+      "2021-10",
+      "2022-09"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2021-10-15",
+    "chat_message_id": 290
   },
   {
     "title": "Mosten bei einer Familie",
     "description": "Apfelsaft pressen bei Familie Trinkle zuhause. Herbst, Gummistiefel. Kinder danach heimfahren.",
     "material": "Gummistiefel, Äpfel",
-    "tags": ["draußen", "essen", "herbst"],
-    "done": ["2021-10", "2022-09"]
+    "tags": [
+      "draußen",
+      "essen",
+      "herbst"
+    ],
+    "done": [
+      "2021-10",
+      "2022-09"
+    ],
+    "suggested_by": "Armin Trinkle",
+    "proposed_at": "2021-10-15",
+    "chat_message_id": 291
   },
   {
     "title": "Pizza backen",
     "description": "Im Saal Pizza backen, davor kurze Liedprobe. Essens-Familie an dem Tag absagen. Online-Variante 2021: Pizzawecken, Zutaten von Helfern nach Hause geliefert.",
     "material": "Teig, Belag, Backbleche",
-    "tags": ["drinnen", "essen"],
-    "done": ["2021-02", "2024-02"]
+    "tags": [
+      "drinnen",
+      "essen"
+    ],
+    "done": [
+      "2021-02",
+      "2024-02"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2021-02-07",
+    "chat_message_id": 166
   },
   {
     "title": "Stationen zur Wahl (A-Team-Format)",
     "description": "Kinder wählen vorher zwischen Nerf-Schlacht, Fußball, Basteln/Kreativ und Backen. Danach mit allen Jungschargruppen auf den Eberg zu Grillen und Versammlung. Vom A-Team vorbereitet.",
     "material": "Je nach Station: Nerf, Bälle, Bastelmaterial, Backzutaten, extra Pullover für den Eberg",
-    "tags": ["drinnen", "draußen", "kreativ", "sport", "essen"],
-    "done": ["2024-04"]
+    "tags": [
+      "drinnen",
+      "draußen",
+      "kreativ",
+      "sport",
+      "essen"
+    ],
+    "done": [
+      "2024-04"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2024-04-17",
+    "chat_message_id": 654
   },
   {
     "title": "Wahlprogramm: Ostereier bemalen oder Outdoor-Action",
     "description": "Kinder entscheiden vor Ort zwischen Ostereier bemalen und Outdoor-Actionprogramm. Gemeinsam mit den großen Jungs.",
     "material": "Eier, Farben, Outdoor-Kleidung",
-    "tags": ["drinnen", "draußen", "kreativ"],
-    "done": ["2022-03"]
+    "tags": [
+      "drinnen",
+      "draußen",
+      "kreativ"
+    ],
+    "done": [
+      "2022-03"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-03-24",
+    "chat_message_id": 352
   },
   {
     "title": "Basteln und Bemalen",
     "description": "Kreativ-Jungschar, dazu meist noch eine Runde draußen. Kleidung die Farbe abkann.",
     "material": "Bastelmaterial, Farben, alte Kleidung",
-    "tags": ["drinnen", "kreativ"],
-    "done": ["2020-06", "2022-02"]
+    "tags": [
+      "drinnen",
+      "kreativ"
+    ],
+    "done": [
+      "2020-06",
+      "2022-02"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-06-18",
+    "chat_message_id": 54
   },
   {
     "title": "Adventskalender basteln",
     "description": "Jedes Kind bastelt seinen eigenen Kalender, laut Eltern jedes Jahr ein Highlight. Auch für Kinder machen, die an dem Tag fehlen, Übergabe in der oberen Hütte. Ein Kind verträgt keinen Industriezucker. Danach noch Sport im Saal oder Nerf.",
     "material": "Kalender-Rohlinge, Süßigkeiten, Stirnlampe falls noch raus",
-    "tags": ["drinnen", "kreativ", "feier"],
-    "done": ["2022-11", "2025-11"]
+    "tags": [
+      "drinnen",
+      "kreativ",
+      "feier"
+    ],
+    "done": [
+      "2022-11",
+      "2025-11"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-11-24",
+    "chat_message_id": 480
   },
   {
     "title": "Wichteln zur Weihnachtsfeier",
     "description": "Jedes Kind wählt im Elternchat eine Nummer, Zuordnung per PN. Richtwert 10 bis 15 Euro. Nicht vergessen, wurde zweimal verpasst und nachgeholt.",
     "material": "Wichtelgeschenk",
-    "tags": ["drinnen", "feier"],
-    "done": ["2020-12", "2021-12", "2022-12", "2023-12", "2025-12"]
+    "tags": [
+      "drinnen",
+      "feier"
+    ],
+    "done": [
+      "2020-12",
+      "2021-12",
+      "2022-12",
+      "2023-12",
+      "2025-12"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2020-12-04",
+    "chat_message_id": 122
   },
   {
     "title": "Weihnachtsfeier mit Fackelwanderung",
     "description": "Erst raus zur Fackelwanderung, dann Feier im Saal mit Wichteln. Zusammen mit den großen Jungs. Start 16:30, Kinder werden heimgebracht.",
     "material": "Fackeln, Stirn- oder Taschenlampe, warme Kleidung, Wichtelgeschenk",
-    "tags": ["draußen", "feier", "winter"],
-    "done": ["2021-12", "2022-12"]
+    "tags": [
+      "draußen",
+      "feier",
+      "winter"
+    ],
+    "done": [
+      "2021-12",
+      "2022-12"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2021-12-10",
+    "chat_message_id": 317
   },
   {
     "title": "Witze-Film für die Weihnachtsfeier",
     "description": "Jedes Kind erzählt einen Witz, Eltern filmen im Querformat. Zusammenschnitt mit Stimmungsbarometer und Lachern wie bei Mr Bean. Videos früh einsammeln, Reminder nötig.",
     "material": "Handy-Videos der Eltern, Schnittprogramm",
-    "tags": ["drinnen", "feier", "kreativ"],
-    "done": ["2025-12"]
+    "tags": [
+      "drinnen",
+      "feier",
+      "kreativ"
+    ],
+    "done": [
+      "2025-12"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2025-11-30",
+    "chat_message_id": 920
   },
   {
     "title": "Jungschar-Rückblick-Film",
     "description": "Helfer machen bei Ausflügen Fotos und Videos im Querformat, das Filmteam schneidet einen Rückblick. Vorschlag von Maris aus dem Elternchat.",
     "material": "Fotos und Videos im Querformat",
-    "tags": ["feier", "kreativ"],
-    "done": []
+    "tags": [
+      "feier",
+      "kreativ"
+    ],
+    "done": [],
+    "suggested_by": "Maris Nitsche",
+    "proposed_at": "2026-08-15",
+    "chat_message_id": 1235
   },
   {
     "title": "Jungscharlied einstudieren",
     "description": "Lied für ein Fest einüben (z. B. Mandelblüte 262 für das Aktionsfest), mit Playback und Soundcheck im Anschluss. Auch als kurze Chorprobe oder Liedprobe vor dem Hauptprogramm.",
     "material": "Liedtext, Playback",
-    "tags": ["drinnen"],
-    "done": ["2022-07", "2022-09", "2024-02"]
+    "tags": [
+      "drinnen"
+    ],
+    "done": [
+      "2022-07",
+      "2022-09",
+      "2024-02"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-06-30",
+    "chat_message_id": 414
   },
   {
     "title": "Kinderstunde gemeinsam anschauen",
     "description": "Kinderstunde von BTV oder aus Brunstad im Saal gemeinsam anschauen, mit Überraschung am Ende. Guter Einstieg vor der Sommerpause.",
     "material": "Beamer, Snacks",
-    "tags": ["drinnen"],
-    "done": ["2020-07", "2021-07"]
+    "tags": [
+      "drinnen"
+    ],
+    "done": [
+      "2020-07",
+      "2021-07"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-07-07",
+    "chat_message_id": 60
   },
   {
     "title": "Explorer-Tag: Zeitreise zu Daniel",
     "description": "BibleKids-Explorers-Programm, 'eine spannende Reise zurück in die Zeit als Daniel lebte'. Outdoor mit Drachen, Schatzkiste für Bibelkarten, Taschenmesser. Auch als Wochenende oder Montag/Dienstag mit Übernachtung. Einverständniserklärungen einsammeln.",
     "material": "Bibel, Schatzkiste, Drachen, Taschenmesser, warme Outdoor-Kleidung",
-    "tags": ["draußen", "ausflug"],
-    "done": ["2022-06", "2022-11", "2023-04", "2023-10"]
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2022-06",
+      "2022-11",
+      "2023-04",
+      "2023-10"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-06-14",
+    "chat_message_id": 406
   },
   {
     "title": "Drachen steigen lassen",
     "description": "Im Herbst auf einer Wiese Drachen steigen lassen, kam beim Explorer-Tag vor.",
     "material": "Drachen",
-    "tags": ["draußen", "herbst"],
-    "done": ["2022-11"]
+    "tags": [
+      "draußen",
+      "herbst"
+    ],
+    "done": [
+      "2022-11"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-11-04",
+    "chat_message_id": 473
   },
   {
     "title": "Übernachtung im Saal",
     "description": "Nach dem Tagesausflug im Saal übernachten, Abholung nach dem Frühstück um 10:30. Übernachtungssachen gleich morgens mitbringen. Braucht genug Helfer, 2020 wurde einmal abgesagt.",
     "material": "Matratze oder Luma, Schlafsack, Frühstück",
-    "tags": ["drinnen", "ausflug"],
-    "done": ["2020-09", "2022-05"]
+    "tags": [
+      "drinnen",
+      "ausflug"
+    ],
+    "done": [
+      "2020-09",
+      "2022-05"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-08-31",
+    "chat_message_id": 65
   },
   {
     "title": "Tagesausflug Tripsdrill",
     "description": "Erlebnispark und Wildpark, mit dem Ticket geht beides. Tickets vorab bestellen, deshalb Abmeldung bis Mittwoch. Start 8:30 bis 10:00 am Saal, Ende ca. 21:00. Abschluss am Saal oder auf dem Kernshof. Lange Schlangen einplanen. Bei Helfermangel helfen Eltern mit.",
     "material": "Kindersitze, Sonnenschutz, Verpflegung wird gestellt",
-    "tags": ["draußen", "ausflug"],
-    "done": ["2020-09", "2020-10", "2021-09", "2022-08", "2025-09"]
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2020-09",
+      "2020-10",
+      "2021-09",
+      "2022-08",
+      "2025-09"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-08-31",
+    "chat_message_id": 65
   },
   {
     "title": "Tagesausflug Schwabenpark mit Fackelwanderung",
     "description": "Start 10:00 am Saal, abends noch eine Fackelwanderung, Ende 21:00 mit Heimfahrt. Bei Hitze Kopfbedeckung.",
     "material": "Kopfbedeckung, Fackeln",
-    "tags": ["draußen", "ausflug"],
-    "done": ["2024-09"]
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2024-09"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2024-09-05",
+    "chat_message_id": 677
   },
   {
     "title": "Tagesausflug Tractor-Pulling und Eisenbachsee",
     "description": "Tractor-Pulling-Show (Karten vorbestellen), dann Baden und Grillen am Eisenbachsee, Abendprogramm auf dem Eberg. War ein 35-Grad-Tag.",
     "material": "Sonnenschutz, Badesachen, Schwimmflügel für Nichtschwimmer",
-    "tags": ["draußen", "ausflug", "wasser"],
-    "done": ["2023-08"]
+    "tags": [
+      "draußen",
+      "ausflug",
+      "wasser"
+    ],
+    "done": [
+      "2023-08"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2023-08-14",
+    "chat_message_id": 581
   },
   {
     "title": "Tagesausflug mit Zugfahrt und Tierpark",
     "description": "Ausflug mit dem Zug in einen Tierpark, Übernachtung im Saal, Abholung der anderen ab 20:30.",
     "material": "Übernachtungssachen, Maske für den Zug",
-    "tags": ["draußen", "ausflug"],
-    "done": ["2022-05"]
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2022-05"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-05-18",
+    "chat_message_id": 395
   },
   {
     "title": "Abschluss auf dem Kernshof",
     "description": "Nach dem Tripsdrill-Ausflug noch auf den Kernshof. 'Bei Kerns war es auch sehr schön.'",
     "material": null,
-    "tags": ["draußen", "essen"],
-    "done": ["2025-09"]
+    "tags": [
+      "draußen",
+      "essen"
+    ],
+    "done": [
+      "2025-09"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2025-09-13",
+    "chat_message_id": 845
   },
   {
     "title": "Pfandflaschen-Aktion",
     "description": "Aktionsjungschar: Flaschen einsammeln, Eltern stellen sie auf die Terrasse, Erlös für ein Hilfsprojekt. Danach noch Programm draußen. Auch beim Giga-Samstag nachgeholt.",
     "material": "Handschuhe, Säcke, Fahrer",
-    "tags": ["draußen", "aktion"],
-    "done": ["2020-10", "2021-11", "2022-03"]
+    "tags": [
+      "draußen",
+      "aktion"
+    ],
+    "done": [
+      "2020-10",
+      "2021-11",
+      "2022-03"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2020-10-16",
+    "chat_message_id": 96
   },
   {
     "title": "Online: Video-Show mit selbstgedrehten Clips",
     "description": "Kinder filmen unter der Woche Tricks (Trampolin, Zaubertrick, Bauen, Malen, Trickshot), schicken die Clips an einen Helfer, der sie in der Online-Jungschar abspielt. Zoom-Bildschirmteilung machte Probleme, Clips vorher testen.",
     "material": "Videos der Kinder, Zoom",
-    "tags": ["online", "kreativ"],
-    "done": ["2020-05", "2021-02"]
+    "tags": [
+      "online",
+      "kreativ"
+    ],
+    "done": [
+      "2020-05",
+      "2021-02"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-05-03",
+    "chat_message_id": 3
   },
   {
     "title": "Online-Challenge: Wer baut das coolste Auto?",
     "description": "Kinder bauen aus Karton oder Holz ein Auto und schicken ein Präsentationsvideo. Jury bewertet Design, Funktion, Aufwand/Kreativität und Name. Drei Gewinner, alle bekommen eine Überraschung vor die Haustür. Teamwork erlaubt. Eltern: 'richtig coole Idee'. Lässt sich auch offline als Bauwettbewerb machen.",
     "material": "Karton, Holz, Kleber, kleine Überraschungen",
-    "tags": ["online", "kreativ"],
-    "done": ["2021-02"]
+    "tags": [
+      "online",
+      "kreativ"
+    ],
+    "done": [
+      "2021-02"
+    ],
+    "suggested_by": "Felix Schniepp",
+    "proposed_at": "2021-02-01",
+    "chat_message_id": 151
   },
   {
     "title": "Online: Weihnachtsgeschenke vorstellen",
     "description": "Erste Jungschar nach Weihnachten: jedes Kind zeigt den anderen sein Lieblingsgeschenk. Als Vorstellrunde auch offline machbar.",
     "material": "Smartphone oder Tablet",
-    "tags": ["online"],
-    "done": ["2021-01"]
+    "tags": [
+      "online"
+    ],
+    "done": [
+      "2021-01"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2021-01-19",
+    "chat_message_id": 142
   },
   {
     "title": "Kleingruppen mit Abholung zuhause",
     "description": "Corona-Format: 3 bis 4 Kinder pro Helfer, Helfer holt die Kinder zuhause ab und bringt sie zurück. Gut für kurze spontane Termine.",
     "material": null,
-    "tags": ["draußen"],
-    "done": ["2021-04", "2021-05"]
+    "tags": [
+      "draußen"
+    ],
+    "done": [
+      "2021-04",
+      "2021-05"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2021-04-10",
+    "chat_message_id": 207
   },
   {
     "title": "Wünsche der Kinder und Eltern im Chat abfragen",
     "description": "Wenn kein Programm steht: im Elternchat nach Ideen fragen. Hat 2025 Burg Rechberg und 2026 Mooswald und Bärenbachtal gebracht. Eltern bieten dabei oft Garten und Essen an.",
     "material": null,
     "tags": [],
-    "done": ["2025-05", "2026-07"]
+    "done": [
+      "2025-05",
+      "2026-07"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2025-05-02",
+    "chat_message_id": 757
   },
   {
     "title": "Abend in der Jungscharhütte",
     "description": "Programm oben in der Hütte, auch mit Feuer davor. Treffpunkt am Saal.",
     "material": null,
-    "tags": ["drinnen"],
-    "done": ["2020-06", "2022-02"]
+    "tags": [
+      "drinnen"
+    ],
+    "done": [
+      "2020-06",
+      "2022-02"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-06-25",
+    "chat_message_id": 58
   },
   {
     "title": "Wald bei Walkersbach oder Gmünd",
     "description": "Dreckiger Waldabend mit Gummistiefeln. Danach Eltern an Zecken erinnern.",
     "material": "Dreckkleider, Gummistiefel",
-    "tags": ["draußen", "wald"],
-    "done": ["2022-05", "2024-04"]
+    "tags": [
+      "draußen",
+      "wald"
+    ],
+    "done": [
+      "2022-05",
+      "2024-04"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2022-05-05",
+    "chat_message_id": 393
   },
   {
     "title": "Geburtstag eines Kindes einbauen",
     "description": "Fahrradtour zur Eisdiele, danach bei dem Geburtstagskind zuhause feiern und baden.",
     "material": "Badesachen",
-    "tags": ["draußen", "feier", "wasser"],
-    "done": ["2023-06"]
+    "tags": [
+      "draußen",
+      "feier",
+      "wasser"
+    ],
+    "done": [
+      "2023-06"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2023-06-17",
+    "chat_message_id": 566
   },
   {
     "title": "Abschluss bei einer Familie in Weitmars",
     "description": "Jungschar endet bei einer Familie zuhause (Kolb, Freijters, Nitsche, Maier). Weitmarser Kinder laufen heim, die anderen werden gefahren, keine Abholung am Saal.",
     "material": null,
-    "tags": ["draußen", "essen"],
-    "done": ["2026-05", "2026-06", "2026-07"]
+    "tags": [
+      "draußen",
+      "essen"
+    ],
+    "done": [
+      "2026-05",
+      "2026-06",
+      "2026-07"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2026-05-02",
+    "chat_message_id": 1087
   },
   {
     "title": "Spielplatz-Abschluss",
     "description": "Nach Minigolf oder Pumptrack noch auf den Spielplatz nebenan. Günstiger Zeitpuffer am Ende.",
     "material": null,
-    "tags": ["draußen"],
-    "done": ["2024-09", "2026-04"]
+    "tags": [
+      "draußen"
+    ],
+    "done": [
+      "2024-09",
+      "2026-04"
+    ],
+    "suggested_by": "Marco Schneider",
+    "proposed_at": "2024-09-20",
+    "chat_message_id": 697
   },
   {
     "title": "Trickshot-Video-Aufgabe",
     "description": "Wochenaufgabe: Kinder filmen einen Trick oder ein Kunststück und schicken es an einen Helfer. Kreativ und mit wenig Aufwand.",
     "material": "Handy",
-    "tags": ["online", "kreativ"],
-    "done": ["2021-02"]
+    "tags": [
+      "online",
+      "kreativ"
+    ],
+    "done": [
+      "2021-02"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2021-02-07",
+    "chat_message_id": 166
   },
   {
     "title": "Fackelwanderung",
     "description": "Abendlicher Programmpunkt bei Weihnachtsfeier oder als Abschluss des Tagesausflugs.",
     "material": "Fackeln, Stirnlampen",
-    "tags": ["draußen", "winter"],
-    "done": ["2021-12", "2024-09"]
+    "tags": [
+      "draußen",
+      "winter"
+    ],
+    "done": [
+      "2021-12",
+      "2024-09"
+    ],
+    "suggested_by": "Jugsen",
+    "proposed_at": "2021-12-10",
+    "chat_message_id": 317
   }
 ]

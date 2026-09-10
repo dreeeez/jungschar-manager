@@ -156,6 +156,7 @@ export interface Database {
           rating: string | null
           source: string
           tags: string[] | null
+          suggested_by: string | null
           created_at: string
         }
         Insert: {
@@ -168,6 +169,7 @@ export interface Database {
           rating?: string | null
           source?: string
           tags?: string[] | null
+          suggested_by?: string | null
           created_at?: string
         }
         Update: {
@@ -180,6 +182,7 @@ export interface Database {
           rating?: string | null
           source?: string
           tags?: string[] | null
+          suggested_by?: string | null
           created_at?: string
         }
       }

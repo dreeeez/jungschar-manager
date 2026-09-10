@@ -19,9 +19,8 @@ interface PoolIdea {
   material: string | null
   source: string
   tags: string[] | null
+  suggested_by: string | null
   created_at: string
-  /** Gesetzt, wenn die Idee per /idee im Bot eingereicht wurde. */
-  suggested_by?: string | null
 }
 
 type Place = 'drinnen' | 'draußen'
@@ -46,12 +45,18 @@ const CATEGORIES: { value: string; label: string }[] = [
 ]
 const CATEGORY_LABEL = new Map(CATEGORIES.map((c) => [c.value, c.label]))
 
-function sourceLabel(source: string): string {
-  return source === 'elterngruppe' ? 'Aus dem Elternchat' : 'Manuell'
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** Herkunftszeile: „Felix Schniepp · 25. Nov. 2021 · Elternchat". */
+function originLabel(idea: PoolIdea): string {
+  const parts = [idea.suggested_by, formatDate(idea.created_at), idea.source === 'elterngruppe' ? 'Elternchat' : 'Mini-App']
+  return parts.filter(Boolean).join(' · ')
 }
 
 export default function PoolPage() {
-  const { showAlert, showConfirm } = useTelegram()
+  const { showAlert, showConfirm, helper, user } = useTelegram()
   const [ideas, setIdeas] = useState<PoolIdea[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -71,7 +76,7 @@ export default function PoolPage() {
   async function fetchIdeas() {
     const { data, error } = await (supabase as any)
       .from('ideas')
-      .select('id, title, description, material, source, tags, created_at, suggested_by')
+      .select('id, title, description, material, source, tags, suggested_by, created_at')
       .is('event_id', null)
       .eq('was_used', false)
       .order('title', { ascending: true })
@@ -118,8 +123,9 @@ export default function PoolPage() {
         was_used: false,
         source: 'manual',
         tags,
+        suggested_by: helper?.name ?? user?.first_name ?? null,
       })
-      .select('id, title, description, material, source, tags, created_at, suggested_by')
+      .select('id, title, description, material, source, tags, suggested_by, created_at')
       .single()
     setSaving(false)
     if (error) {
@@ -244,9 +250,7 @@ export default function PoolPage() {
                 {categoryTags.map((t) => (
                   <Badge key={t}>{CATEGORY_LABEL.get(t)}</Badge>
                 ))}
-                <span className="text-xs text-muted">
-                  {idea.suggested_by ? `Vorschlag von ${idea.suggested_by}` : sourceLabel(idea.source)}
-                </span>
+                <span className="text-xs text-muted">{originLabel(idea)}</span>
               </div>
             </Card>
           )
