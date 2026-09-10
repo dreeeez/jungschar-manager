@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processReminders } from '@/services/reminders'
 import { syncJungscharEvents } from '@/services/ical-sync'
+import { postBirthdayGreetings } from '@/services/parents-bot'
 
 export async function GET(req: NextRequest) {
   // Verify cron secret to prevent unauthorized access
@@ -36,10 +37,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: `${missing} not configured` }, { status: 500 })
     }
 
+    // Geburtstagsgruß in der Elterngruppe (nur live, einmal pro Tag).
+    let birthdays = null
+    if (!isTest && process.env.TELEGRAM_ELTERN_CHAT_ID) {
+      try {
+        birthdays = await postBirthdayGreetings(process.env.TELEGRAM_ELTERN_CHAT_ID)
+      } catch (e: any) {
+        console.error('Birthday greeting failed:', e)
+        birthdays = { error: e.message }
+      }
+    }
+
     // Keine Auto-Rotation mehr: Einteilungen entstehen nur über den Button
     // "Halbjahr einteilen" in der Mini-App.
     const result = await processReminders(chatId, isTest ? parseInt(testStage!) : undefined)
-    return NextResponse.json({ ...result, icalSync })
+    return NextResponse.json({ ...result, icalSync, birthdays })
   } catch (error) {
     console.error('Error in reminder cron:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

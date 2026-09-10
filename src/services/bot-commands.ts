@@ -1,17 +1,36 @@
-import { Bot } from 'grammy'
+import { Bot, Context } from 'grammy'
 import { formatDate } from '@/utils/format'
 import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './helpers'
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
-import { getSupabase } from './database'
 import { recordVote } from './attendance'
 import { handleReviewCallback, handleReviewText } from './review-ping'
-
-// Track pending registrations (in-memory, resets on cold start)
-const pendingRegistrations = new Set<number>()
+import { APP_URL, isAdmin } from './admins'
+import {
+  IDEA_PROMPT,
+  checkRegisterCode,
+  claimFood,
+  essenKeyboard,
+  findParentByTelegram,
+  freeFoodEvents,
+  saveParentIdea,
+} from './parents-bot'
 
 /**
- * Escapes HTML special characters
+ * Bot-Befehle.
+ *
+ * Rollen: Admin (Zugangsliste), Helfer (helpers-Tabelle), Elternteil
+ * (parents-Tabelle, per Telegram-ID oder Benutzername). Jeder Befehl prüft
+ * seine Rolle; /help zeigt nur, was die Person nutzen darf.
+ *
+ * /register verlangt den Registrierungs-Code aus den Einstellungen, damit
+ * sich Eltern nicht versehentlich als Helfer eintragen.
  */
+
+// Wartet auf den Namen nach erfolgreichem /register (in-memory, Cold-Start setzt zurück)
+const pendingRegistrations = new Set<number>()
+// Wartet auf den Freitext nach /idee — Fallback, falls jemand nicht "antwortet"
+const pendingIdeas = new Set<number>()
+
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
@@ -49,194 +68,258 @@ function rebuildHtml(text: string, entities: any[]): string {
   return result
 }
 
+type Role = { helper: any | null; parent: Awaited<ReturnType<typeof findParentByTelegram>>; admin: boolean }
+
+async function roleOf(ctx: Context): Promise<Role> {
+  const id = ctx.from?.id
+  if (!id) return { helper: null, parent: null, admin: false }
+  const [helper, parent] = await Promise.all([
+    getHelperByTelegramId(id),
+    findParentByTelegram(id, ctx.from?.username),
+  ])
+  return { helper, parent, admin: isAdmin(id) }
+}
+
+const NOT_HELPER = 'Dieser Befehl ist nur für Helfer. Eltern nutzen /idee, /essen und /termine.'
+const UNKNOWN =
+  'Ich kenne dich noch nicht.\n\n' +
+  'Helfer: /register CODE (den Code bekommst du von Marco oder Jens).\n' +
+  'Eltern: sag Marco oder Jens Bescheid, dann werdet ihr eingetragen.'
+
+function helpFor(role: Role): string {
+  const lines: string[] = []
+  if (role.helper) {
+    lines.push('<b>Helfer</b>', '/next – nächste Termine mit Team', '/status – nächste Jungschar', '/mystatus – meine Einsätze')
+  }
+  if (role.parent || role.helper) {
+    lines.push('', '<b>Eltern</b>', '/termine – nächste Jungschar-Termine', '/idee – Programm-Idee vorschlagen', '/essen – Essen für einen Termin übernehmen')
+  }
+  if (role.admin) {
+    lines.push('', '<b>Admin</b>', '/chatid – Chat-ID anzeigen', `Mini-App: ${APP_URL}`)
+  }
+  if (!role.helper && !role.parent) {
+    lines.push('/register CODE – als Helfer registrieren')
+  }
+  lines.push('', '/help – diese Übersicht')
+  return lines.join('\n').trim()
+}
+
 /**
  * Richtet alle Bot Commands ein
  */
 export function setupBotCommands(bot: Bot) {
-  // /start
+  // /start – Begrüßung je Rolle. Admins bekommen den Menü-Button "Admin".
   bot.command('start', async (ctx) => {
-    await ctx.reply(`
-Willkommen beim Jungschar Bot!
+    const role = await roleOf(ctx)
 
-Ich helfe eurer Helfer-Gruppe bei der Organisation:
-- Wöchentliche Erinnerungen wer dran ist
-- Nächste Termine anzeigen
-- Vertretungsanfragen
+    if (ctx.chat.type === 'private' && role.admin) {
+      await ctx.api
+        .setChatMenuButton({
+          chat_id: ctx.chat.id,
+          menu_button: { type: 'web_app', text: 'Admin', web_app: { url: APP_URL } },
+        })
+        .catch((e) => console.error('setChatMenuButton failed:', e))
+    }
 
-Registriere dich mit /register um loszulegen!
-    `.trim())
+    let intro: string
+    if (role.helper) {
+      intro = `Hallo ${escapeHtml(role.helper.name)}! Ich erinnere euch an eure Einsätze und halte die Einteilung aktuell.`
+    } else if (role.parent) {
+      intro =
+        `Hallo ${escapeHtml(role.parent.name)}! Schön, dass du da bist.\n\n` +
+        'Mit /idee kannst du uns eine Programm-Idee schicken, mit /essen das Essen für eine Jungschar übernehmen.'
+    } else {
+      intro = 'Willkommen beim Jungschar-Bot!\n\n' + UNKNOWN
+    }
+    await ctx.reply(`${intro}\n\n${helpFor(role)}`, { parse_mode: 'HTML' })
   })
 
-  // /register
+  // /register CODE – nur privat, nur mit gültigem Code
   bot.command('register', async (ctx) => {
     const telegramUserId = ctx.from?.id
-    if (!telegramUserId) {
-      await ctx.reply('Fehler: Konnte deine Telegram-ID nicht ermitteln.')
+    if (!telegramUserId) return
+    if (ctx.chat.type !== 'private') {
+      await ctx.reply('Bitte schreib mir dafür privat.')
       return
     }
 
     const existingHelper = await getHelperByTelegramId(telegramUserId)
     if (existingHelper) {
-      await ctx.reply(`Du bist bereits als "${existingHelper.name}" registriert!`)
+      await ctx.reply(`Du bist bereits als "${existingHelper.name}" registriert.`)
       return
     }
 
-    await ctx.reply(
-      'Wie heißt du? Bitte antworte mit deinem Namen.\n\n' +
-      '(Tipp: Dein Name sollte so sein wie er in der Helfer-Liste steht)'
-    )
+    const check = await checkRegisterCode(ctx.match)
+    if (check === 'closed') {
+      await ctx.reply('Die Registrierung ist gerade geschlossen. Sag Marco oder Jens Bescheid.')
+      return
+    }
+    if (check === 'wrong') {
+      await ctx.reply('Dafür brauchst du den Registrierungs-Code: /register CODE\nDen Code bekommst du von Marco oder Jens.')
+      return
+    }
+
+    await ctx.reply('Wie heißt du? Bitte antworte mit deinem Namen, so wie er in der Helfer-Liste stehen soll.')
     pendingRegistrations.add(telegramUserId)
   })
 
-  // /next - Nächste Termine
+  // /next – Nächste Termine mit Team (Helfer)
   bot.command('next', async (ctx) => {
+    const role = await roleOf(ctx)
+    if (!role.helper) {
+      await ctx.reply(NOT_HELPER)
+      return
+    }
     const events = await getUpcomingEvents(5)
-
     if (events.length === 0) {
       await ctx.reply('Keine anstehenden Termine gefunden.')
       return
     }
-
-    const lines = events.map((event: any) => {
-      const helpers = getHelperNames(event)
-      return `📅 ${formatDate(event.event_date)}: ${helpers}`
-    })
-
+    const lines = events.map((event: any) => `📅 ${formatDate(event.event_date)}: ${getHelperNames(event)}`)
     await ctx.reply(`Nächste Jungschar-Termine:\n\n${lines.join('\n')}`)
   })
 
-  // /status - Status für nächstes Event
-  bot.command('status', async (ctx) => {
-    const event = await getNextEvent()
+  // /termine – Nächste Termine ohne Team (Eltern und Helfer)
+  bot.command('termine', async (ctx) => {
+    const role = await roleOf(ctx)
+    if (!role.helper && !role.parent) {
+      await ctx.reply(UNKNOWN)
+      return
+    }
+    const events = await getUpcomingEvents(6)
+    if (events.length === 0) {
+      await ctx.reply('Keine anstehenden Termine gefunden.')
+      return
+    }
+    const lines = events.map((event: any) => `📅 ${formatDate(event.event_date)}`)
+    await ctx.reply(`Nächste Jungschar-Termine:\n\n${lines.join('\n')}`)
+  })
 
+  // /status – Nächste Jungschar mit Team (Helfer)
+  bot.command('status', async (ctx) => {
+    const role = await roleOf(ctx)
+    if (!role.helper) {
+      await ctx.reply(NOT_HELPER)
+      return
+    }
+    const event = await getNextEvent()
     if (!event) {
       await ctx.reply('Keine anstehende Jungschar gefunden.')
       return
     }
-
-    await ctx.reply(`
-📅 Nächste Jungschar: ${formatDate(event.event_date)}
-
-👥 Team: ${getHelperNames(event)}
-    `.trim())
+    await ctx.reply(`📅 Nächste Jungschar: ${formatDate(event.event_date)}\n\n👥 Team: ${getHelperNames(event)}`)
   })
 
-  // /mystatus - Meine Einsätze
+  // /mystatus – Meine Einsätze (Helfer)
   bot.command('mystatus', async (ctx) => {
-    const telegramUserId = ctx.from?.id
-    if (!telegramUserId) {
-      await ctx.reply('Fehler: Konnte deine Telegram-ID nicht ermitteln.')
+    const role = await roleOf(ctx)
+    if (!role.helper) {
+      await ctx.reply(NOT_HELPER)
       return
     }
-
-    const helper = await getHelperByTelegramId(telegramUserId)
-    if (!helper) {
-      await ctx.reply('Du bist noch nicht registriert. Nutze /register')
-      return
-    }
-
-    const assignments = await getHelperAssignments(helper.id)
-
+    const assignments = await getHelperAssignments(role.helper.id)
     if (assignments.length === 0) {
-      await ctx.reply(`Hallo ${helper.name}! Du hast aktuell keine Einsätze geplant.`)
+      await ctx.reply(`Hallo ${role.helper.name}! Du hast aktuell keine Einsätze geplant.`)
       return
     }
-
-    const lines = assignments
-      .filter((a: any) => a.event)
-      .map((a: any) => `📅 ${formatDate(a.event.event_date)}`)
-
-    await ctx.reply(`👋 Hallo ${helper.name}!\n\nDeine nächsten Einsätze:\n${lines.join('\n')}`)
+    const lines = assignments.filter((a: any) => a.event).map((a: any) => `📅 ${formatDate(a.event.event_date)}`)
+    await ctx.reply(`👋 Hallo ${role.helper.name}!\n\nDeine nächsten Einsätze:\n${lines.join('\n')}`)
   })
 
-  // /kannnicht - Vertretung anfragen
-  bot.command('kannnicht', async (ctx) => {
-    const telegramUserId = ctx.from?.id
-    if (!telegramUserId) {
-      await ctx.reply('Fehler: Konnte deine Telegram-ID nicht ermitteln.')
+  // /idee – Programm-Idee (Eltern und Helfer, privat)
+  bot.command('idee', async (ctx) => {
+    const role = await roleOf(ctx)
+    if (!role.helper && !role.parent) {
+      await ctx.reply(UNKNOWN)
       return
     }
-
-    const helper = await getHelperByTelegramId(telegramUserId)
-    if (!helper) {
-      await ctx.reply('Du bist noch nicht registriert. Nutze /register')
+    if (ctx.chat.type !== 'private') {
+      await ctx.reply('Schreib mir deine Idee gern privat, dann bleibt sie zwischen uns.')
       return
     }
-
-    const event = await getNextEvent()
-    if (!event) {
-      await ctx.reply('Kein anstehender Termin gefunden.')
-      return
-    }
-
-    const isAssigned = event.assignments?.some((a: any) => a.helper_id === helper.id)
-    if (!isAssigned) {
-      await ctx.reply(`Du bist für ${formatDate(event.event_date)} nicht eingetragen.`)
-      return
-    }
-
-    await ctx.reply(
-      `⚠️ <b>Vertretung gesucht!</b>\n\n` +
-      `${helper.name} kann am ${formatDate(event.event_date)} leider nicht.\n\n` +
-      `Kann jemand einspringen? Bitte melden!`,
-      { parse_mode: 'HTML' }
-    )
+    if (ctx.from) pendingIdeas.add(ctx.from.id)
+    await ctx.reply(IDEA_PROMPT, {
+      reply_markup: { force_reply: true, input_field_placeholder: 'Deine Idee' },
+    })
   })
 
-  // /chatid - zeigt die aktuelle Chat-ID (für Setup)
+  // /essen – Elterndienst übernehmen (Eltern, privat)
+  bot.command('essen', async (ctx) => {
+    const role = await roleOf(ctx)
+    if (!role.parent) {
+      await ctx.reply(role.helper ? 'Das Essen tragen die Eltern ein. Als Helfer machst du das in der Mini-App.' : UNKNOWN)
+      return
+    }
+    if (ctx.chat.type !== 'private') {
+      await ctx.reply('Schreib mir dafür privat, dann zeige ich dir die freien Termine.')
+      return
+    }
+    const events = await freeFoodEvents()
+    if (events.length === 0) {
+      await ctx.reply('Alle kommenden Termine haben schon jemanden fürs Essen. Danke!')
+      return
+    }
+    await ctx.reply('Für welchen Termin möchtet ihr das Essen übernehmen?', {
+      reply_markup: essenKeyboard(events),
+    })
+  })
+
+  // /chatid – nur Admins
   bot.command('chatid', async (ctx) => {
-    await ctx.reply(`Chat-ID: \`${ctx.chat.id}\``, { parse_mode: 'Markdown' })
+    if (!isAdmin(ctx.from?.id ?? 0)) return
+    await ctx.reply(`Chat-ID: <code>${ctx.chat.id}</code>`, { parse_mode: 'HTML' })
   })
 
-  // /help
+  // /help – je Rolle
   bot.command('help', async (ctx) => {
-    await ctx.reply(`
-Jungschar Bot Hilfe
-
-Befehle:
-/start - Bot starten
-/register - Als Helfer registrieren
-/status - Status für nächste Jungschar
-/next - Nächste Termine anzeigen
-/mystatus - Meine Einsätze
-/kannnicht - Vertretung anfragen
-/help - Diese Hilfe anzeigen
-
-Fragen? Sprich einen Admin an!
-    `.trim())
+    const role = await roleOf(ctx)
+    await ctx.reply(helpFor(role), { parse_mode: 'HTML' })
   })
 
-  // Text Messages (für Elterngruppe, Registrierung)
+  // Textnachrichten: Idee-Antwort, Bewertungs-Freitext, Registrierungs-Name
   bot.on('message:text', async (ctx) => {
     const telegramUserId = ctx.from?.id
     const text = ctx.message.text
     const chatId = String(ctx.chat?.id)
     const elternChatId = process.env.TELEGRAM_ELTERN_CHAT_ID
 
-    // Elterngruppe activity tracking is disabled for now
+    // In der Elterngruppe hört der Bot nicht mit.
     if (elternChatId && chatId === elternChatId) return
-
     if (text.startsWith('/')) return
+    if (!telegramUserId || ctx.chat?.type !== 'private') return
 
-    // Offene Abend-Bewertung im privaten Chat? Dann ist der Text der Freitext.
-    if (telegramUserId && ctx.chat?.type === 'private') {
-      const handled = await handleReviewText(
-        telegramUserId,
-        text,
-        (html) => ctx.reply(html, { parse_mode: 'HTML' }),
-        ctx.from?.first_name || ctx.from?.username || 'Jemand',
-      )
-      if (handled) return
+    // Antwort auf /idee (per "Antworten" oder direkt danach)
+    const repliedTo = ctx.message.reply_to_message?.text
+    if (repliedTo === IDEA_PROMPT || pendingIdeas.has(telegramUserId)) {
+      pendingIdeas.delete(telegramUserId)
+      const role = await roleOf(ctx)
+      const name = role.parent?.name ?? role.helper?.name ?? ctx.from?.first_name ?? 'Unbekannt'
+      try {
+        await saveParentIdea(text, { name, telegramUserId })
+        await ctx.reply('Danke, deine Idee ist notiert! Wir schauen sie uns an.')
+      } catch (e) {
+        console.error('saveParentIdea failed:', e)
+        await ctx.reply('Speichern hat nicht geklappt. Magst du es später noch einmal versuchen?')
+      }
+      return
     }
 
-    if (telegramUserId && pendingRegistrations.has(telegramUserId)) {
-      pendingRegistrations.delete(telegramUserId)
+    // Offene Abend-Bewertung? Dann ist der Text der Freitext.
+    const handled = await handleReviewText(
+      telegramUserId,
+      text,
+      (html) => ctx.reply(html, { parse_mode: 'HTML' }),
+      ctx.from?.first_name || ctx.from?.username || 'Jemand',
+    )
+    if (handled) return
 
+    if (pendingRegistrations.has(telegramUserId)) {
+      pendingRegistrations.delete(telegramUserId)
       try {
         const helper = await registerHelper(text.trim(), telegramUserId, ctx.from?.username)
         await ctx.reply(`✅ Super! Du bist jetzt als "${helper.name}" registriert!`)
       } catch (error) {
-        await ctx.reply('Fehler bei der Registrierung. Bitte versuche es erneut mit /register')
+        await ctx.reply('Fehler bei der Registrierung. Bitte versuche es erneut mit /register CODE')
       }
     }
   })
@@ -251,10 +334,25 @@ Fragen? Sprich einen Admin an!
     try {
       const [action, eventId, value] = callbackData.split('_')
 
-      // Abend-Bewertung (Sterne / Drinnen-Draußen) — eigener Pfad, kein Event-Lookup nötig.
+      // Abend-Bewertung (Sterne / Drinnen-Draußen)
       if (action === 'rvs' || action === 'rvp') {
         const toast = await handleReviewCallback(action, eventId, value ?? '', telegramUserId)
         await ctx.answerCallbackQuery({ text: toast })
+        return
+      }
+
+      // /essen – Elterndienst übernehmen
+      if (action === 'essen') {
+        const parent = await findParentByTelegram(telegramUserId, user.username)
+        if (!parent) {
+          await ctx.answerCallbackQuery({ text: 'Ich kenne dich noch nicht.' })
+          return
+        }
+        const result = await claimFood(eventId, parent)
+        await ctx.answerCallbackQuery({ text: result.ok ? 'Eingetragen!' : 'Nicht möglich' })
+        try {
+          await ctx.editMessageText(result.text)
+        } catch {}
         return
       }
 

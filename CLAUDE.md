@@ -111,10 +111,26 @@ curl -H "..." "https://<preview-url>/api/cron/reminder?test=2&live=1"  # Stage 2
 - Feature-Branches → automatische Preview-URLs (`<project>-git-<short>-<team>.vercel.app`).
 - Vercel-Cron läuft **nur auf Production**. Preview-Deployments triggern keine Crons.
 
+## Bot-Befehle und Rollen
+
+`services/bot-commands.ts` prüft pro Befehl die Rolle: Admin (Zugangsliste `admins.ts`), Helfer (`helpers`), Elternteil (`parents` per `telegram_user_id` oder `telegram_username`, Logik in `services/parents-bot.ts`).
+
+| Befehl | Wer | Was |
+|---|---|---|
+| `/start`, `/help` | alle | rollenabhängige Begrüßung/Übersicht; Admins bekommen den Menü-Button „Admin“ (Mini-App) |
+| `/register CODE` | unbekannt, privat | Code = `settings.register_code` (Einstellungen). Leer = Registrierung geschlossen |
+| `/next`, `/status`, `/mystatus` | Helfer | Termine mit Team, eigene Einsätze |
+| `/termine` | Eltern + Helfer | nächste Termine ohne Team |
+| `/idee` | Eltern + Helfer, privat | Freitext → `ideas` (event_id null, `source='elterngruppe'`, `suggested_by`); erscheint im Archiv unter „Ideen aus dem Bot“ |
+| `/essen` | Eltern, privat | Buttons `essen_<event_id>` für Termine ohne Elterndienst → `parent_duties` |
+| `/chatid` | Admin | Chat-ID |
+
+Geburtstagsgruß: der tägliche Reminder-Cron postet in `TELEGRAM_ELTERN_CHAT_ID` für Kinder mit Geburtstag heute, einmal pro Tag (`settings.last_birthday_greeting`).
+
 ## Wichtige Konventionen
 
 - Keine inline AI/Gemini-Calls — wurde 2026-05-01 entfernt (`ai-ideas.ts`, `activity-extractor.ts` weg).
-- Helfer registrieren sich ausschließlich per `/register` im Bot — kein manuelles Anlegen in der UI.
+- Helfer registrieren sich ausschließlich per `/register CODE` im Bot — kein manuelles Anlegen in der UI.
 - Eltern-`telegram_username` ist optional; wenn gesetzt, taggt Stage 1 die Eltern in der Essen-Zeile (`Familie Müller @muellerfamily`).
 - HTML-Mode bei `sendMessage`: nur `<b>`, `<i>`, `<a href="tg://user?id=...">`. Keine Markdown.
 - Telegram-Webhook hört nur auf **eine** URL. Vote-Klicks im Test-Chat landen also auch auf Production — Vote-Logik nur via merge-to-main testbar (oder Webhook temporär umbiegen).

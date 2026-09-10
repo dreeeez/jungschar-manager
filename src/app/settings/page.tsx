@@ -26,19 +26,32 @@ export default function SettingsPage() {
   const [icalUrl, setIcalUrl] = useState('')
   const [lastSync, setLastSync] = useState<LastSync | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [registerCode, setRegisterCode] = useState('')
+  const [savingCode, setSavingCode] = useState(false)
 
   useEffect(() => {
     fetchSettings()
   }, [])
 
+  async function saveRegisterCode() {
+    setSavingCode(true)
+    const { error } = await (supabase as any)
+      .from('settings')
+      .upsert({ key: 'register_code', value: registerCode.trim() }, { onConflict: 'key' })
+    showAlert(error ? 'Fehler: ' + error.message : registerCode.trim() ? 'Code gespeichert' : 'Registrierung geschlossen')
+    setSavingCode(false)
+  }
+
   async function fetchSettings() {
     const { data } = await (supabase as any)
       .from('settings')
       .select('key, value')
-      .in('key', ['weather_location', 'ical_url', 'last_ical_sync'])
+      .in('key', ['weather_location', 'ical_url', 'last_ical_sync', 'register_code'])
 
     for (const row of (data ?? []) as { key: string; value: string }[]) {
-      if (row.key === 'weather_location' && row.value) {
+      if (row.key === 'register_code') {
+        setRegisterCode(row.value || '')
+      } else if (row.key === 'weather_location' && row.value) {
         try {
           const location = JSON.parse(row.value)
           setCity(location.city || '')
@@ -134,6 +147,21 @@ export default function SettingsPage() {
 
   return (
     <Page back="/" title="Einstellungen" accent="settings">
+      <Section title="Registrierungs-Code" hint="Neue Helfer registrieren sich im Bot mit /register CODE. Leer lassen schließt die Registrierung.">
+        <Card className="space-y-3">
+          <Input
+            type="text"
+            value={registerCode}
+            onChange={(e) => setRegisterCode(e.target.value)}
+            placeholder="z.B. JS2026"
+            autoCapitalize="characters"
+          />
+          <Button variant="primary" block onClick={saveRegisterCode} disabled={savingCode}>
+            {savingCode ? 'Speichern …' : 'Code speichern'}
+          </Button>
+        </Card>
+      </Section>
+
       <Section title="Termin-Sync" hint="Holt neue Jungschar-Termine aus dem Kalender-Feed. Läuft automatisch am 1. des Monats.">
         <Card className="space-y-3">
           {lastSync ? (

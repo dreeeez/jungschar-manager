@@ -4,7 +4,15 @@ import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
 import { ARCHIVE_START_DATE } from '@/utils/format'
-import { Page, List, Row, Card, Button, Textarea, Loading, Empty, Star, Segmented, IconLine, SmallIcons } from '@/components/ui'
+import { Page, List, Row, Card, Button, Textarea, Loading, Empty, Star, Segmented, IconLine, SmallIcons, IconButton, Section } from '@/components/ui'
+
+interface Suggestion {
+  id: string
+  description: string | null
+  title: string
+  suggested_by: string | null
+  created_at: string
+}
 
 interface Helper { id: string; name: string }
 interface Parent { id: string; name: string }
@@ -56,7 +64,7 @@ function sourceLabel(source: string): string {
 }
 
 export default function ArchivePage() {
-  const { showAlert } = useTelegram()
+  const { showAlert, showConfirm } = useTelegram()
   const [events, setEvents] = useState<PastEvent[]>([])
   const [ideasMap, setIdeasMap] = useState<Map<string, IdeaRecord>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -65,10 +73,28 @@ export default function ArchivePage() {
   const [savingId, setSavingId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
 
   useEffect(() => { fetchData() }, [])
 
+  async function deleteSuggestion(s: Suggestion) {
+    const ok = await showConfirm('Idee löschen?')
+    if (!ok) return
+    const { error } = await (supabase as any).from('ideas').delete().eq('id', s.id)
+    if (error) showAlert('Fehler: ' + error.message)
+    else setSuggestions(prev => prev.filter(x => x.id !== s.id))
+  }
+
   async function fetchData() {
+    // Vorschläge aus dem Bot (/idee): ohne Termin, noch nicht umgesetzt.
+    const { data: sugg } = await (supabase as any)
+      .from('ideas')
+      .select('id, title, description, suggested_by, created_at')
+      .is('event_id', null)
+      .eq('was_used', false)
+      .order('created_at', { ascending: false })
+    setSuggestions(sugg ?? [])
+
     const today = new Date()
     const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
@@ -236,6 +262,26 @@ export default function ArchivePage() {
       accent="archive"
       subtitle={`${logged.length} ${logged.length === 1 ? 'Eintrag' : 'Einträge'}`}
     >
+      {suggestions.length > 0 && (
+        <Section title="Ideen aus dem Bot">
+          <List>
+            {suggestions.map((s) => (
+              <Row key={s.id} className="items-start">
+                <div className="min-w-0 flex-1">
+                  <p className="whitespace-pre-wrap text-sm">{s.description || s.title}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    {s.suggested_by ?? 'Unbekannt'} · {new Date(s.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </p>
+                </div>
+                <IconButton label="Löschen" tone="danger" onClick={() => deleteSuggestion(s)}>
+                  <SmallIcons.trash />
+                </IconButton>
+              </Row>
+            ))}
+          </List>
+        </Section>
+      )}
+
       {events.length === 0 ? (
         <Empty>Noch keine vergangenen Termine.</Empty>
       ) : logged.length === 0 ? (
