@@ -17,8 +17,8 @@
   --muted: var(--tg-theme-hint-color, #8a8a8e);
   --border: rgba(0, 0, 0, 0.08);
   --border: color-mix(in srgb, var(--fg) 10%, transparent);
-  --accent: var(--tg-theme-button-color, #2f6fed);
-  --accent-fg: var(--tg-theme-button-text-color, #ffffff);
+  --accent: #2f6fed;
+  --accent-fg: #ffffff;
   --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
   --success: #2e9e5b;
   --success-soft: rgba(46, 158, 91, 0.14);
@@ -35,7 +35,7 @@
     --card: var(--tg-theme-bg-color, #1c1c1e);
     --fg: var(--tg-theme-text-color, #f2f2f2);
     --muted: var(--tg-theme-hint-color, #8e8e93);
-    --accent: var(--tg-theme-button-color, #4f8bff);
+    --accent: #4f8bff;
     --success: #4cc27a;
     --warn: #f0a63a;
     --danger: #ef6b62;
@@ -54,6 +54,8 @@ body {
   background: var(--bg);
   color: var(--fg);
   -webkit-font-smoothing: antialiased;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 input, textarea, button {
@@ -73,10 +75,3 @@ input[type='date'] {
   box-shadow: var(--shadow);
 }
 
-.safe-area-top {
-  padding-top: env(safe-area-inset-top);
-}
-
-.safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}

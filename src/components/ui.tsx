@@ -30,7 +30,7 @@ export function Page({
   children: ReactNode
 }) {
   return (
-    <main className="mx-auto max-w-md px-4 pb-10 pt-5 safe-area-top safe-area-bottom">
+    <main className="mx-auto max-w-md px-5 pb-12 pt-8">
       {back && (
         <Link href={back} className="mb-3 inline-flex items-center gap-0.5 text-sm font-medium text-accent">
           <ChevronLeft />
