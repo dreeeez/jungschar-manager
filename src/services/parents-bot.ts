@@ -32,6 +32,29 @@ export async function findParentByTelegram(userId: number, username?: string | n
   return null
 }
 
+/**
+ * Admins dürfen /einladen auch ohne Eltern-Eintrag nutzen (zum Testen und
+ * weil sie selbst Gastgeber sein können). Dafür wird ein inaktiver
+ * Eltern-Datensatz angelegt, der in der Eltern-Seite nicht auftaucht.
+ */
+export async function ensureParentForAdmin(userId: number, name: string, username?: string | null): Promise<BotParent> {
+  const db = getSupabase()
+  const { data: existing } = await db
+    .from('parents')
+    .select('id, name, telegram_username, telegram_user_id')
+    .eq('telegram_user_id', userId)
+    .maybeSingle()
+  if (existing) return existing as BotParent
+
+  const { data, error } = await db
+    .from('parents')
+    .insert({ name, telegram_username: username ?? null, telegram_user_id: userId, active: false } as any)
+    .select('id, name, telegram_username, telegram_user_id')
+    .single()
+  if (error) throw error
+  return data as BotParent
+}
+
 /* ---------- Settings ---------- */
 
 export async function getSetting(key: string): Promise<string | null> {

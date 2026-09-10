@@ -9,6 +9,7 @@ import { sendTelegramMessage } from './reminders'
 import {
   IDEA_PROMPT,
   checkRegisterCode,
+  ensureParentForAdmin,
   findParentByTelegram,
   getEventDate,
   inviteConfirmKeyboard,
@@ -94,7 +95,7 @@ function helpFor(role: Role): string {
   if (role.helper) {
     lines.push('<b>Helfer</b>', '/next – nächste Termine mit Team', '/status – nächste Jungschar', '/mystatus – meine Einsätze')
   }
-  if (role.parent || role.helper) {
+  if (role.parent || role.helper || role.admin) {
     lines.push('', '<b>Eltern</b>', '/termine – nächste Jungschar-Termine', '/idee – Programm-Idee vorschlagen', '/einladen – die Jungschar zu euch einladen')
   }
   if (role.admin) {
@@ -246,10 +247,10 @@ export function setupBotCommands(bot: Bot) {
     })
   })
 
-  // /einladen – „Kommt zu uns“ (Eltern, privat)
+  // /einladen – „Kommt zu uns“ (Eltern und Admins, privat)
   bot.command('einladen', async (ctx) => {
     const role = await roleOf(ctx)
-    if (!role.parent) {
+    if (!role.parent && !role.admin) {
       await ctx.reply(role.helper ? 'Einladungen kommen von den Eltern. Als Helfer trägst du so etwas im Ideenpool ein.' : UNKNOWN)
       return
     }
@@ -347,7 +348,11 @@ export function setupBotCommands(bot: Bot) {
 
       // /einladen: Termin gewählt → Rückfrage, bestätigt → eintragen + Admins per DM.
       if (action === 'inv' || action === 'invy' || action === 'invn') {
-        const parent = await findParentByTelegram(telegramUserId, user.username)
+        let parent = await findParentByTelegram(telegramUserId, user.username)
+        if (!parent && isAdmin(telegramUserId)) {
+          const helper = await getHelperByTelegramId(telegramUserId)
+          parent = await ensureParentForAdmin(telegramUserId, helper?.name ?? userName, user.username)
+        }
         if (!parent) {
           await ctx.answerCallbackQuery({ text: 'Ich kenne dich noch nicht.' })
           return
