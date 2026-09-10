@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Badge,
   Button,
@@ -13,6 +13,7 @@ import {
   Page,
   Row,
   Section,
+  Sheet,
   SmallIcons,
 } from '@/components/ui'
 
@@ -65,6 +66,39 @@ function stageLabel(t: string): string {
   return t
 }
 
+interface Preview {
+  type: string
+  date: string
+  text: string
+  buttons: string[]
+}
+
+/**
+ * Telegram-HTML (nur <b>, <i>, <a>) in sichere React-Knoten wandeln.
+ * Alles andere wird als Text gezeigt.
+ */
+function renderTelegramHtml(html: string) {
+  const parts = html.split(/(<\/?(?:b|i)>|<a [^>]*>|<\/a>)/g)
+  const out: React.ReactNode[] = []
+  let bold = false
+  let italic = false
+  let link = false
+  parts.forEach((part, i) => {
+    if (part === '<b>') bold = true
+    else if (part === '</b>') bold = false
+    else if (part === '<i>') italic = true
+    else if (part === '</i>') italic = false
+    else if (part.startsWith('<a ')) link = true
+    else if (part === '</a>') link = false
+    else if (part) {
+      const text = part.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      const cls = [bold ? 'font-semibold' : '', italic ? 'italic' : '', link ? 'text-accent' : ''].join(' ').trim()
+      out.push(cls ? <span key={i} className={cls}>{text}</span> : text)
+    }
+  })
+  return out
+}
+
 function daysLabel(n: number): string {
   if (n === 0) return 'heute'
   if (n === 1) return 'morgen'
@@ -75,10 +109,27 @@ export default function StatusPage() {
   const [status, setStatus] = useState<BotStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<Preview | null>(null)
+  const [previewFor, setPreviewFor] = useState<NextPing | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchStatus()
   }, [])
+
+  async function openPreview(p: NextPing) {
+    setPreviewFor(p)
+    setPreview(null)
+    setPreviewError(null)
+    try {
+      const res = await fetch(`/api/status/preview?type=${encodeURIComponent(p.type)}&date=${p.eventDate}`)
+      const body = await res.json()
+      if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`)
+      setPreview(body)
+    } catch (e: any) {
+      setPreviewError(e.message ?? 'Vorschau nicht verfügbar.')
+    }
+  }
 
   async function fetchStatus() {
     setLoading(true)
@@ -136,7 +187,7 @@ export default function StatusPage() {
 
           <Section title="Nächste Nachricht">
             {nextPing ? (
-              <Card className="flex items-center gap-3">
+              <button type="button" onClick={() => openPreview(nextPing)} className="card flex w-full items-center gap-3 p-4 text-left active:opacity-60">
                 <DateTile date={nextPing.eventDate} />
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{nextPing.label}</p>
@@ -144,8 +195,9 @@ export default function StatusPage() {
                   {status.nextEvent && status.nextEvent.date === nextPing.eventDate && (
                     <p className="text-sm text-muted">Termin {daysLabel(status.nextEvent.daysUntil)}</p>
                   )}
+                  <p className="mt-1 text-xs text-accent">Vorschau anzeigen</p>
                 </div>
-              </Card>
+              </button>
             ) : (
               <Card>
                 <Empty>Keine Nachricht geplant.</Empty>
@@ -159,7 +211,7 @@ export default function StatusPage() {
             ) : (
               <List>
                 {status.nextPings.map((p, i) => (
-                  <Row key={`${p.type}-${p.eventDate}-${i}`}>
+                  <Row key={`${p.type}-${p.eventDate}-${i}`} onClick={() => openPreview(p)}>
                     <span className="shrink-0 text-accent">
                       <SmallIcons.send />
                     </span>
@@ -174,74 +226,39 @@ export default function StatusPage() {
             )}
           </Section>
 
-          <Section title="Kalender">
-            <div className="space-y-2">
-              {status.calendar.feedReachable ? (
-                <p className="text-sm text-muted">
-                  Feed erreichbar, {status.calendar.feedJungscharCount} Jungschar-Termine.
-                </p>
-              ) : (
-                <Note tone="danger">Feed nicht erreichbar. Reminder laufen fail-safe weiter.</Note>
-              )}
-              {status.calendar.lastSync?.at && (
-                <p className="text-sm text-muted">
-                  Letzter Sync: {new Date(status.calendar.lastSync.at).toLocaleString('de-DE', {
-                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-                  })}
-                </p>
-              )}
-              {status.calendar.feedReachable && status.drift.staleInDb.length === 0 && status.drift.missingFromDb.length === 0 && (
-                <p className="text-sm text-muted">Kalender und Datenbank stimmen überein.</p>
-              )}
-              {status.drift.staleInDb.length > 0 && (
-                <Note tone="danger">
-                  {status.drift.staleInDb.length} Termin(e) in der Datenbank, aber nicht mehr im Feed:{' '}
-                  {status.drift.staleInDb.map(fmtShort).join(', ')}
-                </Note>
-              )}
-              {status.drift.missingFromDb.length > 0 && (
-                <Note tone="warn">
-                  {status.drift.missingFromDb.length} Feed-Termin(e) noch nicht in der Datenbank:{' '}
-                  {status.drift.missingFromDb.map(fmtShort).join(', ')}
-                </Note>
-              )}
-            </div>
-          </Section>
-
-          <Section title="Kommende Termine">
-            {status.upcoming.length === 0 ? (
-              <Empty>Keine kommenden Termine.</Empty>
-            ) : (
-              <List>
-                {status.upcoming.map((ev) => (
-                  <Row key={ev.date} className="items-start">
-                    <div className="min-w-0 flex-1">
-                      <p>
-                        <span className="font-semibold">{fmtShort(ev.date)}</span>{' '}
-                        <span className="text-sm text-muted">{daysLabel(ev.daysUntil)}</span>
-                      </p>
-                      <p className="text-sm text-muted">
-                        {ev.duo.length ? ev.duo.join(' + ') : 'keine Einteilung'}
-                      </p>
-                      {ev.remindersSent.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {ev.remindersSent.map((r) => (
-                            <Badge key={r} tone="success">{stageLabel(r)}</Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1.5">
-                      {ev.inFeed === false && <Badge tone="warn">nicht im Feed</Badge>}
-                      {ev.pinned && <Badge tone="accent">Gepinnt</Badge>}
-                    </div>
-                  </Row>
-                ))}
-              </List>
-            )}
-          </Section>
         </>
       )}
+
+      <Sheet
+        open={!!previewFor}
+        onClose={() => { setPreviewFor(null); setPreview(null) }}
+        title={previewFor?.label ?? 'Vorschau'}
+      >
+        {previewFor && (
+          <p className="mb-3 text-sm text-muted">
+            Geplant {fmtDateTime(previewFor.at)} Uhr, Termin {fmtShort(previewFor.eventDate)}
+          </p>
+        )}
+        {previewError && <Note tone="danger">{previewError}</Note>}
+        {!preview && !previewError && <p className="py-6 text-center text-sm text-muted">Lädt …</p>}
+        {preview && (
+          <div className="space-y-3">
+            <div className="card whitespace-pre-wrap p-4 text-[15px] leading-relaxed">
+              {renderTelegramHtml(preview.text)}
+            </div>
+            {preview.buttons.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {preview.buttons.map((b) => (
+                  <span key={b} className="rounded-lg bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent">{b}</span>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted">
+              Vorschau mit aktuellen Daten. Texte rotieren zufällig, die gesendete Nachricht kann eine andere Variante sein.
+            </p>
+          </div>
+        )}
+      </Sheet>
     </Page>
   )
 }

@@ -593,7 +593,7 @@ export default function CalendarPage() {
               )}
             </Section>
 
-            <Section title="Elterndienst (Essen)">
+            <Section title="Elterndienst (Essen)" className="mb-0">
               {parents.length === 0 ? (
                 <Empty>Keine Eltern vorhanden. Unter &quot;Eltern&quot; hinzufügen.</Empty>
               ) : (
@@ -611,45 +611,6 @@ export default function CalendarPage() {
               )}
             </Section>
 
-            <Section title="Aktivität" className="mb-0">
-              {selectedEventIdea === undefined ? (
-                <p className="py-2 text-sm text-muted">Lädt …</p>
-              ) : selectedEventIdea ? (
-                <Note>
-                  <p className="whitespace-pre-wrap text-fg">
-                    {selectedEventIdea.description || selectedEventIdea.title}
-                  </p>
-                  <p className="mt-1 text-xs">
-                    {sourceLabel(selectedEventIdea.source)} · im Archiv bearbeitbar
-                  </p>
-                </Note>
-              ) : (
-                <div className="space-y-2">
-                  <Textarea
-                    value={newActivityText}
-                    onChange={(e) => setNewActivityText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        saveManualActivity()
-                      }
-                    }}
-                    placeholder="Was habt ihr gemacht? (Shift+Enter für Absatz)"
-                    rows={3}
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={saveManualActivity}
-                      disabled={savingActivity || !newActivityText.trim()}
-                    >
-                      {savingActivity ? 'Speichert …' : 'Speichern'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Section>
           </>
         )}
       </Sheet>

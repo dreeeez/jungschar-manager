@@ -1,5 +1,5 @@
 import { formatDate, getDaysUntil, getDayOfWeek } from '@/utils/format'
-import { getUpcomingEvents, getHelperTags } from './events'
+import { getUpcomingEvents, getHelperTags, getEventById } from './events'
 import { getParentDutyDisplay } from './parents'
 import { getSupabase } from './database'
 import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './weather'
@@ -619,4 +619,38 @@ export async function processReminders(chatId: string, testStage?: number) {
     message: `${results.length} reminder(s) sent${isTest ? ' (TEST)' : ''}`,
     results,
   }
+}
+
+/**
+ * Rendert die Reminder-Nachricht für einen Termin, ohne zu senden — für die
+ * Vorschau auf der Bot-Status-Seite. Templates rotieren zufällig, die
+ * gesendete Nachricht kann also eine andere Variante sein.
+ */
+export async function renderReminderPreview(
+  type: string,
+  eventDate: string,
+): Promise<{ text: string; replyMarkup?: any } | null> {
+  const { data: row } = await getSupabase().from('events').select('id').eq('event_date', eventDate).maybeSingle()
+  if (!row) return null
+  const event = await getEventById((row as any).id)
+  if (!event) return null
+
+  if (type === STAGE_SATURDAY) {
+    const r = generateStage3Message(event)
+    return { text: r.message }
+  }
+
+  const [weather, birthdays] = await Promise.all([
+    fetchWeatherForEvent(eventDate),
+    getBirthdaysAroundEvent(eventDate),
+  ])
+  if (type === STAGE_SUNDAY) {
+    const r = generateStage1Message(event, weather, birthdays)
+    return { text: r.message }
+  }
+  if (type === STAGE_WEDNESDAY) {
+    const r = generateStage2Message(event, getDaysUntil(new Date(eventDate)), weather, birthdays)
+    return { text: r.message, replyMarkup: r.replyMarkup }
+  }
+  return null
 }

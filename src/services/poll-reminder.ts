@@ -159,3 +159,15 @@ export async function processPollReminder(chatId: string, isTest = false) {
     result,
   }
 }
+
+/**
+ * Vorschau des Donnerstags-Pings für einen Termin (ohne Senden). Nennt die
+ * aktuellen Nicht-Voter; vor dem Mittwochs-Reminder sind das alle Helfer.
+ */
+export async function renderPollReminderPreview(eventDate: string): Promise<string | null> {
+  const { data: row } = await getSupabase().from('events').select('id').eq('event_date', eventDate).maybeSingle()
+  if (!row) return null
+  const nonVoters = await getNonVoters((row as any).id)
+  const mentions = nonVoters.length ? nonVoters.map(mentionFor).join(' ') : '(alle haben abgestimmt)'
+  return pickReminderTemplate()(mentions, formatDate(eventDate))
+}

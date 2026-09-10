@@ -359,3 +359,14 @@ export async function handleReviewText(
 
   return true
 }
+
+/** Vorschau der Bewertungs-DM für einen Termin (ohne Senden). */
+export async function renderReviewPreview(eventDate: string): Promise<string | null> {
+  const { data: event } = await getSupabase()
+    .from('events')
+    .select('id, event_date, assignments(helper:helpers(name))')
+    .eq('event_date', eventDate)
+    .maybeSingle()
+  if (!event) return null
+  return `${header(event)}\n\nBewerte mit Sternen:\n[ 1 ★ ] [ 2 ★ ] [ 3 ★ ] [ 4 ★ ] [ 5 ★ ]`
+}

@@ -40,12 +40,13 @@ export async function createParent(
  */
 export async function updateParent(
   parentId: string,
-  patch: { name?: string; phone?: string | null; telegramUsername?: string | null }
+  patch: { name?: string; phone?: string | null; telegramUsername?: string | null; telegramUserId?: number | null }
 ) {
   const update: Record<string, unknown> = {}
   if (patch.name !== undefined) update.name = patch.name
   if (patch.phone !== undefined) update.phone = patch.phone
   if (patch.telegramUsername !== undefined) update.telegram_username = patch.telegramUsername
+  if (patch.telegramUserId !== undefined) update.telegram_user_id = patch.telegramUserId
 
   const { error } = await getSupabase()
     .from('parents')
@@ -128,7 +129,17 @@ export function getParentDutyDisplay(event: any): string {
   const duty = event?.parent_duties?.[0]
   const parent = duty?.parent
   if (!parent) return 'Noch nicht eingeteilt'
-  return parent.telegram_username
-    ? `${parent.name} @${parent.telegram_username}`
-    : parent.name
+  return parentMention(parent)
+}
+
+/**
+ * Taggbare Darstellung eines Elternteils für HTML-Nachrichten:
+ * @username (Push), sonst ID-Link <a href="tg://user?id=…">Name</a>
+ * (ebenfalls Push), sonst Klarname.
+ */
+export function parentMention(parent: { name: string; telegram_username?: string | null; telegram_user_id?: number | null }): string {
+  const name = String(parent.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  if (parent.telegram_username) return `${name} @${parent.telegram_username}`
+  if (parent.telegram_user_id) return `<a href="tg://user?id=${parent.telegram_user_id}">${name}</a>`
+  return name
 }

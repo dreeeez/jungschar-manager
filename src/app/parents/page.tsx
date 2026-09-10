@@ -9,11 +9,24 @@ interface Parent {
   id: string
   name: string
   telegram_username: string | null
+  telegram_user_id: number | null
   active: boolean
 }
 
 function stripAt(s: string): string {
   return s.trim().replace(/^@+/, '')
+}
+
+/** Telegram-ID aus Eingabe: nur Ziffern, sonst null. */
+function parseTgId(s: string): number | null {
+  const digits = s.replace(/\D/g, '')
+  return digits ? Number(digits) : null
+}
+
+function telegramLabel(p: Parent): string {
+  if (p.telegram_username) return `@${p.telegram_username}`
+  if (p.telegram_user_id) return `Telegram-ID ${p.telegram_user_id}`
+  return 'ohne Telegram, wird nicht getaggt'
 }
 
 export default function ParentsPage() {
@@ -22,9 +35,11 @@ export default function ParentsPage() {
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [newTag, setNewTag] = useState('')
+  const [newTgId, setNewTgId] = useState('')
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTag, setEditTag] = useState('')
+  const [editTgId, setEditTgId] = useState('')
 
   useEffect(() => {
     fetchParents()
@@ -56,6 +71,7 @@ export default function ParentsPage() {
       .insert({
         name: newName.trim(),
         telegram_username: stripAt(newTag) || null,
+        telegram_user_id: parseTgId(newTgId),
       })
 
     if (error) {
@@ -63,6 +79,7 @@ export default function ParentsPage() {
     } else {
       setNewName('')
       setNewTag('')
+      setNewTgId('')
       setAdding(false)
       fetchParents()
     }
@@ -71,11 +88,13 @@ export default function ParentsPage() {
   function startEdit(parent: Parent) {
     setEditingId(parent.id)
     setEditTag(parent.telegram_username || '')
+    setEditTgId(parent.telegram_user_id ? String(parent.telegram_user_id) : '')
   }
 
   function cancelEdit() {
     setEditingId(null)
     setEditTag('')
+    setEditTgId('')
   }
 
   async function saveEdit(parentId: string) {
@@ -83,6 +102,7 @@ export default function ParentsPage() {
       .from('parents')
       .update({
         telegram_username: stripAt(editTag) || null,
+        telegram_user_id: parseTgId(editTgId),
       })
       .eq('id', parentId)
 
@@ -129,6 +149,14 @@ export default function ParentsPage() {
             onChange={(e) => setNewTag(e.target.value)}
             placeholder="Telegram-Name, optional"
           />
+          <Input
+            type="text"
+            inputMode="numeric"
+            value={newTgId}
+            onChange={(e) => setNewTgId(e.target.value)}
+            placeholder="Telegram-ID, falls kein Name"
+          />
+          <p className="text-xs text-muted">Mit Name oder ID wird die Person in den Reminder-Nachrichten getaggt.</p>
           <Button variant="primary" block onClick={addParent}>Hinzufügen</Button>
         </div>
       </Disclosure>
@@ -151,6 +179,13 @@ export default function ParentsPage() {
                       placeholder="Telegram-Name, z.B. muellerfamily"
                       autoFocus
                     />
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={editTgId}
+                      onChange={(e) => setEditTgId(e.target.value)}
+                      placeholder="Telegram-ID, falls kein Name"
+                    />
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="sm" onClick={cancelEdit}>Abbrechen</Button>
                       <Button variant="primary" size="sm" onClick={() => saveEdit(parent.id)}>Speichern</Button>
@@ -162,9 +197,7 @@ export default function ParentsPage() {
                 <Row key={parent.id}>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{parent.name}</p>
-                    <p className="text-sm text-muted">
-                      {parent.telegram_username ? `@${parent.telegram_username}` : 'ohne Telegram-Name'}
-                    </p>
+                    <p className="text-sm text-muted">{telegramLabel(parent)}</p>
                   </div>
                   <div className="flex shrink-0 gap-1.5">
                     <IconButton label="Bearbeiten" onClick={() => startEdit(parent)}>
