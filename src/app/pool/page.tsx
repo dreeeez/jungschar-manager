@@ -20,6 +20,8 @@ interface PoolIdea {
   source: string
   tags: string[] | null
   created_at: string
+  /** Gesetzt, wenn die Idee per /idee im Bot eingereicht wurde. */
+  suggested_by?: string | null
 }
 
 type Place = 'drinnen' | 'draußen'
@@ -69,7 +71,7 @@ export default function PoolPage() {
   async function fetchIdeas() {
     const { data, error } = await (supabase as any)
       .from('ideas')
-      .select('id, title, description, material, source, tags, created_at')
+      .select('id, title, description, material, source, tags, created_at, suggested_by')
       .is('event_id', null)
       .eq('was_used', false)
       .order('title', { ascending: true })
@@ -117,7 +119,7 @@ export default function PoolPage() {
         source: 'manual',
         tags,
       })
-      .select('id, title, description, material, source, tags, created_at')
+      .select('id, title, description, material, source, tags, created_at, suggested_by')
       .single()
     setSaving(false)
     if (error) {
@@ -242,7 +244,9 @@ export default function PoolPage() {
                 {categoryTags.map((t) => (
                   <Badge key={t}>{CATEGORY_LABEL.get(t)}</Badge>
                 ))}
-                <span className="text-xs text-muted">{sourceLabel(idea.source)}</span>
+                <span className="text-xs text-muted">
+                  {idea.suggested_by ? `Vorschlag von ${idea.suggested_by}` : sourceLabel(idea.source)}
+                </span>
               </div>
             </Card>
           )

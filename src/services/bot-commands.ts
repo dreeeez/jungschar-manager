@@ -4,7 +4,8 @@ import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './h
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { recordVote } from './attendance'
 import { handleReviewCallback, handleReviewText } from './review-ping'
-import { APP_URL, isAdmin } from './admins'
+import { ADMIN_TELEGRAM_USER_IDS, APP_URL, isAdmin } from './admins'
+import { sendTelegramMessage } from './reminders'
 import {
   IDEA_PROMPT,
   checkRegisterCode,
@@ -353,6 +354,13 @@ export function setupBotCommands(bot: Bot) {
         try {
           await ctx.editMessageText(result.text)
         } catch {}
+        // Nur die Admins erfahren es per DM; in der Mini-App steht es im Kalender.
+        if (result.ok && result.eventDate) {
+          const note = `🍽️ <b>${escapeHtml(parent.name)}</b> übernimmt das Essen am ${formatDate(result.eventDate)}.`
+          for (const adminId of ADMIN_TELEGRAM_USER_IDS) {
+            sendTelegramMessage(String(adminId), note).catch((e) => console.error('admin food notice failed:', e))
+          }
+        }
         return
       }
 

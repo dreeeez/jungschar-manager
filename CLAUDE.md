@@ -121,8 +121,8 @@ curl -H "..." "https://<preview-url>/api/cron/reminder?test=2&live=1"  # Stage 2
 | `/register CODE` | unbekannt, privat | Code = `settings.register_code` (Einstellungen). Leer = Registrierung geschlossen |
 | `/next`, `/status`, `/mystatus` | Helfer | Termine mit Team, eigene Einsätze |
 | `/termine` | Eltern + Helfer | nächste Termine ohne Team |
-| `/idee` | Eltern + Helfer, privat | Freitext → `ideas` (event_id null, `source='elterngruppe'`, `suggested_by`); erscheint im Archiv unter „Ideen aus dem Bot“ |
-| `/essen` | Eltern, privat | Buttons `essen_<event_id>` für Termine ohne Elterndienst → `parent_duties` |
+| `/idee` | Eltern + Helfer, privat | Freitext → `ideas` (event_id null, was_used=false, `source='elterngruppe'`, `suggested_by`); erscheint im Ideenpool als „Vorschlag von X“ |
+| `/essen` | Eltern, privat | Buttons `essen_<event_id>` für Termine ohne Elterndienst → `parent_duties`; Admins bekommen eine DM, Kalender zeigt „Essen: Name“ |
 | `/chatid` | Admin | Chat-ID |
 
 Geburtstagsgruß: der tägliche Reminder-Cron postet in `TELEGRAM_ELTERN_CHAT_ID` für Kinder mit Geburtstag heute, einmal pro Tag (`settings.last_birthday_greeting`).
