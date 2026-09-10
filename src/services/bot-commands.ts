@@ -8,11 +8,10 @@ import { ADMIN_TELEGRAM_USER_IDS, APP_URL, isAdmin } from './admins'
 import { sendTelegramMessage } from './reminders'
 import {
   IDEA_PROMPT,
+  INVITE_PROMPT,
   checkRegisterCode,
-  claimFood,
-  essenKeyboard,
   findParentByTelegram,
-  freeFoodEvents,
+  saveInvitation,
   saveParentIdea,
 } from './parents-bot'
 
@@ -29,8 +28,9 @@ import {
 
 // Wartet auf den Namen nach erfolgreichem /register (in-memory, Cold-Start setzt zurück)
 const pendingRegistrations = new Set<number>()
-// Wartet auf den Freitext nach /idee — Fallback, falls jemand nicht "antwortet"
+// Warten auf den Freitext nach /idee bzw. /einladen — Fallback, falls jemand nicht "antwortet"
 const pendingIdeas = new Set<number>()
+const pendingInvites = new Set<number>()
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -81,7 +81,7 @@ async function roleOf(ctx: Context): Promise<Role> {
   return { helper, parent, admin: isAdmin(id) }
 }
 
-const NOT_HELPER = 'Dieser Befehl ist nur für Helfer. Eltern nutzen /idee, /essen und /termine.'
+const NOT_HELPER = 'Dieser Befehl ist nur für Helfer. Eltern nutzen /idee, /einladen und /termine.'
 const UNKNOWN =
   'Ich kenne dich noch nicht.\n\n' +
   'Helfer: /register CODE (den Code bekommst du von Marco oder Jens).\n' +
@@ -93,7 +93,7 @@ function helpFor(role: Role): string {
     lines.push('<b>Helfer</b>', '/next – nächste Termine mit Team', '/status – nächste Jungschar', '/mystatus – meine Einsätze')
   }
   if (role.parent || role.helper) {
-    lines.push('', '<b>Eltern</b>', '/termine – nächste Jungschar-Termine', '/idee – Programm-Idee vorschlagen', '/essen – Essen für einen Termin übernehmen')
+    lines.push('', '<b>Eltern</b>', '/termine – nächste Jungschar-Termine', '/idee – Programm-Idee vorschlagen', '/einladen – die Jungschar zu euch einladen')
   }
   if (role.admin) {
     lines.push('', '<b>Admin</b>', '/chatid – Chat-ID anzeigen', `Mini-App: ${APP_URL}`)
@@ -128,7 +128,7 @@ export function setupBotCommands(bot: Bot) {
     } else if (role.parent) {
       intro =
         `Hallo ${escapeHtml(role.parent.name)}! Schön, dass du da bist.\n\n` +
-        'Mit /idee kannst du uns eine Programm-Idee schicken, mit /essen das Essen für eine Jungschar übernehmen.'
+        'Mit /idee kannst du uns eine Programm-Idee schicken, mit /einladen die Jungschar zu euch nach Hause einladen.'
     } else {
       intro = 'Willkommen beim Jungschar-Bot!\n\n' + UNKNOWN
     }
@@ -244,24 +244,20 @@ export function setupBotCommands(bot: Bot) {
     })
   })
 
-  // /essen – Elterndienst übernehmen (Eltern, privat)
-  bot.command('essen', async (ctx) => {
+  // /einladen – „Kommt zu uns“ (Eltern, privat)
+  bot.command('einladen', async (ctx) => {
     const role = await roleOf(ctx)
     if (!role.parent) {
-      await ctx.reply(role.helper ? 'Das Essen tragen die Eltern ein. Als Helfer machst du das in der Mini-App.' : UNKNOWN)
+      await ctx.reply(role.helper ? 'Einladungen kommen von den Eltern. Als Helfer trägst du so etwas im Ideenpool ein.' : UNKNOWN)
       return
     }
     if (ctx.chat.type !== 'private') {
-      await ctx.reply('Schreib mir dafür privat, dann zeige ich dir die freien Termine.')
+      await ctx.reply('Schreib mir dafür gern privat.')
       return
     }
-    const events = await freeFoodEvents()
-    if (events.length === 0) {
-      await ctx.reply('Alle kommenden Termine haben schon jemanden fürs Essen. Danke!')
-      return
-    }
-    await ctx.reply('Für welchen Termin möchtet ihr das Essen übernehmen?', {
-      reply_markup: essenKeyboard(events),
+    if (ctx.from) pendingInvites.add(ctx.from.id)
+    await ctx.reply(INVITE_PROMPT, {
+      reply_markup: { force_reply: true, input_field_placeholder: 'Wann passt es euch?' },
     })
   })
 
@@ -289,8 +285,28 @@ export function setupBotCommands(bot: Bot) {
     if (text.startsWith('/')) return
     if (!telegramUserId || ctx.chat?.type !== 'private') return
 
-    // Antwort auf /idee (per "Antworten" oder direkt danach)
     const repliedTo = ctx.message.reply_to_message?.text
+
+    // Antwort auf /einladen: Einladung in den Ideenpool, Admins per DM informieren.
+    if (repliedTo === INVITE_PROMPT || pendingInvites.has(telegramUserId)) {
+      pendingInvites.delete(telegramUserId)
+      const role = await roleOf(ctx)
+      const name = role.parent?.name ?? ctx.from?.first_name ?? 'Unbekannt'
+      try {
+        await saveInvitation(text, { name, telegramUserId })
+        await ctx.reply('Danke für die Einladung! Wir melden uns, sobald wir einen Termin dafür planen.')
+        const note = `🏠 <b>${escapeHtml(name)}</b> lädt die Jungschar zu sich ein:\n${escapeHtml(text.trim())}`
+        for (const adminId of ADMIN_TELEGRAM_USER_IDS) {
+          sendTelegramMessage(String(adminId), note).catch((e) => console.error('admin invite notice failed:', e))
+        }
+      } catch (e) {
+        console.error('saveInvitation failed:', e)
+        await ctx.reply('Speichern hat nicht geklappt. Magst du es später noch einmal versuchen?')
+      }
+      return
+    }
+
+    // Antwort auf /idee (per "Antworten" oder direkt danach)
     if (repliedTo === IDEA_PROMPT || pendingIdeas.has(telegramUserId)) {
       pendingIdeas.delete(telegramUserId)
       const role = await roleOf(ctx)
@@ -339,28 +355,6 @@ export function setupBotCommands(bot: Bot) {
       if (action === 'rvs' || action === 'rvp') {
         const toast = await handleReviewCallback(action, eventId, value ?? '', telegramUserId)
         await ctx.answerCallbackQuery({ text: toast })
-        return
-      }
-
-      // /essen – Elterndienst übernehmen
-      if (action === 'essen') {
-        const parent = await findParentByTelegram(telegramUserId, user.username)
-        if (!parent) {
-          await ctx.answerCallbackQuery({ text: 'Ich kenne dich noch nicht.' })
-          return
-        }
-        const result = await claimFood(eventId, parent)
-        await ctx.answerCallbackQuery({ text: result.ok ? 'Eingetragen!' : 'Nicht möglich' })
-        try {
-          await ctx.editMessageText(result.text)
-        } catch {}
-        // Nur die Admins erfahren es per DM; in der Mini-App steht es im Kalender.
-        if (result.ok && result.eventDate) {
-          const note = `🍽️ <b>${escapeHtml(parent.name)}</b> übernimmt das Essen am ${formatDate(result.eventDate)}.`
-          for (const adminId of ADMIN_TELEGRAM_USER_IDS) {
-            sendTelegramMessage(String(adminId), note).catch((e) => console.error('admin food notice failed:', e))
-          }
-        }
         return
       }
 

@@ -1,9 +1,9 @@
-import { getSupabase, getTodayISO } from './database'
+import { getSupabase } from './database'
 import { sendTelegramMessage } from './reminders'
 import { berlinNow } from './review-ping'
 
 /**
- * Eltern im Bot: Erkennung, Registrierungs-Code, /idee, /essen und der
+ * Eltern im Bot: Erkennung, Registrierungs-Code, /idee, /einladen und der
  * Geburtstagsgruß in der Elterngruppe.
  *
  * Eltern werden über die in der Mini-App gepflegte Telegram-ID oder den
@@ -78,53 +78,32 @@ export async function saveParentIdea(
   if (error) throw error
 }
 
-/* ---------- /essen ---------- */
+/* ---------- /einladen ---------- */
 
-function shortDate(iso: string): string {
-  const d = new Date(iso + 'T12:00:00')
-  const wd = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][d.getDay()]
-  return `${wd} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`
-}
-
-/** Kommende Termine ohne Elterndienst. */
-export async function freeFoodEvents(limit = 8): Promise<{ id: string; event_date: string }[]> {
-  const { data } = await getSupabase()
-    .from('events')
-    .select('id, event_date, parent_duties(id)')
-    .gte('event_date', getTodayISO())
-    .order('event_date', { ascending: true })
-    .limit(30)
-  return ((data ?? []) as any[])
-    .filter(e => (e.parent_duties?.length ?? 0) === 0)
-    .slice(0, limit)
-    .map(e => ({ id: e.id, event_date: e.event_date }))
-}
-
-export function essenKeyboard(events: { id: string; event_date: string }[]) {
-  const buttons = events.map(e => ({ text: shortDate(e.event_date), callback_data: `essen_${e.id}` }))
-  const rows: typeof buttons[] = []
-  for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2))
-  return { inline_keyboard: rows }
-}
+export const INVITE_PROMPT =
+  'Schön, dass ihr die Jungschar zu euch einladen wollt! Wann passt es euch, und gibt es etwas zu beachten? ' +
+  'Schreib es einfach als Antwort auf diese Nachricht, z.B. „gerne im Oktober, wir grillen“.'
 
 /**
- * Trägt den Elterndienst ein, wenn der Termin noch frei ist.
- * @returns Text für die Rückmeldung an das Elternteil.
+ * Einladung „kommt zu uns“: landet als Idee im Pool (Kategorie Essen),
+ * damit das Team sie beim Planen sieht.
  */
-export async function claimFood(eventId: string, parent: BotParent): Promise<{ ok: boolean; text: string; eventDate?: string }> {
-  const db = getSupabase()
-  const { data: event } = await db
-    .from('events')
-    .select('id, event_date, parent_duties(parent:parents(name))')
-    .eq('id', eventId)
-    .maybeSingle()
-  if (!event) return { ok: false, text: 'Diesen Termin gibt es nicht mehr.' }
-  const taken = ((event as any).parent_duties ?? [])[0]?.parent?.name
-  if (taken) return { ok: false, text: `Der ${shortDate((event as any).event_date)} ist schon vergeben (${taken}).`, eventDate: (event as any).event_date }
-
-  const { error } = await db.from('parent_duties').insert({ event_id: eventId, parent_id: parent.id } as any)
-  if (error) return { ok: false, text: 'Eintragen hat nicht geklappt, bitte später noch einmal.' }
-  return { ok: true, text: `Danke! ${parent.name} übernimmt das Essen am ${shortDate((event as any).event_date)}.`, eventDate: (event as any).event_date }
+export async function saveInvitation(
+  text: string,
+  by: { name: string; telegramUserId: number },
+): Promise<void> {
+  const clean = text.trim()
+  const { error } = await getSupabase().from('ideas').insert({
+    event_id: null,
+    title: `Einladung bei ${by.name}`.slice(0, 200),
+    description: clean,
+    was_used: false,
+    source: 'elterngruppe',
+    tags: ['essen'],
+    suggested_by: by.name,
+    suggested_by_telegram_id: by.telegramUserId,
+  } as any)
+  if (error) throw error
 }
 
 /* ---------- Geburtstagsgruß ---------- */

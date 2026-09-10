@@ -20,7 +20,7 @@ const commands = [
   { command: 'help', description: 'Befehle anzeigen' },
   { command: 'termine', description: 'Nächste Jungschar-Termine' },
   { command: 'idee', description: 'Programm-Idee vorschlagen' },
-  { command: 'essen', description: 'Essen für einen Termin übernehmen' },
+  { command: 'einladen', description: 'Die Jungschar zu euch einladen' },
   { command: 'next', description: 'Termine mit Team (Helfer)' },
   { command: 'mystatus', description: 'Meine Einsätze (Helfer)' },
   { command: 'register', description: 'Als Helfer registrieren (mit Code)' },
