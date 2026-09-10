@@ -126,7 +126,7 @@ export default function PoolPage() {
       })
       const body = await res.json()
       if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`)
-      showAlert(`In der ${target} gepostet${body.poll ? ', mit Umfrage' : ''}.`)
+      showAlert(`In der ${target} gepostet.`)
       stopSelecting()
     } catch (e: any) {
       showAlert('Fehler: ' + e.message)
@@ -241,14 +241,21 @@ export default function PoolPage() {
       title="Ideenpool"
       accent="pool"
       subtitle={`${filtered.length} von ${ideas.length} Ideen`}
-      action={
-        canShare && ideas.length > 0 ? (
-          <Button variant="ghost" size="sm" onClick={() => (selecting ? stopSelecting() : setSelecting(true))}>
-            {selecting ? 'Fertig' : 'Auswählen'}
-          </Button>
-        ) : undefined
-      }
     >
+      {canShare && ideas.length > 0 && !selecting && (
+        <div className="mb-6">
+          <Button variant="secondary" block onClick={() => setSelecting(true)}>
+            Ideen in Helfer-Gruppe teilen
+          </Button>
+        </div>
+      )}
+      {selecting && (
+        <div className="card mb-6 flex items-center justify-between gap-3 px-4 py-3">
+          <p className="text-sm">Ideen antippen, die du teilen willst.</p>
+          <Button variant="ghost" size="sm" onClick={stopSelecting}>Abbrechen</Button>
+        </div>
+      )}
+
       <Disclosure label="Idee hinzufügen" open={formOpen} onOpenChange={(open) => { setFormOpen(open); if (!open) resetForm() }}>
         <div className="space-y-3">
           <div>

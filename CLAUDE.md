@@ -113,7 +113,7 @@ curl -H "..." "https://<preview-url>/api/cron/reminder?test=2&live=1"  # Stage 2
 
 ## Ideen teilen
 
-Ideenpool → „Auswählen“ (nur Admins) → bis zu 10 Ideen markieren → „In Helfer-Gruppe teilen“ (oder „Test“ → Sandbox). `POST /api/pool/share { ids, test }` prüft Session-Admin, postet die Ideen als Nachricht (`services/pool-share.ts`) und bei ≥ 2 Ideen eine Umfrage mit Mehrfachauswahl.
+Ideenpool → Button „Ideen in Helfer-Gruppe teilen“ (nur Admins) → bis zu 10 Ideen antippen → Leiste unten „In Helfer-Gruppe teilen“ (oder „Test“ → Sandbox). `POST /api/pool/share { ids, test }` prüft Session-Admin und postet eine knappe Nachricht (`services/pool-share.ts`: Titel, Tags, gekürzter Inhalt, Mitbringen, „von X“). Keine Umfrage.
 
 ## Bot-Befehle und Rollen
 

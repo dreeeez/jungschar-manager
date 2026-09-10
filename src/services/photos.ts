@@ -140,8 +140,12 @@ export async function previewPhotos(chatId: string, event: PhotoEvent): Promise<
   return ids.length
 }
 
-/** /senden: alle ungeposteten Fotos als Album(s) in die Elterngruppe, dann markieren. */
-export async function postPhotos(chatId: string, event: PhotoEvent): Promise<{ posted: number; albums: number }> {
+/**
+ * /senden: alle ungeposteten Fotos als Album(s) posten. Mit mark=true
+ * (Elterngruppe) werden sie als gepostet markiert; mark=false (Sandbox-Test)
+ * lässt sie offen, damit der echte Post später noch geht.
+ */
+export async function postPhotos(chatId: string, event: PhotoEvent, mark = true): Promise<{ posted: number; albums: number }> {
   const db = getSupabase()
   const { data } = await db
     .from('event_photos')
@@ -164,7 +168,9 @@ export async function postPhotos(chatId: string, event: PhotoEvent): Promise<{ p
     postedIds.push(...batch.map(r => r.id))
   }
 
-  await db.from('event_photos').update({ posted_at: new Date().toISOString() } as any).in('id', postedIds)
+  if (mark) {
+    await db.from('event_photos').update({ posted_at: new Date().toISOString() } as any).in('id', postedIds)
+  }
   return { posted: postedIds.length, albums }
 }
 

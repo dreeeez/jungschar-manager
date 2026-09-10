@@ -53,8 +53,16 @@ interface Event {
   imported_at: string
   assignments: Assignment[]
   parent_duties: ParentDuty[]
-  /** Eltern, die die Jungschar zu sich eingeladen haben (/einladen im Bot). */
-  invitations?: { id: string; parent: Parent | null }[]
+  /**
+   * Einladung (/einladen im Bot). Wegen UNIQUE(event_id) liefert PostgREST
+   * ein einzelnes Objekt, kein Array — deshalb beides zulassen.
+   */
+  invitations?: { id: string; parent: Parent | null }[] | { id: string; parent: Parent | null } | null
+}
+
+function getInvitationName(event: Event): string | null {
+  const inv = Array.isArray(event.invitations) ? event.invitations[0] : event.invitations
+  return inv?.parent?.name ?? null
 }
 
 interface IdeaRecord {
@@ -515,9 +523,9 @@ export default function CalendarPage() {
                         {parentName}
                       </IconLine>
                     )}
-                    {event.invitations?.[0]?.parent && (
+                    {getInvitationName(event) && (
                       <IconLine icon={<SmallIcons.home />} color={PAGE_COLORS.parents}>
-                        Einladung: {event.invitations[0].parent.name}
+                        Einladung: {getInvitationName(event)}
                       </IconLine>
                     )}
                     {birthdays.map((b, i) => (
@@ -558,9 +566,9 @@ export default function CalendarPage() {
               </div>
             </div>
 
-            {selectedEvent.invitations?.[0]?.parent && (
+            {getInvitationName(selectedEvent) && (
               <div className="mb-5">
-                <Note tone="accent">Einladung: {selectedEvent.invitations[0].parent.name} lädt die Jungschar zu sich ein.</Note>
+                <Note tone="accent">Einladung: {getInvitationName(selectedEvent)} lädt die Jungschar zu sich ein.</Note>
               </div>
             )}
 

@@ -300,11 +300,17 @@ export function setupBotCommands(bot: Bot) {
     )
   })
 
-  // /senden – Fotos in den Elternchat posten (Admins, privat, mit Rückfrage)
+  // /senden – Fotos in den Elternchat posten (Admins, privat, mit Rückfrage).
+  // "/senden test" postet in die Sandbox-Gruppe, ohne die Bilder als gepostet zu markieren.
   bot.command('senden', async (ctx) => {
     if (!isAdmin(ctx.from?.id ?? 0) || ctx.chat.type !== 'private') return
-    if (!process.env.TELEGRAM_ELTERN_CHAT_ID) {
+    const isTest = (ctx.match ?? '').trim().toLowerCase() === 'test'
+    if (!isTest && !process.env.TELEGRAM_ELTERN_CHAT_ID) {
       await ctx.reply('Die Elterngruppe ist nicht konfiguriert (TELEGRAM_ELTERN_CHAT_ID).')
+      return
+    }
+    if (isTest && !process.env.TELEGRAM_TEST_CHAT_ID) {
+      await ctx.reply('Die Sandbox-Gruppe ist nicht konfiguriert (TELEGRAM_TEST_CHAT_ID).')
       return
     }
     const event = await eventForPosting()
@@ -317,14 +323,17 @@ export function setupBotCommands(bot: Bot) {
       await ctx.reply(`Für ${shortDate(event.event_date)} gibt es nichts zu posten.`)
       return
     }
-    await ctx.reply(`${counts.pending} Bilder für ${shortDate(event.event_date)} in den Elternchat posten?`, {
-      reply_markup: {
-        inline_keyboard: [[
-          { text: 'Ja, posten', callback_data: `phs_${event.id}` },
-          { text: 'Nein', callback_data: `phn_${event.id}` },
-        ]],
+    await ctx.reply(
+      `${counts.pending} Bilder für ${shortDate(event.event_date)} in ${isTest ? 'die Sandbox-Gruppe (Test)' : 'den Elternchat'} posten?`,
+      {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: 'Ja, posten', callback_data: `${isTest ? 'pht' : 'phs'}_${event.id}` },
+            { text: 'Nein', callback_data: `phn_${event.id}` },
+          ]],
+        },
       },
-    })
+    )
   })
 
   // Fotos im privaten Chat: nur von Helfern (Admins sind Helfer). Eltern sind hier bewusst raus.
@@ -435,8 +444,8 @@ export function setupBotCommands(bot: Bot) {
         return
       }
 
-      // /senden: Rückfrage beantwortet
-      if (action === 'phs' || action === 'phn') {
+      // /senden: Rückfrage beantwortet (phs = Elternchat, pht = Sandbox-Test, phn = Nein)
+      if (action === 'phs' || action === 'pht' || action === 'phn') {
         if (!isAdmin(telegramUserId)) {
           await ctx.answerCallbackQuery({ text: 'Nur für Admins.' })
           return
@@ -446,17 +455,20 @@ export function setupBotCommands(bot: Bot) {
           try { await ctx.editMessageText('Alles klar, nichts gepostet.') } catch {}
           return
         }
-        const chatId = process.env.TELEGRAM_ELTERN_CHAT_ID
+        const isTest = action === 'pht'
+        const chatId = isTest ? process.env.TELEGRAM_TEST_CHAT_ID : process.env.TELEGRAM_ELTERN_CHAT_ID
         const event = await getEventById(eventId)
         if (!chatId || !event) {
           await ctx.answerCallbackQuery({ text: 'Nicht möglich.' })
           return
         }
         try {
-          const result = await postPhotos(chatId, { id: event.id, event_date: event.event_date })
+          const result = await postPhotos(chatId, { id: event.id, event_date: event.event_date }, !isTest)
           await ctx.answerCallbackQuery({ text: 'Gepostet!' })
           try {
-            await ctx.editMessageText(`${result.posted} Bilder für ${shortDate(event.event_date)} im Elternchat gepostet.`)
+            await ctx.editMessageText(
+              `${result.posted} Bilder für ${shortDate(event.event_date)} in ${isTest ? 'der Sandbox-Gruppe gepostet (Test, Bilder bleiben offen)' : 'den Elternchat gepostet'}.`,
+            )
           } catch {}
         } catch (e: any) {
           await ctx.answerCallbackQuery({ text: 'Fehler beim Posten.' })

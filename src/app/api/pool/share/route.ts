@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession, hasCronSecret } from '@/services/api-guard'
 import { isAdmin } from '@/services/admins'
-import { findAllowedHelper } from '@/services/admins'
 import { shareIdeas } from '@/services/pool-share'
 
 export const dynamic = 'force-dynamic'
@@ -30,8 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `${test ? 'TELEGRAM_TEST_CHAT_ID' : 'TELEGRAM_CHAT_ID'} not configured` }, { status: 500 })
     }
 
-    const helper = session ? await findAllowedHelper(session.uid) : null
-    const result = await shareIdeas({ ids, chatId, sharedBy: helper?.name ?? 'Admin' })
+    const result = await shareIdeas({ ids, chatId })
     return NextResponse.json({ mode: test ? 'sandbox' : 'live', ...result })
   } catch (e: any) {
     console.error('pool share failed:', e)
