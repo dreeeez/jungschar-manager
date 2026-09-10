@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jungschar-Bot Big Picture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --fg: #1b1f26;
+    --muted: #667085;
+    --line: rgba(27, 31, 38, 0.12);
+    --line-strong: rgba(27, 31, 38, 0.28);
+    --admin: #2f6fed;
+    --helper: #2e9e5b;
+    --parent: #d98c1f;
+    --group: #5b6b8f;
+    --unknown: #8a8f98;
+    --warn-bg: rgba(217, 140, 31, 0.12);
+    --warn-fg: #9a5f0a;
+    --ok-bg: rgba(46, 158, 91, 0.12);
+    --ok-fg: #1f6f3f;
+    --dot: #1b1f26;
+    --dot-soft: rgba(27, 31, 38, 0.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101216;
+      --card: #191c22;
+      --fg: #eceef2;
+      --muted: #9aa3b2;
+      --line: rgba(236, 238, 242, 0.12);
+      --line-strong: rgba(236, 238, 242, 0.3);
+      --admin: #5b8dff;
+      --helper: #4cc27a;
+      --parent: #f0a63a;
+      --group: #8fa0c8;
+      --unknown: #8a8f98;
+      --warn-bg: rgba(240, 166, 58, 0.16);
+      --warn-fg: #f0c27a;
+      --ok-bg: rgba(76, 194, 122, 0.16);
+      --ok-fg: #8fe0b0;
+      --dot: #eceef2;
+      --dot-soft: rgba(236, 238, 242, 0.2);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101216;
+    --card: #191c22;
+    --fg: #eceef2;
+    --muted: #9aa3b2;
+    --line: rgba(236, 238, 242, 0.12);
+    --line-strong: rgba(236, 238, 242, 0.3);
+    --admin: #5b8dff;
+    --helper: #4cc27a;
+    --parent: #f0a63a;
+    --group: #8fa0c8;
+    --unknown: #8a8f98;
+    --warn-bg: rgba(240, 166, 58, 0.16);
+    --warn-fg: #f0c27a;
+    --ok-bg: rgba(76, 194, 122, 0.16);
+    --ok-fg: #8fe0b0;
+    --dot: #eceef2;
+    --dot-soft: rgba(236, 238, 242, 0.2);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'IBM Plex Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    padding-block: 40px 80px;
+    padding-inline: 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 44px; }
+  h1, h2, h3 {
+    font-family: 'IBM Plex Sans Condensed', 'IBM Plex Sans', sans-serif;
+    text-wrap: balance;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  h1 { font-size: 40px; line-height: 1.05; font-weight: 700; }
+  h2 { font-size: 24px; font-weight: 700; }
+  h3 { font-size: 16px; font-weight: 600; }
+  p { margin: 0; }
+  .lede { color: var(--muted); max-width: 62ch; font-size: 16px; }
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  section { display: grid; gap: 16px; }
+  .section-head { display: grid; gap: 6px; }
+  .section-head p { color: var(--muted); max-width: 70ch; }
+  code, .mono {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+  code {
+    background: color-mix(in srgb, var(--fg) 7%, transparent);
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  /* Rollen */
+  .roles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .role {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 16px;
+    display: grid;
+    gap: 8px;
+    border-top: 4px solid var(--c);
+    align-content: start;
+  }
+  .role h3 { color: var(--c); }
+  .role p { font-size: 14px; }
+  .role .who { color: var(--muted); font-size: 13px; }
+  .role.admin { --c: var(--admin); }
+  .role.helper { --c: var(--helper); }
+  .role.parent { --c: var(--parent); }
+  .role.unknown { --c: var(--unknown); }
+
+  .principle {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: grid;
+    gap: 6px;
+    border-left: 4px solid var(--parent);
+  }
+  .principle h3 { color: var(--parent); }
+
+  /* Tabellen */
+  .tablewrap { overflow-x: auto; background: var(--card); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; }
+  th, td { padding: 11px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+  thead th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    border-bottom: 1px solid var(--line-strong);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.c, th.c { text-align: center; }
+  td .sub { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+  td .when { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .dot {
+    display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--dot); vertical-align: middle;
+  }
+  .dot.soft { background: transparent; border: 2px solid var(--dot-soft); width: 12px; height: 12px; }
+  .dot.admin { background: var(--admin); }
+  .dot.helper { background: var(--helper); }
+  .dot.parent { background: var(--parent); }
+  .dot.group { background: var(--group); }
+  th.col-admin { color: var(--admin); }
+  th.col-helper { color: var(--helper); }
+  th.col-parent { color: var(--parent); }
+  th.col-group { color: var(--group); }
+  .tag {
+    display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px;
+    font-weight: 500; white-space: nowrap;
+  }
+  .tag.warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .tag.ok { background: var(--ok-bg); color: var(--ok-fg); }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 13px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* Woche */
+  .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .day {
+    background: var(--card); border-radius: 12px; padding: 12px; display: grid; gap: 8px; align-content: start;
+    min-height: 150px;
+  }
+  .day .name { font-family: 'IBM Plex Sans Condensed', sans-serif; font-weight: 700; font-size: 15px; }
+  .day .ev { font-size: 13px; line-height: 1.35; padding-left: 10px; border-left: 3px solid var(--c); }
+  .day .ev .t { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  .ev.group { --c: var(--group); }
+  .ev.admin { --c: var(--admin); }
+  .ev.helper { --c: var(--helper); }
+  .ev.parent { --c: var(--parent); }
+  .day.event { outline: 2px solid var(--helper); outline-offset: -2px; }
+
+  /* Mini-App */
+  .pages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .page {
+    background: var(--card); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px;
+  }
+  .page h3 { font-size: 15px; }
+  .page p { font-size: 13px; color: var(--muted); }
+
+  .open { display: grid; gap: 10px; }
+  .open .item {
+    background: var(--card); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px;
+    border-left: 4px solid var(--parent);
+  }
+  .open .item p { font-size: 14px; }
+  .foot { color: var(--muted); font-size: 13px; }
+
+  @media (max-width: 760px) {
+    h1 { font-size: 32px; }
+    .roles { grid-template-columns: 1fr 1fr; }
+    .week { grid-template-columns: repeat(2, 1fr); }
+    .pages { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 440px) {
+    .roles, .week, .pages { grid-template-columns: 1fr; }
+    .day { min-height: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:grid; gap:10px;">
+    <span class="eyebrow">Stand 10. September 2026 · aus dem Code gelesen</span>
+    <h1>Wer bekommt was vom Jungschar-Bot</h1>
+    <p class="lede">Alle Nachrichten, Empfänger, Befehle und Zugriffe auf einen Blick. Drei Rollen, drei Gruppen, ein Grundsatz: Eltern werden nie von sich aus angeschrieben.</p>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Rollen</span>
+      <h2>Wer ist wer, und woran erkennt es der Bot</h2>
+    </div>
+    <div class="roles">
+      <div class="role admin">
+        <h3>Admin</h3>
+        <p class="who">Marco, Jens</p>
+        <p>Feste Liste im Code. Einzige Rolle mit Zugang zur Mini-App, zur Bewertung, zu <code>/bilder</code> und <code>/senden</code>.</p>
+      </div>
+      <div class="role helper">
+        <h3>Helfer</h3>
+        <p class="who">7 registriert</p>
+        <p>Eintrag in der Helfer-Tabelle, angelegt per <code>/register CODE</code>. Bekommen Einteilung und Reminder in der Helfer-Gruppe.</p>
+      </div>
+      <div class="role parent">
+        <h3>Eltern</h3>
+        <p class="who">6 aktiv</p>
+        <p>Eintrag auf der Eltern-Seite mit Telegram-ID oder Benutzername. Sprechen den Bot nur selbst an, privat.</p>
+      </div>
+      <div class="role unknown">
+        <h3>Unbekannt</h3>
+        <p class="who">alle anderen</p>
+        <p>Bekommen bei jedem Befehl nur den Hinweis, sich bei Marco oder Jens zu melden. Keine Daten, keine Aktion.</p>
+      </div>
+    </div>
+    <div class="principle">
+      <h3>Grundsatz für Eltern</h3>
+      <p>Keine DM vom Bot an Eltern, nie. Eltern schreiben dem Bot mit <code>/idee</code>, <code>/einladen</code> und <code>/termine</code>. Was in die Elterngruppe geht, sind Gruppen-Posts: Fotoalben nach der Jungschar und der Geburtstagsgruß.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Nachrichten</span>
+      <h2>Was der Bot verschickt, und an wen</h2>
+      <p>Automatisch heißt: läuft über Vercel-Cron ohne Zutun. Manuell heißt: einer von euch löst es aus, in der Mini-App oder per Befehl.</p>
+    </div>
+    <div class="legend">
+      <span><i class="dot group"></i> Gruppe</span>
+      <span><i class="dot admin"></i> DM an Admins</span>
+      <span><i class="dot helper"></i> DM an Helfer</span>
+      <span><i class="dot parent"></i> Antwort an das Elternteil selbst</span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nachricht</th>
+            <th>Auslöser</th>
+            <th class="c col-group">Helfer-Gruppe</th>
+            <th class="c col-group">Elterngruppe</th>
+            <th class="c col-admin">Marco &amp; Jens</th>
+            <th class="c col-helper">Helfer</th>
+            <th class="c col-parent">Elternteil</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Heads-up eine Woche vorher<span class="sub">Termin, Wetter, Team getaggt, Essen-Familie getaggt, Geburtstage</span></td>
+            <td><span class="when">So 10:00</span><span class="sub">automatisch</span></td>
+            <td class="c"><i class="dot group"></i></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Countdown mit Abstimmung<span class="sub">Dabei / Kann nicht als Buttons, Checkliste</span></td>
+            <td><span class="when">Mi 10:00</span><span class="sub">automatisch</span></td>
+            <td class="c"><i class="dot group"></i></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Nicht-Voter-Ping<span class="sub">Antwort auf den Countdown, taggt wer noch nicht abgestimmt hat</span></td>
+            <td><span class="when">Do 18:00</span><span class="sub">automatisch</span></td>
+            <td class="c"><i class="dot group"></i></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Aufwacher am Jungschar-Tag<span class="sub">Bibelvers und Segen</span></td>
+            <td><span class="when">Sa 10:00</span><span class="sub">automatisch</span></td>
+            <td class="c"><i class="dot group"></i></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Ausfall-Ankündigung<span class="sub">wenn ein Termin aus dem Kalender-Feed verschwindet, Duos rücken nach</span></td>
+            <td><span class="when">täglich</span><span class="sub">automatisch</span></td>
+            <td class="c"><i class="dot group"></i></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Bewertung der Jungschar<span class="sub">Sterne, Drinnen/Draußen, ein Satz. Wer zuerst fertig ist, schließt die DM des anderen</span></td>
+            <td><span class="when">Sa 20:00</span><span class="sub">automatisch</span></td>
+            <td class="c"></td><td class="c"></td><td class="c"><i class="dot admin"></i></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Foto-Erinnerung<span class="sub">nur an die zwei eingeteilten Helfer des Tages</span></td>
+            <td><span class="when">Sa 20:00</span><span class="sub">automatisch</span></td>
+            <td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><i class="dot helper"></i></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Geburtstagsgruß<span class="sub">wenn ein Kind Geburtstag hat</span></td>
+            <td><span class="when">täglich 10:00</span><span class="sub">automatisch</span></td>
+            <td class="c"></td><td class="c"><i class="dot group"></i> <span class="tag warn">Bot nicht in Gruppe</span></td><td class="c"></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Halbjahres-Einteilung<span class="sub">gepinnt, Tausche editieren die Nachricht</span></td>
+            <td>Mini-App, Kalender<span class="sub">manuell, Admin</span></td>
+            <td class="c"><i class="dot group"></i><span class="sub">erst Sandbox</span></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Ideen aus dem Pool<span class="sub">bis zu 10 Ideen als Diskussionsgrundlage</span></td>
+            <td>Mini-App, Ideenpool<span class="sub">manuell, Admin</span></td>
+            <td class="c"><i class="dot group"></i><span class="sub">oder Sandbox</span></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Fotoalbum nach der Jungschar<span class="sub">Caption mit Links zu /idee und /einladen</span></td>
+            <td><code>/senden</code><span class="sub">manuell, Admin</span></td>
+            <td class="c"></td><td class="c"><i class="dot group"></i> <span class="tag warn">vorläufig Sandbox</span></td><td class="c"></td><td class="c"></td><td class="c"></td>
+          </tr>
+          <tr>
+            <td>Einladung bestätigt<span class="sub">„Familie X lädt die Jungschar am … ein“</span></td>
+            <td><code>/einladen</code>, Ja<span class="sub">Elternteil</span></td>
+            <td class="c"></td><td class="c"></td><td class="c"><i class="dot admin"></i></td><td class="c"></td><td class="c"><i class="dot parent"></i></td>
+          </tr>
+          <tr>
+            <td>Idee gespeichert<span class="sub">landet im Ideenpool, keine weitere Benachrichtigung</span></td>
+            <td><code>/idee</code>, Text<span class="sub">Elternteil oder Helfer</span></td>
+            <td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><i class="dot parent"></i></td>
+          </tr>
+          <tr>
+            <td>Foto gespeichert<span class="sub">„Danke, gespeichert für Sa 26.09.“, keine Info an Admins</span></td>
+            <td>Foto an den Bot<span class="sub">Helfer</span></td>
+            <td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><i class="dot helper"></i></td><td class="c"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="foot">Uhrzeiten sind Ortszeit im Sommer. Vercel-Crons laufen in UTC und können bis zu 59 Minuten später feuern; die Abend-Pings prüfen selbst, ob es schon 20 Uhr ist.</p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Wochenrhythmus</span>
+      <h2>Eine Jungschar-Woche, Samstag als Termin</h2>
+      <p>So sieht die Woche vor einer Jungschar aus. Fällt der Termin auf einen Freitag, verschieben sich Aufwacher, Bewertung und Foto-Erinnerung auf diesen Tag.</p>
+    </div>
+    <div class="week">
+      <div class="day">
+        <span class="name">Sonntag</span>
+        <div class="ev group"><span class="t">10:00 · Helfer-Gruppe</span>Heads-up: Team, Wetter, Essen, Geburtstage</div>
+      </div>
+      <div class="day">
+        <span class="name">Montag</span>
+      </div>
+      <div class="day">
+        <span class="name">Dienstag</span>
+      </div>
+      <div class="day">
+        <span class="name">Mittwoch</span>
+        <div class="ev group"><span class="t">10:00 · Helfer-Gruppe</span>Countdown mit Dabei / Kann nicht</div>
+      </div>
+      <div class="day">
+        <span class="name">Donnerstag</span>
+        <div class="ev group"><span class="t">18:00 · Helfer-Gruppe</span>Ping an alle, die nicht abgestimmt haben</div>
+      </div>
+      <div class="day">
+        <span class="name">Freitag</span>
+      </div>
+      <div class="day event">
+        <span class="name">Samstag</span>
+        <div class="ev group"><span class="t">10:00 · Helfer-Gruppe</span>Aufwacher mit Bibelvers</div>
+        <div class="ev admin"><span class="t">20:00 · DM Marco, Jens</span>Bewertung</div>
+        <div class="ev helper"><span class="t">20:00 · DM eingeteilte Helfer</span>Foto-Erinnerung</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Befehle</span>
+      <h2>Wer darf welchen Befehl</h2>
+      <p>Privat heißt im Chat mit dem Bot. In einer Gruppe antwortet der Bot auf <code>/idee</code> und <code>/einladen</code> nur stumm mit einem Button, der in den privaten Chat führt.</p>
+    </div>
+    <div class="legend">
+      <span><i class="dot"></i> erlaubt</span>
+      <span><i class="dot soft"></i> nicht erlaubt, kurzer Hinweis</span>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Befehl</th>
+            <th>Was passiert</th>
+            <th>Wo</th>
+            <th class="c col-admin">Admin</th>
+            <th class="c col-helper">Helfer</th>
+            <th class="c col-parent">Eltern</th>
+            <th class="c">Unbekannt</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/start</code>, <code>/help</code></td><td>Begrüßung und Befehlsliste, je nach Rolle. Admins bekommen den Menü-Button zur Mini-App.</td><td>überall</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td></tr>
+          <tr><td><code>/register CODE</code></td><td>Als Helfer registrieren. Der Code steht in den Einstellungen der Mini-App, ohne Code bleibt die Tür zu.</td><td>privat</td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot"></i></td></tr>
+          <tr><td><code>/next</code>, <code>/status</code></td><td>Nächste Termine mit Team</td><td>überall</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+          <tr><td><code>/mystatus</code></td><td>Eigene Einsätze</td><td>überall</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+          <tr><td><code>/termine</code></td><td>Nächste Termine ohne Namen</td><td>überall</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+          <tr><td><code>/idee</code></td><td>„Worauf hätte dein Kind Lust?“ Freitext landet im Ideenpool mit Absender.</td><td>privat</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+          <tr><td><code>/einladen</code></td><td>Termin per Button wählen, Ja/Nein, eine Einladung pro Termin. Kalender zeigt „Einladung: Familie X“.</td><td>privat</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+          <tr><td>Foto schicken</td><td>Bild an den Bot, Zuordnung zum Termin des Tages, bis drei Tage danach</td><td>privat</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+          <tr><td><code>/bilder</code></td><td>Vorschau der gesammelten Bilder, sonst „Bis jetzt keine Bilder“</td><td>privat</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+          <tr><td><code>/senden</code></td><td>Rückfrage, dann Album mit Caption. <code>/senden test</code> geht in die Sandbox ohne Markierung.</td><td>privat</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+          <tr><td>Bewertungs-Buttons</td><td>Sterne und Drinnen/Draußen in der Abend-DM</td><td>privat</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+          <tr><td><code>/chatid</code></td><td>Chat-ID anzeigen, Werkzeug für die Einrichtung</td><td>überall</td><td class="c"><i class="dot"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td><td class="c"><i class="dot soft"></i></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="foot">Bei Helfern, Eltern und Unbekannt bedeutet „nicht erlaubt“: der Bot antwortet mit einem Satz, was stattdessen geht. Bei <code>/bilder</code>, <code>/senden</code> und <code>/chatid</code> antwortet er anderen gar nicht.</p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Mini-App</span>
+      <h2>Zugriff nur für Marco und Jens</h2>
+      <p>Öffnen geht nur aus Telegram: die signierte Anmeldung wird auf dem Server geprüft, die Telegram-ID muss auf der Zugangsliste stehen. Der Web-Link ohne Telegram zeigt nur „Kein Zugang“. Jede Datenanfrage läuft über den eigenen Server, der Browser kennt keinen Datenbank-Schlüssel.</p>
+    </div>
+    <div class="pages">
+      <div class="page"><h3>Kalender</h3><p>Termine, Helfer tauschen, Elterndienst, Einladungen. Button „Halbjahr einteilen“.</p></div>
+      <div class="page"><h3>Helfer</h3><p>Registrierte Helfer, Senior-Tag setzen, löschen.</p></div>
+      <div class="page"><h3>Eltern</h3><p>Name, Telegram-Name oder Telegram-ID fürs Taggen.</p></div>
+      <div class="page"><h3>Kinder</h3><p>Geburtstage für Reminder und Gruß.</p></div>
+      <div class="page"><h3>Archiv</h3><p>Bewertete Jungschar-Termine mit Sternen, Ort, Wetter.</p></div>
+      <div class="page"><h3>Ideenpool</h3><p>Ideen sammeln, filtern, bis zu zehn in die Helfer-Gruppe teilen.</p></div>
+      <div class="page"><h3>Bot-Status</h3><p>Health, nächste Nachricht mit Vorschau, geplante Pings.</p></div>
+      <div class="page"><h3>Einstellungen</h3><p>Registrierungs-Code, Termin-Sync, Wetter-Standort.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <span class="eyebrow">Offen</span>
+      <h2>Zwei Dinge sind noch nicht scharf</h2>
+    </div>
+    <div class="open">
+      <div class="item">
+        <h3>Elterngruppe ist nicht angebunden</h3>
+        <p>Der Bot hat die Gruppe „Elternjet“ verlassen. Bis er wieder drin ist, läuft der Geburtstagsgruß ins Leere und <code>/senden</code> postet vorläufig in die Sandbox. Umschalten ist eine Zeile im Code, vorher die Gruppen-ID prüfen.</p>
+      </div>
+      <div class="item">
+        <h3>Registrierungs-Code noch nicht gesetzt</h3>
+        <p>Solange in den Einstellungen kein Code steht, ist die Registrierung für neue Helfer geschlossen.</p>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
