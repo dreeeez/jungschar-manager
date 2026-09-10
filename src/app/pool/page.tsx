@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import { Badge, Button, Card, Disclosure, Empty, Input, Label, Loading, Page, Segmented, Textarea } from '@/components/ui'
+import { Badge, Button, ChevronRight, Disclosure, Empty, Input, Label, List, Loading, Page, Row, Segmented, Textarea } from '@/components/ui'
 
 /*
  * Ideenpool: Aktivitäten, die noch keinem Termin zugeordnet sind.
@@ -65,6 +65,16 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function cx(...parts: (string | false | null | undefined)[]) {
+  return parts.filter(Boolean).join(' ')
+}
+
+/** Kurzform für die Zeile: „Felix Schniepp, Nov. 2021". */
+function shortOrigin(idea: PoolIdea): string {
+  const month = new Date(idea.created_at).toLocaleDateString('de-DE', { month: 'short', year: 'numeric' })
+  return idea.suggested_by ? `${idea.suggested_by}, ${month}` : month
+}
+
 /** Herkunftszeile: „Felix Schniepp · 25. Nov. 2021 · Elternchat". */
 function originLabel(idea: PoolIdea): string {
   const parts = [idea.suggested_by, formatDate(idea.created_at), idea.source === 'elterngruppe' ? 'Elternchat' : 'Mini-App']
@@ -79,6 +89,7 @@ export default function PoolPage() {
   const [place, setPlace] = useState<Place | null>(null)
   const [category, setCategory] = useState<string | null>(null)
   const [sort, setSort] = useState<Sort>('newest')
+  const [openId, setOpenId] = useState<string | null>(null)
 
   const [formOpen, setFormOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -265,36 +276,49 @@ export default function PoolPage() {
       ) : filtered.length === 0 ? (
         <Empty>Keine Idee passt zu diesem Filter.</Empty>
       ) : (
-        filtered.map((idea) => {
-          const tags = idea.tags || []
-          const placeTag = tags.find((t) => t === 'drinnen' || t === 'draußen')
-          const categoryTags = tags.filter((t) => CATEGORY_LABEL.has(t))
-          return (
-            <Card key={idea.id} className="mb-3 p-5">
-              <div className="flex items-start justify-between gap-2">
-                <p className="flex-1 font-semibold">{idea.title}</p>
-                <Button variant="ghost" size="sm" className="-mr-3 -mt-1 shrink-0" onClick={() => removeIdea(idea)}>
-                  Entfernen
-                </Button>
+        <List>
+          {filtered.map((idea) => {
+            const tags = idea.tags || []
+            const placeTag = tags.find((t) => t === 'drinnen' || t === 'draußen')
+            const categoryTags = tags.filter((t) => CATEGORY_LABEL.has(t))
+            const open = openId === idea.id
+            return (
+              <div key={idea.id}>
+                <Row onClick={() => setOpenId(open ? null : idea.id)}>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{idea.title}</p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+                      {placeTag && <span className="text-accent">{placeTag === 'drinnen' ? 'Drinnen' : 'Draußen'}</span>}
+                      {categoryTags.length > 0 && <span>{categoryTags.map((t) => CATEGORY_LABEL.get(t)).join(', ')}</span>}
+                      <span>{shortOrigin(idea)}</span>
+                    </p>
+                  </div>
+                  <span className={cx('shrink-0 text-muted transition-transform', open && 'rotate-90')}>
+                    <ChevronRight />
+                  </span>
+                </Row>
+                {open && (
+                  <div className="space-y-3 px-4 pb-4">
+                    {idea.description && (
+                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{idea.description}</p>
+                    )}
+                    {idea.material && (
+                      <p className="text-sm text-muted">
+                        <span className="font-medium">Mitbringen:</span> {idea.material}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted">{originLabel(idea)}</span>
+                      <Button variant="danger" size="sm" className="-mr-3" onClick={() => removeIdea(idea)}>
+                        Entfernen
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
-              {idea.description && (
-                <p className="mt-1.5 whitespace-pre-wrap text-[15px] leading-relaxed">{idea.description}</p>
-              )}
-              {idea.material && (
-                <p className="mt-2 text-sm text-muted">
-                  <span className="font-medium">Mitbringen:</span> {idea.material}
-                </p>
-              )}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {placeTag && <Badge tone="accent">{placeTag === 'drinnen' ? 'Drinnen' : 'Draußen'}</Badge>}
-                {categoryTags.map((t) => (
-                  <Badge key={t}>{CATEGORY_LABEL.get(t)}</Badge>
-                ))}
-                <span className="text-xs text-muted">{originLabel(idea)}</span>
-              </div>
-            </Card>
-          )
-        })
+            )
+          })}
+        </List>
       )}
     </Page>
   )
