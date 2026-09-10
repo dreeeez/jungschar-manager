@@ -112,17 +112,38 @@ async function sendMediaGroup(chatId: string, fileIds: string[], caption?: strin
   return res.json()
 }
 
-/** Caption für die Elterngruppe: kurz, nett, mit den beiden Befehlen. */
-export function photoCaption(eventDate: string): string {
+/**
+ * Caption für die Elterngruppe: kurz, nett, mit den beiden Befehlen als
+ * Direktlinks in den privaten Chat (t.me/<bot>?start=…), damit niemand in
+ * der Gruppe tippen muss.
+ */
+export async function photoCaption(eventDate: string): Promise<string> {
   const { date } = berlinNow()
   const when = eventDate === date
     ? 'heute'
     : `am ${new Date(eventDate + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'long' })}`
+  const username = await botUsername()
+  const link = (payload: string, label: string) =>
+    username ? `<a href="https://t.me/${username}?start=${payload}">${label}</a>` : label
   return (
     `Coole Jungschar wieder ${when}! Hier ein paar Einblicke. 📸\n\n` +
-    `💡 Ideen für nächstes Mal? Schick sie mir mit /idee\n` +
-    `🏠 Ihr wollt uns zu euch einladen? Einfach /einladen`
+    `💡 Ideen für nächstes Mal? ${link('idee', '/idee')}\n` +
+    `🏠 Ihr wollt uns zu euch einladen? ${link('einladen', '/einladen')}`
   )
+}
+
+let cachedBotUsername: string | null = null
+async function botUsername(): Promise<string | null> {
+  if (cachedBotUsername) return cachedBotUsername
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN
+    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`)
+    const json = await res.json()
+    cachedBotUsername = json?.result?.username ?? null
+  } catch {
+    cachedBotUsername = null
+  }
+  return cachedBotUsername
 }
 
 /** /bilder: Vorschau der ungeposteten Fotos an den Admin, ohne Markierung. */
@@ -158,11 +179,12 @@ export async function postPhotos(chatId: string, event: PhotoEvent, mark = true)
 
   let albums = 0
   const postedIds: string[] = []
+  const caption = await photoCaption(event.event_date)
   for (let i = 0; i < rows.length; i += ALBUM_MAX) {
     const batch = rows.slice(i, i + ALBUM_MAX)
     const res = batch.length === 1
-      ? await sendSinglePhoto(chatId, batch[0].file_id, i === 0 ? photoCaption(event.event_date) : undefined)
-      : await sendMediaGroup(chatId, batch.map(r => r.file_id), i === 0 ? photoCaption(event.event_date) : undefined)
+      ? await sendSinglePhoto(chatId, batch[0].file_id, i === 0 ? caption : undefined)
+      : await sendMediaGroup(chatId, batch.map(r => r.file_id), i === 0 ? caption : undefined)
     if (!res?.ok) throw new Error(res?.description ?? 'Senden fehlgeschlagen')
     albums++
     postedIds.push(...batch.map(r => r.id))

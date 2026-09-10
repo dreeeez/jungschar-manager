@@ -297,8 +297,10 @@ export function setupBotCommands(bot: Bot) {
       return
     }
     if (ctx.chat.type !== 'private') {
+      // Stumm: keine Push-Benachrichtigung für die Gruppe.
       await ctx.reply('Ideen nehme ich privat entgegen, dann bleibt es zwischen uns.', {
         reply_markup: privateChatButton(ctx, 'idee'),
+        disable_notification: true,
       })
       return
     }
@@ -315,6 +317,7 @@ export function setupBotCommands(bot: Bot) {
     if (ctx.chat.type !== 'private') {
       await ctx.reply('Einladungen nehme ich privat entgegen.', {
         reply_markup: privateChatButton(ctx, 'einladen'),
+        disable_notification: true,
       })
       return
     }
