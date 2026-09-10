@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
+import { Button, Empty, Input, List, Loading, Page, Row, Section } from '@/components/ui'
 
 interface Parent {
   id: string
@@ -108,119 +108,72 @@ export default function ParentsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tg-button" />
-      </div>
-    )
-  }
+  if (loading) return <Loading />
 
   return (
-    <main className="p-4 safe-area-top safe-area-bottom">
-      <div className="flex items-center gap-2 mb-6">
-        <Link href="/" className="text-tg-link">←</Link>
-        <h1 className="text-xl font-bold">Eltern verwalten</h1>
-      </div>
-
-      {/* Add new parent */}
-      <div className="space-y-2 mb-6">
-        <div className="flex gap-2">
-          <input
+    <Page title="Eltern" back="/">
+      <Section title="Hinzufügen">
+        <div className="space-y-2">
+          <Input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Name (z.B. Familie Müller)"
-            className="flex-1 px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
+            placeholder="Name, z.B. Familie Müller"
           />
-          <button
-            onClick={addParent}
-            className="px-4 py-2 bg-tg-button text-tg-button-text rounded-lg font-medium"
-          >
-            +
-          </button>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              placeholder="Telegram-Name, optional"
+              className="flex-1"
+            />
+            <Button variant="primary" onClick={addParent}>Hinzufügen</Button>
+          </div>
         </div>
-        <input
-          type="text"
-          value={newTag}
-          onChange={(e) => setNewTag(e.target.value)}
-          placeholder="Telegram-Tag, z.B. @muellerfamily (optional)"
-          className="w-full px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
-        />
-      </div>
+      </Section>
 
-      {/* Parent list */}
-      <div className="space-y-2">
+      <Section title={`${parents.length} Eltern`}>
         {parents.length === 0 ? (
-          <p className="text-tg-hint text-center py-8">
-            Noch keine Eltern vorhanden
-          </p>
+          <Empty>Noch keine Eltern vorhanden</Empty>
         ) : (
-          parents.map((parent) => {
-            const isEditing = editingId === parent.id
-            return (
-              <div
-                key={parent.id}
-                className="p-4 bg-tg-secondary-bg rounded-xl"
-              >
-                {!isEditing ? (
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{parent.name}</p>
-                      {parent.telegram_username ? (
-                        <p className="text-sm text-tg-link">@{parent.telegram_username}</p>
-                      ) : (
-                        <p className="text-sm text-tg-hint italic">kein Telegram-Tag</p>
-                      )}
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <button
-                        onClick={() => startEdit(parent)}
-                        className="text-tg-link p-2"
-                        aria-label="Bearbeiten"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => deleteParent(parent.id, parent.name)}
-                        className="text-red-500 p-2"
-                        aria-label="Löschen"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
+          <List>
+            {parents.map((parent) => {
+              const isEditing = editingId === parent.id
+              if (isEditing) {
+                return (
+                  <div key={parent.id} className="space-y-2 py-3">
                     <p className="font-medium">{parent.name}</p>
-                    <input
+                    <Input
                       type="text"
                       value={editTag}
                       onChange={(e) => setEditTag(e.target.value)}
-                      placeholder="Telegram-Tag, z.B. @muellerfamily"
-                      className="w-full px-3 py-2 bg-tg-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button text-sm"
+                      placeholder="Telegram-Name, z.B. muellerfamily"
+                      autoFocus
                     />
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={cancelEdit}
-                        className="px-3 py-1.5 text-sm text-tg-hint"
-                      >
-                        Abbrechen
-                      </button>
-                      <button
-                        onClick={() => saveEdit(parent.id)}
-                        className="px-3 py-1.5 text-sm bg-tg-button text-tg-button-text rounded-lg font-medium"
-                      >
-                        Speichern
-                      </button>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="sm" onClick={cancelEdit}>Abbrechen</Button>
+                      <Button variant="primary" size="sm" onClick={() => saveEdit(parent.id)}>Speichern</Button>
                     </div>
                   </div>
-                )}
-              </div>
-            )
-          })
+                )
+              }
+              return (
+                <Row key={parent.id}>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{parent.name}</p>
+                    <p className="text-sm text-muted">
+                      {parent.telegram_username ? `@${parent.telegram_username}` : 'ohne Telegram-Name'}
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => startEdit(parent)}>Bearbeiten</Button>
+                  <Button variant="danger" size="sm" onClick={() => deleteParent(parent.id, parent.name)}>Löschen</Button>
+                </Row>
+              )
+            })}
+          </List>
         )}
-      </div>
-    </main>
+      </Section>
+    </Page>
   )
 }

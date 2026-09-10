@@ -1,90 +1,35 @@
 'use client'
 
 import { useTelegram } from '@/components/TelegramProvider'
-import Link from 'next/link'
+import { ChevronRight, IconTile, Icons, List, Page, Row } from '@/components/ui'
+
+const NAV = [
+  { href: '/calendar', title: 'Kalender', description: 'Termine und Zuweisungen', color: '#2f6fed', icon: Icons.calendar },
+  { href: '/helpers', title: 'Helfer', description: 'Registrierte Helfer', color: '#2e9e5b', icon: Icons.users },
+  { href: '/parents', title: 'Eltern', description: 'Elterndienst', color: '#d98c1f', icon: Icons.home },
+  { href: '/children', title: 'Kinder', description: 'Kinder und Geburtstage', color: '#e05585', icon: Icons.smile },
+  { href: '/ideas', title: 'Archiv', description: 'Vergangene Termine', color: '#7b5cd6', icon: Icons.archive },
+  { href: '/settings', title: 'Einstellungen', description: 'Sync, Wetter, Bot-Status', color: '#6b7280', icon: Icons.settings },
+]
 
 export default function Home() {
-  const { user, isReady } = useTelegram()
-
-  if (!isReady) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tg-button" />
-      </div>
-    )
-  }
+  const { helper, user } = useTelegram()
+  const name = helper?.name ?? user?.first_name
 
   return (
-    <main className="p-4 safe-area-top safe-area-bottom">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Jungschar Admin</h1>
-        <p className="text-tg-hint">Hallo, {user?.first_name}!</p>
-      </div>
-
-      <div className="grid gap-4">
-        <NavCard
-          href="/helpers"
-          icon="👥"
-          title="Helfer"
-          description="Helfer verwalten"
-        />
-        <NavCard
-          href="/calendar"
-          icon="📅"
-          title="Kalender"
-          description="Termine & Zuweisungen"
-        />
-        <NavCard
-          href="/parents"
-          icon="👨‍👩‍👧"
-          title="Eltern"
-          description="Elterndienst verwalten"
-        />
-        <NavCard
-          href="/children"
-          icon="🧒"
-          title="Kinder"
-          description="Kinder & Geburtstage"
-        />
-        <NavCard
-          href="/ideas"
-          icon="📋"
-          title="Archiv"
-          description="Vergangene Termine & Logs"
-        />
-        <NavCard
-          href="/settings"
-          icon="⚙️"
-          title="Einstellungen"
-          description="ICS-Upload, Wetter-Ort"
-        />
-      </div>
-    </main>
-  )
-}
-
-function NavCard({
-  href,
-  icon,
-  title,
-  description,
-}: {
-  href: string
-  icon: string
-  title: string
-  description: string
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-4 p-4 bg-tg-secondary-bg rounded-xl active:opacity-70 transition-opacity"
-    >
-      <span className="text-3xl">{icon}</span>
-      <div>
-        <h2 className="font-semibold">{title}</h2>
-        <p className="text-sm text-tg-hint">{description}</p>
-      </div>
-      <span className="ml-auto text-tg-hint">→</span>
-    </Link>
+    <Page title="Jungschar" subtitle={name ? `Angemeldet als ${name}` : undefined}>
+      <List>
+        {NAV.map((item) => (
+          <Row key={item.href} href={item.href}>
+            <IconTile color={item.color}>{item.icon()}</IconTile>
+            <div className="flex-1">
+              <p className="font-medium">{item.title}</p>
+              <p className="text-sm text-muted">{item.description}</p>
+            </div>
+            <ChevronRight />
+          </Row>
+        ))}
+      </List>
+    </Page>
   )
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
+import { Badge, Button, Empty, List, Loading, Page, Row } from '@/components/ui'
 
 interface Helper {
   id: string
@@ -66,78 +66,40 @@ export default function HelpersPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tg-button" />
-      </div>
-    )
-  }
+  if (loading) return <Loading />
 
   return (
-    <main className="p-4 safe-area-top safe-area-bottom">
-      <div className="flex items-center gap-2 mb-6">
-        <Link href="/" className="text-tg-link">←</Link>
-        <h1 className="text-xl font-bold">Helfer verwalten</h1>
-      </div>
-
-      {/* Hinweis: neue Helfer registrieren sich selbst per /register im Bot */}
-      <p className="text-sm text-tg-hint mb-6">
-        Neue Helfer registrieren sich selbst im Bot mit <b>/register</b>.
-      </p>
-
-      {/* Helper list */}
-      <div className="space-y-2">
-        {helpers.length === 0 ? (
-          <p className="text-tg-hint text-center py-8">
-            Noch keine Helfer vorhanden
-          </p>
-        ) : (
-          helpers.map((helper) => (
-            <div
-              key={helper.id}
-              className="flex items-center justify-between p-4 bg-tg-secondary-bg rounded-xl"
-            >
-              <div className="flex-1">
+    <Page
+      title="Helfer"
+      back="/"
+      subtitle="Neue Helfer registrieren sich im Bot mit /register."
+    >
+      {helpers.length === 0 ? (
+        <Empty>Noch keine Helfer vorhanden</Empty>
+      ) : (
+        <List>
+          {helpers.map((helper) => (
+            <Row key={helper.id} className="items-start">
+              <div className="min-w-0 flex-1">
                 <p className="font-medium">{helper.name}</p>
-                {helper.telegram_username && (
-                  <p className="text-sm text-tg-hint">@{helper.telegram_username}</p>
-                )}
-                <div className="flex gap-1.5 mt-1 flex-wrap">
-                  {helper.is_admin && (
-                    <span className="text-xs bg-tg-button text-tg-button-text px-2 py-0.5 rounded">
-                      Admin
-                    </span>
-                  )}
-                  <button
-                    onClick={() => toggleSenior(helper)}
-                    className={`text-xs px-2 py-0.5 rounded ${
-                      helper.is_senior
-                        ? 'bg-amber-500/20 text-amber-700'
-                        : 'bg-tg-bg text-tg-hint border border-tg-hint/20'
-                    }`}
-                  >
-                    {helper.is_senior ? '👴 Senior' : '+ Senior'}
-                  </button>
+                <p className="text-sm text-muted">
+                  {helper.telegram_username ? `@${helper.telegram_username}` : 'ohne Telegram-Name'}
+                  {!helper.telegram_user_id && ' · nicht verknüpft'}
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {helper.is_admin && <Badge tone="accent">Admin</Badge>}
+                  <Badge tone={helper.is_senior ? 'warn' : 'outline'} onClick={() => toggleSenior(helper)}>
+                    Senior
+                  </Badge>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {helper.telegram_user_id ? (
-                  <span className="text-green-500">✓</span>
-                ) : (
-                  <span className="text-tg-hint text-sm">Nicht verknüpft</span>
-                )}
-                <button
-                  onClick={() => deleteHelper(helper.id, helper.name)}
-                  className="text-red-500 p-2"
-                >
-                  🗑️
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </main>
+              <Button variant="danger" size="sm" onClick={() => deleteHelper(helper.id, helper.name)}>
+                Löschen
+              </Button>
+            </Row>
+          ))}
+        </List>
+      )}
+    </Page>
   )
 }

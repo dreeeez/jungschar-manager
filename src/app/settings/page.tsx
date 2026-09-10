@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
+import { Badge, Button, Input, Label, List, Loading, Note, Page, Row, Section } from '@/components/ui'
 
 interface LastSync {
   at: string
@@ -92,7 +92,7 @@ export default function SettingsPage() {
       if (!res.ok) {
         showAlert('Sync fehlgeschlagen: ' + (body.errors?.join(', ') || 'Unbekannter Fehler'))
       } else {
-        showAlert(`✅ Sync OK — ${body.inserted} neu, ${body.skipped} bereits vorhanden`)
+        showAlert(`Sync OK: ${body.inserted} neu, ${body.skipped} bereits vorhanden`)
         setLastSync({ at: new Date().toISOString(), result: body })
       }
     } catch (e: any) {
@@ -150,209 +150,179 @@ export default function SettingsPage() {
     if (error) {
       showAlert('Fehler beim Speichern: ' + error.message)
     } else {
-      showAlert('Standort gespeichert!')
+      showAlert('Standort gespeichert')
     }
 
     setSaving(false)
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tg-button" />
-      </div>
-    )
+    return <Loading />
   }
 
+  const driftClean =
+    botStatus &&
+    botStatus.drift.staleInDb.length === 0 &&
+    botStatus.drift.missingFromDb.length === 0
+
   return (
-    <main className="p-4 safe-area-top safe-area-bottom">
-      <div className="flex items-center gap-2 mb-6">
-        <Link href="/" className="text-tg-link">←</Link>
-        <h1 className="text-xl font-bold">Einstellungen</h1>
-      </div>
-
+    <Page back="/" title="Einstellungen">
       {/* Bot-Status (read-only) */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold">Bot-Status</h2>
-          <button
-            onClick={fetchBotStatus}
-            disabled={statusLoading}
-            className="text-xs text-tg-link disabled:opacity-50"
-          >
-            {statusLoading ? '…' : '↻ Aktualisieren'}
-          </button>
-        </div>
-        <p className="text-sm text-tg-hint mb-4">
-          Überblick — kommende Termine, Abgleich mit dem Kalender-Feed und
-          Reminder-Status. Sendet nichts.
-        </p>
-
-        {!botStatus && statusLoading && (
-          <p className="text-xs text-tg-hint">Lädt…</p>
-        )}
+      <Section
+        title="Bot-Status"
+        hint="Überblick über kommende Termine, Abgleich mit dem Kalender-Feed und Reminder-Status. Sendet nichts."
+        action={
+          <Button variant="ghost" size="sm" onClick={fetchBotStatus} disabled={statusLoading}>
+            {statusLoading ? 'Lädt …' : 'Aktualisieren'}
+          </Button>
+        }
+      >
+        {!botStatus && statusLoading && <p className="text-sm text-muted">Lädt …</p>}
 
         {botStatus && (
-          <>
+          <div className="space-y-3">
             {/* Feed-Status */}
-            <p className="text-xs mb-3">
-              {botStatus.calendar.feedReachable ? (
-                <span className="text-tg-hint">
-                  📡 Feed erreichbar — {botStatus.calendar.feedJungscharCount} Jungschar-Termine
-                </span>
-              ) : (
-                <span className="text-red-500">
-                  📡 Feed nicht erreichbar (Reminder laufen fail-safe normal weiter)
-                </span>
-              )}
-            </p>
+            {botStatus.calendar.feedReachable ? (
+              <p className="text-sm text-muted">
+                Feed erreichbar, {botStatus.calendar.feedJungscharCount} Jungschar-Termine
+              </p>
+            ) : (
+              <Note tone="danger">
+                Feed nicht erreichbar. Reminder laufen fail-safe normal weiter.
+              </Note>
+            )}
 
-            {/* Drift-Warnung */}
+            {/* Drift */}
             {botStatus.calendar.feedReachable &&
-              (botStatus.drift.staleInDb.length === 0 &&
-              botStatus.drift.missingFromDb.length === 0 ? (
-                <p className="text-xs text-green-600 mb-3">✅ Kalender &amp; DB im Einklang</p>
+              (driftClean ? (
+                <p className="text-sm text-muted">Kalender und Datenbank stimmen überein</p>
               ) : (
-                <div className="text-xs mb-3 bg-tg-secondary-bg p-2 rounded space-y-1">
+                <div className="space-y-2">
                   {botStatus.drift.staleInDb.length > 0 && (
-                    <p className="text-red-500">
-                      ⚠️ {botStatus.drift.staleInDb.length} Termin(e) in der DB, aber nicht (mehr) im Feed:{' '}
+                    <Note tone="danger">
+                      {botStatus.drift.staleInDb.length} Termin(e) in der Datenbank, aber nicht (mehr) im Feed:{' '}
                       {botStatus.drift.staleInDb.map(fmtShort).join(', ')}
-                    </p>
+                    </Note>
                   )}
                   {botStatus.drift.missingFromDb.length > 0 && (
-                    <p className="text-amber-600">
-                      ➕ {botStatus.drift.missingFromDb.length} Feed-Termin(e) noch nicht in der DB:{' '}
+                    <Note>
+                      {botStatus.drift.missingFromDb.length} Feed-Termin(e) noch nicht in der Datenbank:{' '}
                       {botStatus.drift.missingFromDb.map(fmtShort).join(', ')}
-                    </p>
+                    </Note>
                   )}
                 </div>
               ))}
 
             {/* Kommende Termine */}
-            <div className="space-y-2">
-              {botStatus.upcoming.length === 0 && (
-                <p className="text-xs text-tg-hint">Keine kommenden Termine.</p>
-              )}
-              {botStatus.upcoming.map((ev: any) => (
-                <div key={ev.date} className="text-xs bg-tg-secondary-bg p-2 rounded">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">
-                      {ev.inFeed === false ? '❌' : ev.inFeed === null ? '·' : '✅'} {fmtShort(ev.date)}{' '}
-                      <span className="text-tg-hint font-normal">· in {ev.daysUntil} T</span>
-                    </span>
-                    {ev.pinned && <span className="text-tg-hint">📌</span>}
-                  </div>
-                  <div className="text-tg-hint mt-0.5">
-                    {ev.duo.length ? ev.duo.join(' + ') : '— keine Einteilung —'}
-                  </div>
-                  {ev.remindersSent.length > 0 && (
-                    <div className="text-tg-hint mt-0.5">
-                      📨 {ev.remindersSent.map(stageLabel).join(' · ')}
+            {botStatus.upcoming.length === 0 ? (
+              <p className="text-sm text-muted">Keine kommenden Termine.</p>
+            ) : (
+              <List>
+                {botStatus.upcoming.map((ev: any) => (
+                  <Row key={ev.date}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm">
+                        <span className="font-medium">{fmtShort(ev.date)}</span>{' '}
+                        <span className="text-muted">in {ev.daysUntil} Tagen</span>
+                      </p>
+                      <p className="mt-0.5 text-sm text-muted">
+                        {ev.duo.length ? ev.duo.join(' + ') : 'keine Einteilung'}
+                      </p>
+                      {ev.remindersSent.length > 0 && (
+                        <p className="mt-0.5 text-xs text-muted">
+                          Reminder: {ev.remindersSent.map(stageLabel).join(' · ')}
+                        </p>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* iCal-Sync */}
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-2">Termin-Sync</h2>
-        <p className="text-sm text-tg-hint mb-4">
-          Lädt neue Jungschar-Termine aus dem BCC-Kalender. Läuft automatisch
-          am 1. jedes Monats — kann hier jederzeit manuell angestoßen werden.
-        </p>
-
-        {icalUrl && (
-          <p className="text-xs text-tg-hint mb-3 break-all bg-tg-secondary-bg p-2 rounded">
-            🔗 {icalUrl}
-          </p>
-        )}
-
-        <button
-          onClick={syncIcal}
-          disabled={syncing}
-          className={`w-full py-3 bg-tg-button text-tg-button-text rounded-lg font-medium ${
-            syncing ? 'opacity-50' : ''
-          }`}
-        >
-          {syncing ? 'Synchronisiere...' : '🔄 Jetzt synchronisieren'}
-        </button>
-
-        {lastSync && (
-          <div className="mt-3 text-xs text-tg-hint">
-            <p>Letzter Sync: {formatSyncTime(lastSync.at)}</p>
-            <p>
-              {lastSync.result.jungscharFound} Jungschar-Events im Feed,{' '}
-              {lastSync.result.inserted} neu importiert,{' '}
-              {lastSync.result.skipped} bereits vorhanden
-            </p>
-            {lastSync.result.errors?.length > 0 && (
-              <p className="text-red-500 mt-1">⚠️ {lastSync.result.errors.join(', ')}</p>
+                    <div className="flex shrink-0 gap-1.5">
+                      {ev.inFeed === false && <Badge tone="warn">nicht im Feed</Badge>}
+                      {ev.pinned && <Badge tone="accent">Gepinnt</Badge>}
+                    </div>
+                  </Row>
+                ))}
+              </List>
             )}
           </div>
         )}
-      </div>
+      </Section>
+
+      {/* iCal-Sync */}
+      <Section
+        title="Termin-Sync"
+        hint="Lädt neue Jungschar-Termine aus dem BCC-Kalender. Läuft automatisch am 1. jedes Monats und kann hier jederzeit manuell angestoßen werden."
+      >
+        <div className="space-y-3">
+          {icalUrl && (
+            <Note>
+              <span className="break-all text-xs">{icalUrl}</span>
+            </Note>
+          )}
+
+          <Button variant="primary" block onClick={syncIcal} disabled={syncing}>
+            {syncing ? 'Synchronisiere …' : 'Jetzt synchronisieren'}
+          </Button>
+
+          {lastSync && (
+            <div className="text-xs text-muted">
+              <p>Letzter Sync: {formatSyncTime(lastSync.at)}</p>
+              <p>
+                {lastSync.result.jungscharFound} Jungschar-Events im Feed,{' '}
+                {lastSync.result.inserted} neu importiert,{' '}
+                {lastSync.result.skipped} bereits vorhanden
+              </p>
+              {lastSync.result.errors?.length > 0 && (
+                <p className="mt-1 text-danger">{lastSync.result.errors.join(', ')}</p>
+              )}
+            </div>
+          )}
+        </div>
+      </Section>
 
       {/* Wetter-Standort */}
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-2">Wetter-Standort</h2>
-        <p className="text-sm text-tg-hint mb-4">
-          Wird für die AI-Ideengenerierung verwendet (Wetter-basierte Vorschläge).
-        </p>
-
+      <Section
+        title="Wetter-Standort"
+        hint="Wird für die Wettervorhersage in den Remindern verwendet."
+      >
         <div className="space-y-3">
           <div>
-            <label className="text-sm text-tg-hint block mb-1">Stadt</label>
-            <input
+            <Label>Stadt</Label>
+            <Input
               type="text"
               value={city}
               onChange={(e) => setCity(e.target.value)}
               placeholder="z.B. Zürich"
-              className="w-full px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-tg-hint block mb-1">Breitengrad</label>
-              <input
+              <Label>Breitengrad</Label>
+              <Input
                 type="text"
                 value={latitude}
                 onChange={(e) => setLatitude(e.target.value)}
                 placeholder="z.B. 47.37"
-                className="w-full px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
               />
             </div>
             <div>
-              <label className="text-sm text-tg-hint block mb-1">Längengrad</label>
-              <input
+              <Label>Längengrad</Label>
+              <Input
                 type="text"
                 value={longitude}
                 onChange={(e) => setLongitude(e.target.value)}
                 placeholder="z.B. 8.54"
-                className="w-full px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
               />
             </div>
           </div>
 
-          <p className="text-xs text-tg-hint">
+          <p className="text-xs text-muted">
             Tipp: Suche deine Stadt auf Google Maps, rechtsklicke auf den Ort und kopiere die Koordinaten.
           </p>
 
-          <button
-            onClick={saveLocation}
-            disabled={saving}
-            className={`w-full py-3 bg-tg-button text-tg-button-text rounded-lg font-medium ${
-              saving ? 'opacity-50' : ''
-            }`}
-          >
-            {saving ? 'Speichern...' : 'Standort speichern'}
-          </button>
+          <Button variant="primary" block onClick={saveLocation} disabled={saving}>
+            {saving ? 'Speichern …' : 'Standort speichern'}
+          </Button>
         </div>
-      </div>
-    </main>
+      </Section>
+    </Page>
   )
 }

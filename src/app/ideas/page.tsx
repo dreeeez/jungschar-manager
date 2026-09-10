@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
 import { ARCHIVE_START_DATE } from '@/utils/format'
-import Link from 'next/link'
+import { Page, List, Row, Button, Textarea, Badge, Loading, Empty, Star } from '@/components/ui'
 
 interface Helper { id: string; name: string }
 interface Parent { id: string; name: string }
@@ -38,9 +38,9 @@ function formatDate(dateStr: string): string {
 
 function sourceLabel(source: string): string {
   switch (source) {
-    case 'elterngruppe': return '📨 Elterngruppe'
-    case 'manual': return '✍️ Manuell'
-    default: return '💡 Idee'
+    case 'elterngruppe': return 'Elterngruppe'
+    case 'manual': return 'Manuell'
+    default: return 'Idee'
   }
 }
 
@@ -160,7 +160,7 @@ export default function ArchivePage() {
 
   function getHelperNames(event: PastEvent): string {
     const names = event.assignments?.map(a => a.helper?.name).filter(Boolean) as string[]
-    return names.length ? names.join(' & ') : '—'
+    return names.length ? names.join(' & ') : '–'
   }
 
   function getParentName(event: PastEvent): string {
@@ -168,47 +168,38 @@ export default function ArchivePage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tg-button" />
-      </div>
-    )
+    return <Loading />
   }
 
   return (
-    <main className="p-4 safe-area-top safe-area-bottom">
-      <div className="flex items-center gap-2 mb-6">
-        <Link href="/" className="text-tg-link">←</Link>
-        <h1 className="text-xl font-bold">Vergangene Termine</h1>
-      </div>
-
-      <p className="text-sm text-tg-hint mb-5">
-        {events.length} {events.length === 1 ? 'Termin' : 'Termine'} im Archiv
-      </p>
-
-      <div className="space-y-3">
-        {events.length === 0 ? (
-          <p className="text-tg-hint text-center py-8">
-            Noch keine vergangenen Termine.
-          </p>
-        ) : (
-          events.map((event) => {
+    <Page
+      back="/"
+      title="Archiv"
+      subtitle={`${events.length} ${events.length === 1 ? 'Termin' : 'Termine'}`}
+    >
+      {events.length === 0 ? (
+        <Empty>Noch keine vergangenen Termine.</Empty>
+      ) : (
+        <List>
+          {events.map((event) => {
             const idea = ideasMap.get(event.id)
             const isAddingLog = activeEntryId === event.id
             const parentName = getParentName(event)
             return (
-              <div key={event.id} className="p-4 bg-tg-secondary-bg rounded-xl">
-                <p className="font-medium">📅 {formatDate(event.event_date)}</p>
-                <p className="text-xs text-tg-hint mt-1">👥 {getHelperNames(event)}</p>
-                {parentName && (
-                  <p className="text-xs text-tg-hint mt-0.5">🍽️ {parentName}</p>
-                )}
+              <Row key={event.id} className="flex-col items-stretch gap-2">
+                <div>
+                  <p className="font-medium">{formatDate(event.event_date)}</p>
+                  <p className="text-sm text-muted">Helfer: {getHelperNames(event)}</p>
+                  {parentName && (
+                    <p className="text-sm text-muted">Essen: {parentName}</p>
+                  )}
+                </div>
 
                 {idea ? (
-                  <div className="mt-3 pt-3 border-t border-tg-hint/10 space-y-3">
+                  <div className="space-y-3 pt-1">
                     {editingId === idea.id ? (
                       <div className="space-y-2">
-                        <textarea
+                        <Textarea
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
                           onKeyDown={(e) => {
@@ -218,47 +209,55 @@ export default function ArchivePage() {
                             }
                           }}
                           rows={3}
-                          className="w-full px-3 py-2 bg-tg-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button resize-y"
                           autoFocus
                         />
-                        <div className="flex gap-2 justify-end">
-                          <button
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => { setEditingId(null); setEditText('') }}
-                            className="px-3 py-1 text-tg-hint text-sm"
                           >
                             Abbrechen
-                          </button>
-                          <button
+                          </Button>
+                          <Button
+                            variant="primary"
+                            size="sm"
                             onClick={() => saveEdit(idea)}
                             disabled={!editText.trim()}
-                            className="px-4 py-1 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
                           >
                             Speichern
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => { setEditingId(idea.id); setEditText(idea.description || idea.title) }}
-                        className="text-left w-full group"
-                      >
-                        <div className="flex items-start gap-2">
-                          <p className="text-sm whitespace-pre-wrap flex-1">✅ {idea.description || idea.title}</p>
-                          <span className="text-xs text-tg-hint mt-0.5 opacity-50">✏️</span>
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="flex-1 whitespace-pre-wrap text-sm">
+                            {idea.description || idea.title}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="-mr-3 -mt-1 shrink-0"
+                            onClick={() => { setEditingId(idea.id); setEditText(idea.description || idea.title) }}
+                          >
+                            Bearbeiten
+                          </Button>
                         </div>
-                        <p className="text-xs text-tg-hint mt-1">{sourceLabel(idea.source)}</p>
-                      </button>
+                        <p className="mt-1 text-xs text-muted">{sourceLabel(idea.source)}</p>
+                      </div>
                     )}
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 text-fg">
                       {[1, 2, 3, 4, 5].map(star => (
                         <button
                           key={star}
+                          type="button"
                           onClick={() => toggleStar(idea, star)}
-                          className="text-xl leading-none active:scale-90 transition-transform"
+                          className="p-0.5 transition-transform active:scale-90"
                           aria-label={`${star} Sterne`}
                         >
-                          {(idea.rating ?? 0) >= star ? '⭐' : '☆'}
+                          <Star filled={(idea.rating ?? 0) >= star} />
                         </button>
                       ))}
                     </div>
@@ -267,24 +266,20 @@ export default function ArchivePage() {
                       {AVAILABLE_TAGS.map(tag => {
                         const active = (idea.tags || []).includes(tag)
                         return (
-                          <button
+                          <Badge
                             key={tag}
+                            tone={active ? 'accent' : 'outline'}
                             onClick={() => toggleTag(idea, tag)}
-                            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                              active
-                                ? 'bg-tg-button text-tg-button-text'
-                                : 'bg-tg-bg text-tg-hint border border-tg-hint/20'
-                            }`}
                           >
-                            {tag === 'drinnen' ? '🏠' : '🌳'} {tag}
-                          </button>
+                            {tag}
+                          </Badge>
                         )
                       })}
                     </div>
                   </div>
                 ) : isAddingLog ? (
-                  <div className="mt-3 pt-3 border-t border-tg-hint/10 space-y-2">
-                    <textarea
+                  <div className="space-y-2 pt-1">
+                    <Textarea
                       value={entryText}
                       onChange={(e) => setEntryText(e.target.value)}
                       onKeyDown={(e) => {
@@ -295,38 +290,43 @@ export default function ArchivePage() {
                       }}
                       placeholder="Was habt ihr gemacht? (Shift+Enter für Absatz)"
                       rows={3}
-                      className="w-full px-3 py-2 bg-tg-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button resize-y"
                       autoFocus
                     />
-                    <div className="flex gap-2 justify-end">
-                      <button
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => { setActiveEntryId(null); setEntryText('') }}
-                        className="px-3 py-1 text-tg-hint text-sm"
                       >
                         Abbrechen
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => saveLog(event.id)}
                         disabled={savingId === event.id || !entryText.trim()}
-                        className="px-4 py-1 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
                       >
-                        {savingId === event.id ? '...' : 'Speichern'}
-                      </button>
+                        {savingId === event.id ? 'Speichert …' : 'Speichern'}
+                      </Button>
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => { setActiveEntryId(event.id); setEntryText('') }}
-                    className="mt-3 pt-3 border-t border-tg-hint/10 w-full text-left text-sm text-tg-link"
-                  >
-                    + Aktivität nachtragen
-                  </button>
+                  <div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-ml-3"
+                      onClick={() => { setActiveEntryId(event.id); setEntryText('') }}
+                    >
+                      Aktivität nachtragen
+                    </Button>
+                  </div>
                 )}
-              </div>
+              </Row>
             )
-          })
-        )}
-      </div>
-    </main>
+          })}
+        </List>
+      )}
+    </Page>
   )
 }

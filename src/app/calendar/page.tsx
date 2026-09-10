@@ -4,7 +4,22 @@ import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
 import { ARCHIVE_START_DATE } from '@/utils/format'
-import Link from 'next/link'
+import {
+  Page,
+  Section,
+  List,
+  Row,
+  CheckRow,
+  Button,
+  Textarea,
+  Badge,
+  Loading,
+  Empty,
+  Note,
+  Sheet,
+  ChevronRight,
+  DateTile,
+} from '@/components/ui'
 
 interface Helper {
   id: string
@@ -264,9 +279,9 @@ export default function CalendarPage() {
 
   function sourceLabel(source: string): string {
     switch (source) {
-      case 'elterngruppe': return '📨 Elterngruppe'
-      case 'manual': return '✍️ Manuell erfasst'
-      default: return '💡 Idee'
+      case 'elterngruppe': return 'Elterngruppe'
+      case 'manual': return 'Manuell erfasst'
+      default: return 'Idee'
     }
   }
 
@@ -431,7 +446,7 @@ export default function CalendarPage() {
       if (testMode) {
         showAlert(`Test-Nachricht in den Test-Chat gesendet (${body.proposals?.length ?? 0} Termine).`)
       } else {
-        showAlert(`✅ Einteilung gepostet. ${body.inserted ?? 0} Helfer-Slots eingetragen.`)
+        showAlert(`Einteilung gepostet. ${body.inserted ?? 0} Helfer-Slots eingetragen.`)
         setRotationPreview(null)
         await fetchData()
       }
@@ -458,253 +473,169 @@ export default function CalendarPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tg-button" />
-      </div>
-    )
+    return <Loading />
   }
 
   const upcomingEvents = events.filter(e => isUpcoming(e.event_date))
   const pastEvents = events.filter(e => !isUpcoming(e.event_date) && e.event_date >= ARCHIVE_START_DATE)
+  const selectedLocked = selectedEvent ? isPastEvent(selectedEvent.event_date) : false
+
+  const syncSubtitle = lastSyncAt
+    ? 'Stand: ' +
+      new Date(lastSyncAt).toLocaleString('de-DE', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    : 'Noch nie synchronisiert. In den Einstellungen synchronisieren.'
 
   return (
-    <main className="p-4 safe-area-top safe-area-bottom">
-      <div className="flex items-center gap-2 mb-2">
-        <Link href="/" className="text-tg-link">←</Link>
-        <h1 className="text-xl font-bold">Kalender</h1>
-      </div>
+    <Page back="/" title="Kalender" subtitle={syncSubtitle}>
+      <Section title="Kommende Termine">
+        {upcomingEvents.length === 0 ? (
+          <Empty>Keine kommenden Termine</Empty>
+        ) : (
+          <List>
+            {upcomingEvents.slice(0, 5).map((event) => {
+              const idea = ideasMap.get(event.id)
+              const birthdays = getBirthdaysNearEvent(event.event_date)
+              const parentName = getParentDutyName(event)
+              return (
+                <Row key={event.id} onClick={() => openModal(event)}>
+                  <DateTile date={event.event_date} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{formatDate(event.event_date)}</span>
+                      {idea && <Badge tone="success">Log</Badge>}
+                    </div>
+                    <p className="mt-0.5 text-sm text-muted">{getAssignedHelperNames(event)}</p>
+                    {parentName && (
+                      <p className="text-sm text-muted">Essen: {parentName}</p>
+                    )}
+                    {birthdays.map((b, i) => (
+                      <p key={i} className="text-sm text-muted">
+                        Geburtstag: {b.name}, {b.dayMonth} (wird {b.age})
+                      </p>
+                    ))}
+                  </div>
+                  <ChevronRight />
+                </Row>
+              )
+            })}
+          </List>
+        )}
+        {upcomingEvents.length > 5 && (
+          <p className="mt-2 text-xs text-muted">{upcomingEvents.length - 5} weitere folgen</p>
+        )}
+      </Section>
 
-      <p className="text-xs text-tg-hint mb-6">
-        Letzte Aktualisierung:{' '}
-        {lastSyncAt
-          ? new Date(lastSyncAt).toLocaleString('de-DE', {
-              day: '2-digit', month: '2-digit', year: 'numeric',
-              hour: '2-digit', minute: '2-digit',
-            })
-          : 'noch nie — bitte in Einstellungen synchronisieren'}
-      </p>
+      {pastEvents.length > 0 && (
+        <Section title="Archiv">
+          <List>
+            <Row href="/ideas">
+              <div className="flex-1">
+                <p className="font-medium">Vergangene Termine</p>
+                <p className="text-sm text-muted">
+                  {pastEvents.length} {pastEvents.length === 1 ? 'Termin' : 'Termine'}
+                </p>
+              </div>
+              <ChevronRight />
+            </Row>
+          </List>
+        </Section>
+      )}
 
-      <details className="mb-6">
-        <summary className="text-xs text-tg-hint cursor-pointer py-2">
-          ⚙️ Erweitert: Einteilung manuell neu generieren
+      <details className="mb-8">
+        <summary className="cursor-pointer py-2 text-sm text-muted">
+          Erweitert: Einteilung manuell neu generieren
         </summary>
-        <p className="text-xs text-tg-hint mt-2 mb-3">
-          ⚠️ Auto-Modus läuft täglich automatisch. Nur drücken wenn du die aktuelle gepinnte Einteilung
-          ersetzen willst (z.B. neuer Helfer dazu) — alte Pin wird entfernt, neue erstellt.
+        <p className="mb-3 mt-2 text-sm text-muted">
+          Der Auto-Modus läuft täglich. Nur nutzen, wenn die aktuelle gepinnte Einteilung
+          ersetzt werden soll (z.B. neuer Helfer). Die alte Pin-Nachricht wird entfernt, eine neue erstellt.
         </p>
-        <button
+        <Button
+          variant="secondary"
+          block
           onClick={async () => {
             const ok = await showConfirm('Aktuelle gepinnte Einteilung wirklich ersetzen?')
             if (ok) loadRotationPreview()
           }}
           disabled={rotationLoading}
-          className="w-full py-3 bg-tg-secondary-bg text-tg-text rounded-lg font-medium disabled:opacity-50 border border-tg-hint/20"
         >
-          {rotationLoading ? 'Berechne…' : '🔄 Einteilung neu generieren'}
-        </button>
+          {rotationLoading ? 'Berechne …' : 'Einteilung neu generieren'}
+        </Button>
       </details>
 
-      {/* Upcoming Events */}
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-4">Kommende Termine</h2>
-        {upcomingEvents.length === 0 ? (
-          <p className="text-tg-hint text-center py-8">
-            Keine kommenden Termine
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {upcomingEvents.slice(0, 5).map((event) => {
-              const idea = ideasMap.get(event.id)
-              const birthdays = getBirthdaysNearEvent(event.event_date)
-              return (
-                <div
-                  key={event.id}
-                  onClick={() => openModal(event)}
-                  className="p-4 bg-tg-secondary-bg rounded-xl cursor-pointer active:opacity-80 transition-opacity"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-lg">📅</span>
-                        <span className="font-medium">{formatDate(event.event_date)}</span>
-                        {birthdays.length > 0 && (
-                          <span className="text-xs bg-pink-500/20 text-pink-600 px-2 py-0.5 rounded-full font-medium">
-                            🎂 {birthdays.length}
-                          </span>
-                        )}
-                        {idea && (
-                          <span className="text-xs bg-green-500/20 text-green-600 px-2 py-0.5 rounded-full font-medium">
-                            📋 Log
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-tg-hint mt-2">
-                        👥 {getAssignedHelperNames(event)}
-                      </p>
-                      {getParentDutyName(event) && (
-                        <p className="text-xs text-tg-hint mt-1">
-                          🍽️ {getParentDutyName(event)}
-                        </p>
-                      )}
-                      {birthdays.length > 0 && (
-                        <div className="text-xs text-pink-600 mt-1.5 space-y-0.5">
-                          {birthdays.map((b, i) => (
-                            <p key={i}>🎂 {b.name} — {b.dayMonth} (wird {b.age})</p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-tg-hint">›</span>
-                  </div>
-                </div>
-              )
-            })}
-            {upcomingEvents.length > 5 && (
-              <p className="text-xs text-tg-hint text-center pt-1">
-                + {upcomingEvents.length - 5} weitere folgen
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {pastEvents.length > 0 && (
-        <Link
-          href="/ideas"
-          className="block p-4 bg-tg-secondary-bg rounded-xl active:opacity-70 transition-opacity"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">📋 Vergangene Termine</p>
-              <p className="text-xs text-tg-hint mt-1">
-                {pastEvents.length} {pastEvents.length === 1 ? 'Termin' : 'Termine'} im Archiv
-              </p>
-            </div>
-            <span className="text-tg-hint">→</span>
-          </div>
-        </Link>
-      )}
-
-      {/* Assignment Modal */}
-      {selectedEvent && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-end"
-          onClick={() => setSelectedEvent(null)}
-        >
-          <div
-            className="bg-tg-bg w-full rounded-t-2xl p-4 pb-8 max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Termin bearbeiten</h2>
-              <button
-                onClick={() => setSelectedEvent(null)}
-                className="p-2 text-tg-hint"
-              >
-                ✕
-              </button>
+      {/* Termin-Sheet */}
+      <Sheet open={!!selectedEvent} onClose={() => setSelectedEvent(null)} title="Termin">
+        {selectedEvent && (
+          <>
+            <div className="mb-5 flex items-center gap-3">
+              <DateTile date={selectedEvent.event_date} />
+              <div>
+                <p className="font-medium">{selectedEvent.title || 'Jungschar'}</p>
+                <p className="text-sm text-muted">{formatDateLong(selectedEvent.event_date)}</p>
+              </div>
             </div>
 
-            <div className="bg-tg-secondary-bg rounded-xl p-4 mb-6">
-              <p className="font-medium">{selectedEvent.title || 'Jungschar'}</p>
-              <p className="text-sm text-tg-hint mt-1">
-                📅 {formatDateLong(selectedEvent.event_date)}
-              </p>
-            </div>
-
-            {isPastEvent(selectedEvent.event_date) && (
-              <div className="bg-tg-hint/10 border border-tg-hint/20 rounded-xl p-3 mb-6 text-sm text-tg-hint">
-                🔒 Termin abgeschlossen — Helfer- und Eltern-Zuweisungen sind eingefroren. Aktivität kannst du weiterhin nachtragen.
+            {selectedLocked && (
+              <div className="mb-5">
+                <Note>
+                  Termin abgeschlossen: Zuweisungen sind eingefroren. Aktivität kannst du weiterhin nachtragen.
+                </Note>
               </div>
             )}
 
-            {/* Helfer zuweisen */}
-            <p className="text-sm text-tg-hint mb-3">
-              👥 Helfer zuweisen:
-            </p>
-
-            <div className="space-y-2 mb-6">
-              {helpers.map((helper) => {
-                const isAssigned = getAssignedHelperIds(selectedEvent).includes(helper.id)
-                const locked = isPastEvent(selectedEvent.event_date)
-                return (
-                  <button
-                    key={helper.id}
-                    onClick={() => toggleHelper(helper.id)}
-                    disabled={saving || locked}
-                    className={`w-full p-4 rounded-xl text-left flex items-center justify-between transition-colors ${
-                      isAssigned
-                        ? 'bg-green-500/20 border-2 border-green-500'
-                        : 'bg-tg-secondary-bg border-2 border-transparent'
-                    } ${saving || locked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <span className="font-medium">{helper.name}</span>
-                    {isAssigned && <span className="text-green-500">✓</span>}
-                  </button>
-                )
-              })}
-              {helpers.length === 0 && (
-                <p className="text-center text-tg-hint py-4">
-                  Keine Helfer vorhanden.
-                </p>
+            <Section title="Helfer">
+              {helpers.length === 0 ? (
+                <Empty>Keine Helfer vorhanden.</Empty>
+              ) : (
+                <List>
+                  {helpers.map((helper) => (
+                    <CheckRow
+                      key={helper.id}
+                      label={helper.name}
+                      checked={getAssignedHelperIds(selectedEvent).includes(helper.id)}
+                      onClick={() => toggleHelper(helper.id)}
+                      disabled={saving || selectedLocked}
+                    />
+                  ))}
+                </List>
               )}
-            </div>
+            </Section>
 
-            {/* Elterndienst zuweisen */}
-            <p className="text-sm text-tg-hint mb-3">
-              🍽️ Elterndienst (Essen):
-            </p>
-
-            <div className="space-y-2 mb-6">
-              {parents.map((parent) => {
-                const isAssigned = getAssignedParentId(selectedEvent) === parent.id
-                const locked = isPastEvent(selectedEvent.event_date)
-                return (
-                  <button
-                    key={parent.id}
-                    onClick={() => toggleParentDuty(parent.id)}
-                    disabled={saving || locked}
-                    className={`w-full p-4 rounded-xl text-left flex items-center justify-between transition-colors ${
-                      isAssigned
-                        ? 'bg-orange-500/20 border-2 border-orange-500'
-                        : 'bg-tg-secondary-bg border-2 border-transparent'
-                    } ${saving || locked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <span className="font-medium">{parent.name}</span>
-                    {isAssigned && <span className="text-orange-500">🍽️</span>}
-                  </button>
-                )
-              })}
-              {parents.length === 0 && (
-                <p className="text-center text-tg-hint py-4">
-                  Keine Eltern vorhanden. Füge sie unter &quot;Eltern&quot; hinzu.
-                </p>
+            <Section title="Elterndienst (Essen)">
+              {parents.length === 0 ? (
+                <Empty>Keine Eltern vorhanden. Unter &quot;Eltern&quot; hinzufügen.</Empty>
+              ) : (
+                <List>
+                  {parents.map((parent) => (
+                    <CheckRow
+                      key={parent.id}
+                      label={parent.name}
+                      checked={getAssignedParentId(selectedEvent) === parent.id}
+                      onClick={() => toggleParentDuty(parent.id)}
+                      disabled={saving || selectedLocked}
+                    />
+                  ))}
+                </List>
               )}
-            </div>
+            </Section>
 
-            {/* Aktivitäts-Log */}
-            <div className="border-t border-tg-hint/20 pt-5">
-              <p className="text-sm text-tg-hint mb-3">📋 Aktivitäts-Log:</p>
-
+            <Section title="Aktivität" className="mb-0">
               {selectedEventIdea === undefined ? (
-                <div className="flex items-center gap-2 py-3 text-tg-hint text-sm">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-tg-button" />
-                  Lädt...
-                </div>
+                <p className="py-2 text-sm text-muted">Lädt …</p>
               ) : selectedEventIdea ? (
-                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
-                  <p className="font-medium text-sm whitespace-pre-wrap">
-                    ✅ {selectedEventIdea.description || selectedEventIdea.title}
+                <Note>
+                  <p className="whitespace-pre-wrap text-fg">
+                    {selectedEventIdea.description || selectedEventIdea.title}
                   </p>
-                  <p className="text-xs text-tg-hint mt-1">
+                  <p className="mt-1 text-xs">
                     {sourceLabel(selectedEventIdea.source)} · im Archiv bearbeitbar
                   </p>
-                </div>
+                </Note>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-sm text-tg-hint">Noch keine Aktivität erfasst.</p>
-                  <textarea
+                  <Textarea
                     value={newActivityText}
                     onChange={(e) => setNewActivityText(e.target.value)}
                     onKeyDown={(e) => {
@@ -715,113 +646,105 @@ export default function CalendarPage() {
                     }}
                     placeholder="Was habt ihr gemacht? (Shift+Enter für Absatz)"
                     rows={3}
-                    className="w-full px-3 py-2 bg-tg-secondary-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-tg-button resize-y"
                   />
                   <div className="flex justify-end">
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={saveManualActivity}
                       disabled={savingActivity || !newActivityText.trim()}
-                      className="px-4 py-1 bg-tg-button text-tg-button-text rounded-lg text-sm font-medium disabled:opacity-50"
                     >
-                      {savingActivity ? '...' : 'Speichern'}
-                    </button>
+                      {savingActivity ? 'Speichert …' : 'Speichern'}
+                    </Button>
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
+            </Section>
+          </>
+        )}
+      </Sheet>
 
-      {/* Rotation-Vorschlag Modal */}
-      {rotationPreview && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-end"
-          onClick={() => !rotationCommitting && setRotationPreview(null)}
-        >
-          <div
-            className="bg-tg-bg w-full rounded-t-2xl p-4 pb-8 max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold">Einteilungs-Vorschlag</h2>
-              <button
-                onClick={() => setRotationPreview(null)}
-                disabled={rotationCommitting}
-                className="p-2 text-tg-hint disabled:opacity-50"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-tg-hint mb-4">
-              Algorithmus: weniger eingesetzte Helfer zuerst, Senior+Junior bevorzugt.
+      {/* Rotation-Sheet */}
+      <Sheet
+        open={!!rotationPreview}
+        onClose={() => setRotationPreview(null)}
+        title="Einteilungs-Vorschlag"
+        locked={rotationCommitting}
+      >
+        {rotationPreview && (
+          <>
+            <p className="mb-4 text-sm text-muted">
+              Weniger eingesetzte Helfer zuerst, Senior und Junior bevorzugt.
               Bestehende Zuweisungen bleiben unangetastet.
             </p>
 
             {rotationPreview.length === 0 ? (
-              <p className="text-tg-hint text-center py-6">
-                Keine offenen Slots im 12-Wochen-Fenster.
-              </p>
+              <Empty>Keine offenen Slots im 12-Wochen-Fenster.</Empty>
             ) : (
-              <div className="space-y-2 mb-5">
+              <List className="mb-5">
                 {rotationPreview.map(p => (
-                  <div key={p.eventId} className="p-3 bg-tg-secondary-bg rounded-lg">
-                    <p className="text-sm font-medium">
-                      📅 {new Date(p.eventDate + 'T12:00:00').toLocaleDateString('de-DE', {
-                        weekday: 'short', day: '2-digit', month: '2-digit',
-                      })}
-                    </p>
-                    <p className="text-sm mt-1">
-                      {p.helpers.map(h => (
-                        <span key={h.id} className="inline-block mr-2">
-                          {h.isSenior ? '👴 ' : ''}{h.name}
-                        </span>
-                      ))}
-                    </p>
-                  </div>
+                  <Row key={p.eventId}>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">
+                        {new Date(p.eventDate + 'T12:00:00').toLocaleDateString('de-DE', {
+                          weekday: 'short', day: '2-digit', month: '2-digit',
+                        })}
+                      </p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                        {p.helpers.map(h => (
+                          <span key={h.id} className="inline-flex items-center gap-1.5">
+                            {h.name}
+                            {h.isSenior && <Badge tone="warn">Senior</Badge>}
+                          </span>
+                        ))}
+                      </p>
+                    </div>
+                  </Row>
                 ))}
-              </div>
+              </List>
             )}
 
             {rotationSkipped.length > 0 && (
-              <div className="mb-5 text-xs text-tg-hint">
-                <p className="font-medium mb-1">Übersprungen:</p>
+              <div className="mb-5 text-sm text-muted">
+                <p className="mb-1 font-medium">Übersprungen</p>
                 {rotationSkipped.map((s, i) => (
-                  <p key={i}>• {s.eventDate}: {s.reason}</p>
+                  <p key={i}>{s.eventDate}: {s.reason}</p>
                 ))}
               </div>
             )}
 
             {rotationPreview.length > 0 && (
               <div className="space-y-3">
-                <button
+                <Button
+                  variant="primary"
+                  block
                   onClick={() => commitRotation(true)}
                   disabled={rotationCommitting}
-                  className="w-full py-3 bg-tg-button text-tg-button-text rounded-lg font-medium disabled:opacity-50"
                 >
-                  {rotationCommitting ? 'Sende…' : '🧪 Test in Test-Chat senden'}
-                </button>
+                  {rotationCommitting ? 'Sende …' : 'Test in Test-Chat senden'}
+                </Button>
                 <details>
-                  <summary className="text-xs text-tg-hint cursor-pointer">
-                    🔴 Live in Hauptgruppe posten (nur nach erfolgreichem Test)
+                  <summary className="cursor-pointer text-sm text-muted">
+                    Live in Hauptgruppe posten (nur nach erfolgreichem Test)
                   </summary>
-                  <button
+                  <Button
+                    variant="danger"
+                    block
+                    className="mt-2 border border-line"
                     onClick={async () => {
                       const ok = await showConfirm('Wirklich LIVE in die Hauptgruppe posten und Assignments speichern?')
                       if (ok) commitRotation(false)
                     }}
                     disabled={rotationCommitting}
-                    className="mt-2 w-full py-3 bg-red-500 text-white rounded-lg font-medium disabled:opacity-50"
                   >
-                    {rotationCommitting ? 'Sende…' : '✅ LIVE bestätigen'}
-                  </button>
+                    {rotationCommitting ? 'Sende …' : 'Live in Hauptgruppe posten'}
+                  </Button>
                 </details>
               </div>
             )}
-          </div>
-        </div>
-      )}
-    </main>
+          </>
+        )}
+      </Sheet>
+    </Page>
   )
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
+import { Badge, Button, Empty, Input, List, Loading, Page, Row, Section } from '@/components/ui'
 
 interface Child {
   id: string
@@ -97,13 +97,7 @@ export default function ChildrenPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tg-button" />
-      </div>
-    )
-  }
+  if (loading) return <Loading />
 
   // Kinder mit bald-Geburtstag oben sortieren
   const sortedChildren = [...children].sort((a, b) => {
@@ -116,80 +110,59 @@ export default function ChildrenPage() {
   })
 
   return (
-    <main className="p-4 safe-area-top safe-area-bottom">
-      <div className="flex items-center gap-2 mb-6">
-        <Link href="/" className="text-tg-link">←</Link>
-        <h1 className="text-xl font-bold">Kinder verwalten</h1>
-      </div>
-
-      {/* Add new child */}
-      <div className="space-y-2 mb-6">
-        <div className="flex gap-2">
-          <input
+    <Page title="Kinder" back="/">
+      <Section title="Hinzufügen">
+        <div className="space-y-2">
+          <Input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Name"
-            className="flex-1 px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
           />
-          <button
-            onClick={addChild}
-            className="px-4 py-2 bg-tg-button text-tg-button-text rounded-lg font-medium"
-          >
-            +
-          </button>
+          <div className="flex gap-2">
+            <Input
+              type="date"
+              value={newBirthday}
+              onChange={(e) => setNewBirthday(e.target.value)}
+              className="flex-1"
+            />
+            <Button variant="primary" onClick={addChild}>Hinzufügen</Button>
+          </div>
         </div>
-        <input
-          type="date"
-          value={newBirthday}
-          onChange={(e) => setNewBirthday(e.target.value)}
-          className="w-full px-4 py-2 bg-tg-secondary-bg rounded-lg outline-none focus:ring-2 focus:ring-tg-button"
-        />
-      </div>
+      </Section>
 
-      {/* Children list */}
-      <div className="space-y-2">
+      <Section title={`${sortedChildren.length} Kinder`}>
         {sortedChildren.length === 0 ? (
-          <p className="text-tg-hint text-center py-8">
-            Noch keine Kinder vorhanden
-          </p>
+          <Empty>Noch keine Kinder vorhanden</Empty>
         ) : (
-          sortedChildren.map((child) => {
-            const bday = child.birthday ? getNextBirthday(child.birthday) : null
-            const isSoon = bday && bday.daysUntil <= 14
-            const isToday = bday && bday.daysUntil === 0
+          <List>
+            {sortedChildren.map((child) => {
+              const bday = child.birthday ? getNextBirthday(child.birthday) : null
+              const isSoon = !!bday && bday.daysUntil <= 14
+              const isToday = !!bday && bday.daysUntil === 0
 
-            return (
-              <div
-                key={child.id}
-                className={`flex items-center justify-between p-4 bg-tg-secondary-bg rounded-xl ${
-                  isToday ? 'ring-2 ring-yellow-500' : ''
-                }`}
-              >
-                <div>
-                  <p className="font-medium">
-                    {child.name}
-                    {isToday && ' 🎂'}
-                  </p>
-                  {child.birthday && (
-                    <p className={`text-sm ${isSoon ? 'text-yellow-500 font-medium' : 'text-tg-hint'}`}>
-                      🎂 {formatBirthday(child.birthday)}
-                      {bday && !isToday && isSoon && ` (in ${bday.daysUntil} Tagen)`}
-                      {isToday && ' — Heute!'}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => deleteChild(child.id, child.name)}
-                  className="text-red-500 p-2"
-                >
-                  🗑️
-                </button>
-              </div>
-            )
-          })
+              return (
+                <Row key={child.id}>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{child.name}</p>
+                    {child.birthday && (
+                      <p className="text-sm text-muted">{formatBirthday(child.birthday)}</p>
+                    )}
+                  </div>
+                  {isToday ? (
+                    <Badge tone="success">Heute</Badge>
+                  ) : isSoon && bday ? (
+                    <Badge tone="warn">in {bday.daysUntil} Tagen</Badge>
+                  ) : null}
+                  <Button variant="danger" size="sm" onClick={() => deleteChild(child.id, child.name)}>
+                    Löschen
+                  </Button>
+                </Row>
+              )
+            })}
+          </List>
         )}
-      </div>
-    </main>
+      </Section>
+    </Page>
   )
 }

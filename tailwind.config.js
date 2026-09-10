@@ -1,19 +1,26 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    './src/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
       colors: {
-        // Telegram theme colors (will be set via CSS variables)
-        'tg-bg': 'var(--tg-theme-bg-color, #ffffff)',
-        'tg-text': 'var(--tg-theme-text-color, #000000)',
-        'tg-hint': 'var(--tg-theme-hint-color, #999999)',
-        'tg-link': 'var(--tg-theme-link-color, #2481cc)',
-        'tg-button': 'var(--tg-theme-button-color, #2481cc)',
-        'tg-button-text': 'var(--tg-theme-button-text-color, #ffffff)',
-        'tg-secondary-bg': 'var(--tg-theme-secondary-bg-color, #f0f0f0)',
+        bg: 'var(--bg)',
+        card: 'var(--card)',
+        fg: 'var(--fg)',
+        muted: 'var(--muted)',
+        line: 'var(--border)',
+        accent: 'var(--accent)',
+        'accent-fg': 'var(--accent-fg)',
+        'accent-soft': 'var(--accent-soft)',
+        success: 'var(--success)',
+        'success-soft': 'var(--success-soft)',
+        warn: 'var(--warn)',
+        'warn-soft': 'var(--warn-soft)',
+        danger: 'var(--danger)',
+        'danger-soft': 'var(--danger-soft)',
+      },
+      borderColor: {
+        DEFAULT: 'var(--border)',
       },
     },
   },

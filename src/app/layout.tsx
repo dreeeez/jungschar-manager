@@ -3,7 +3,7 @@ import { TelegramProvider } from '@/components/TelegramProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Jungschar Admin',
+  title: 'Jungschar',
   description: 'Verwaltung für Jungschar-Helfer',
 }
 
@@ -24,7 +24,7 @@ export default function RootLayout({
       <head>
         <script src="https://telegram.org/js/telegram-web-app.js" />
       </head>
-      <body className="bg-tg-bg text-tg-text min-h-screen">
+      <body className="min-h-screen bg-bg text-fg">
         <TelegramProvider>
           {children}
         </TelegramProvider>

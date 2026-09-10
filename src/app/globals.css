@@ -2,21 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Farb-Tokens. Telegram setzt --tg-theme-* zur Laufzeit auf <html>,
+ * dadurch folgt die App dem Telegram-Theme (hell/dunkel). Lokal ohne
+ * Telegram greifen die Fallbacks, inkl. prefers-color-scheme.
+ *
+ * Aufbau: gedeckter Seitenhintergrund, weiße Karten, ein Akzent (Blau)
+ * für Interaktion, Grün/Orange/Rot für Status.
+ */
 :root {
-  --tg-theme-bg-color: #ffffff;
-  --tg-theme-text-color: #000000;
-  --tg-theme-hint-color: #999999;
-  --tg-theme-link-color: #2481cc;
-  --tg-theme-button-color: #2481cc;
-  --tg-theme-button-text-color: #ffffff;
-  --tg-theme-secondary-bg-color: #f0f0f0;
+  --bg: var(--tg-theme-secondary-bg-color, #f2f2f7);
+  --card: var(--tg-theme-bg-color, #ffffff);
+  --fg: var(--tg-theme-text-color, #111111);
+  --muted: var(--tg-theme-hint-color, #8a8a8e);
+  --border: rgba(0, 0, 0, 0.08);
+  --border: color-mix(in srgb, var(--fg) 10%, transparent);
+  --accent: var(--tg-theme-button-color, #2f6fed);
+  --accent-fg: var(--tg-theme-button-text-color, #ffffff);
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --success: #2e9e5b;
+  --success-soft: rgba(46, 158, 91, 0.14);
+  --warn: #d98c1f;
+  --warn-soft: rgba(217, 140, 31, 0.16);
+  --danger: #d9463e;
+  --danger-soft: rgba(217, 70, 62, 0.14);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 6px rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: var(--tg-theme-secondary-bg-color, #0d0d0f);
+    --card: var(--tg-theme-bg-color, #1c1c1e);
+    --fg: var(--tg-theme-text-color, #f2f2f2);
+    --muted: var(--tg-theme-hint-color, #8e8e93);
+    --accent: var(--tg-theme-button-color, #4f8bff);
+    --success: #4cc27a;
+    --warn: #f0a63a;
+    --danger: #ef6b62;
+    --shadow: none;
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Telegram Mini App safe area */
+input, textarea, button {
+  font: inherit;
+  color: inherit;
+}
+
+input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 2.75rem;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
 .safe-area-top {
   padding-top: env(safe-area-inset-top);
 }
