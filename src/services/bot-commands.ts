@@ -120,13 +120,60 @@ function helpFor(role: Role): string {
   return lines.join('\n').trim()
 }
 
+/** Button, der den privaten Chat mit dem Bot öffnet und dort direkt {payload} startet. */
+function privateChatButton(ctx: Context, payload: 'idee' | 'einladen') {
+  const username = ctx.me.username
+  return {
+    inline_keyboard: [[{ text: 'Privat schreiben', url: `https://t.me/${username}?start=${payload}` }]],
+  }
+}
+
+/** /idee im privaten Chat: nach der Idee fragen. */
+async function startIdeaFlow(ctx: Context) {
+  if (ctx.from) pendingIdeas.add(ctx.from.id)
+  await ctx.reply(IDEA_PROMPT, {
+    reply_markup: { force_reply: true, input_field_placeholder: 'Worauf hat dein Kind Lust?' },
+  })
+}
+
+/** /einladen im privaten Chat: freie Termine als Buttons. */
+async function startInviteFlow(ctx: Context) {
+  const events = await openInviteEvents()
+  if (events.length === 0) {
+    await ctx.reply('Gerade ist kein Termin frei. Danke euch!')
+    return
+  }
+  await ctx.reply('Schön! Zu welcher Jungschar möchtet ihr uns einladen?', {
+    reply_markup: inviteDateKeyboard(events),
+  })
+}
+
 /**
  * Richtet alle Bot Commands ein
  */
 export function setupBotCommands(bot: Bot) {
   // /start – Begrüßung je Rolle. Admins bekommen den Menü-Button "Admin".
+  // Mit Deep-Link-Payload (t.me/<bot>?start=idee|einladen) direkt in den Ablauf springen.
   bot.command('start', async (ctx) => {
     const role = await roleOf(ctx)
+    const payload = (ctx.match ?? '').trim().toLowerCase()
+
+    if (ctx.chat.type === 'private' && (payload === 'idee' || payload === 'einladen')) {
+      if (!role.helper && !role.parent && !role.admin) {
+        await ctx.reply(UNKNOWN)
+        return
+      }
+      if (payload === 'idee') {
+        await startIdeaFlow(ctx)
+        return
+      }
+      if (role.parent || role.admin) {
+        await startInviteFlow(ctx)
+        return
+      }
+      await ctx.reply('Einladungen kommen von den Eltern. Als Helfer trägst du so etwas im Ideenpool ein.')
+      return
+    }
 
     if (ctx.chat.type === 'private' && role.admin) {
       await ctx.api
@@ -250,13 +297,12 @@ export function setupBotCommands(bot: Bot) {
       return
     }
     if (ctx.chat.type !== 'private') {
-      await ctx.reply('Schreib mir deine Idee gern privat, dann bleibt sie zwischen uns.')
+      await ctx.reply('Ideen nehme ich privat entgegen, dann bleibt es zwischen uns.', {
+        reply_markup: privateChatButton(ctx, 'idee'),
+      })
       return
     }
-    if (ctx.from) pendingIdeas.add(ctx.from.id)
-    await ctx.reply(IDEA_PROMPT, {
-      reply_markup: { force_reply: true, input_field_placeholder: 'Worauf hat dein Kind Lust?' },
-    })
+    await startIdeaFlow(ctx)
   })
 
   // /einladen – „Kommt zu uns“ (Eltern und Admins, privat)
@@ -267,17 +313,12 @@ export function setupBotCommands(bot: Bot) {
       return
     }
     if (ctx.chat.type !== 'private') {
-      await ctx.reply('Schreib mir dafür gern privat.')
+      await ctx.reply('Einladungen nehme ich privat entgegen.', {
+        reply_markup: privateChatButton(ctx, 'einladen'),
+      })
       return
     }
-    const events = await openInviteEvents()
-    if (events.length === 0) {
-      await ctx.reply('Gerade ist kein Termin frei. Danke euch!')
-      return
-    }
-    await ctx.reply('Schön! Zu welcher Jungschar möchtet ihr uns einladen?', {
-      reply_markup: inviteDateKeyboard(events),
-    })
+    await startInviteFlow(ctx)
   })
 
   // /bilder – gesammelte Fotos ansehen (Admins, privat)
