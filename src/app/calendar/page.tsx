@@ -625,14 +625,14 @@ export default function CalendarPage() {
                           weekday: 'short', day: '2-digit', month: '2-digit',
                         })}
                       </p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                      <div className="mt-1 space-y-1">
                         {p.helpers.map(h => (
-                          <span key={h.id} className="inline-flex items-center gap-1.5">
-                            {h.name}
-                            {h.isSenior && <Badge tone="warn">Senior</Badge>}
-                          </span>
+                          <p key={h.id} className="flex items-center justify-between gap-2 text-sm">
+                            <span>{h.name}</span>
+                            <Badge tone={h.isSenior ? 'warn' : 'outline'}>{h.isSenior ? 'Senior' : 'Junior'}</Badge>
+                          </p>
                         ))}
-                      </p>
+                      </div>
                     </div>
                   </Row>
                 ))}
