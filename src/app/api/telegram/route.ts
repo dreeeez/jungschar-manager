@@ -14,6 +14,17 @@ function getBot() {
 }
 
 export async function POST(req: NextRequest) {
+  // Telegram schickt den beim setWebhook hinterlegten secret_token in
+  // diesem Header mit. Wird nur geprüft, wenn die Env-Var gesetzt ist —
+  // so bleibt ein bestehender Webhook ohne Secret weiter funktionsfähig,
+  // bis er neu registriert wird.
+  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET
+  if (expectedSecret) {
+    if (req.headers.get('x-telegram-bot-api-secret-token') !== expectedSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  }
+
   try {
     const handleUpdate = webhookCallback(getBot(), 'std/http')
     return await handleUpdate(req)

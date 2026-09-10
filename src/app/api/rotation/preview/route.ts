@@ -1,9 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { generateRotation } from '@/services/rotation'
+
+import { requireOperator } from '@/services/api-guard'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const denied = requireOperator(req)
+  if (denied) return denied
+
   try {
     const result = await generateRotation()
     return NextResponse.json(result)
@@ -13,6 +18,6 @@ export async function POST() {
   }
 }
 
-export async function GET() {
-  return POST()
+export async function GET(req: NextRequest) {
+  return POST(req)
 }

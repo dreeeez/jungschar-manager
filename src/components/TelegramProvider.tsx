@@ -10,8 +10,19 @@ interface TelegramUser {
   language_code?: string
 }
 
+/** Serverseitig bestätigte Identität (aus /api/auth/me). */
+interface Helper {
+  helperId: string | null
+  telegramUserId: number
+  name: string
+  isAdmin: boolean
+}
+
+type AuthState = 'checking' | 'authorized' | 'denied'
+
 interface TelegramContextType {
   user: TelegramUser | null
+  helper: Helper | null
   isReady: boolean
   initData: string | null
   colorScheme: 'light' | 'dark'
@@ -24,7 +35,9 @@ const TelegramContext = createContext<TelegramContextType | null>(null)
 
 export function TelegramProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<TelegramUser | null>(null)
-  const [isReady, setIsReady] = useState(false)
+  const [helper, setHelper] = useState<Helper | null>(null)
+  const [auth, setAuth] = useState<AuthState>('checking')
+  const [denyReason, setDenyReason] = useState<string>('')
   const [initData, setInitData] = useState<string | null>(null)
   const [colorScheme, setColorScheme] = useState<'light' | 'dark'>('light')
 
@@ -32,37 +45,47 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
     const tg = (window as any).Telegram?.WebApp
 
     if (tg) {
-      // Initialize the Mini App
       tg.ready()
       tg.expand()
-
-      // Get user data
-      if (tg.initDataUnsafe?.user) {
-        setUser(tg.initDataUnsafe.user)
-      }
-
-      // Get init data for validation
+      if (tg.initDataUnsafe?.user) setUser(tg.initDataUnsafe.user)
       setInitData(tg.initData)
-
-      // Get color scheme
       setColorScheme(tg.colorScheme || 'light')
-
-      // Listen for theme changes
-      tg.onEvent('themeChanged', () => {
-        setColorScheme(tg.colorScheme || 'light')
-      })
-
-      setIsReady(true)
-    } else {
-      // Development mode without Telegram
-      console.log('Running outside Telegram - using mock data')
-      setUser({
-        id: 123456789,
-        first_name: 'Test',
-        username: 'testuser',
-      })
-      setIsReady(true)
+      tg.onEvent('themeChanged', () => setColorScheme(tg.colorScheme || 'light'))
     }
+
+    // Anmelden: initData einmalig gegen ein Session-Cookie tauschen.
+    // Ohne Telegram wird ohne initData angefragt — das gelingt nur lokal
+    // mit gesetztem DEV_TELEGRAM_USER_ID, in Production nie.
+    const login = async () => {
+      try {
+        const res = await fetch('/api/auth/me', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData: tg?.initData ?? null }),
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          setHelper(data.user)
+          setAuth('authorized')
+          return
+        }
+
+        const err = await res.json().catch(() => ({}))
+        setDenyReason(
+          err?.message ??
+            (res.status === 403
+              ? 'Dein Telegram-Konto ist nicht als Helfer registriert.'
+              : 'Diese Seite lässt sich nur aus dem Telegram-Bot heraus öffnen.'),
+        )
+        setAuth('denied')
+      } catch {
+        setDenyReason('Anmeldung fehlgeschlagen. Bitte später erneut versuchen.')
+        setAuth('denied')
+      }
+    }
+
+    login()
   }, [])
 
   const close = () => {
@@ -83,20 +106,41 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
     return new Promise((resolve) => {
       const tg = (window as any).Telegram?.WebApp
       if (tg?.showConfirm) {
-        tg.showConfirm(message, (confirmed: boolean) => {
-          resolve(confirmed)
-        })
+        tg.showConfirm(message, (confirmed: boolean) => resolve(confirmed))
       } else {
         resolve(confirm(message))
       }
     })
   }
 
+  if (auth === 'checking') {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <p className="text-tg-hint text-sm">Anmeldung läuft …</p>
+      </div>
+    )
+  }
+
+  if (auth === 'denied') {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="max-w-sm text-center">
+          <p className="mb-2 text-4xl">🔒</p>
+          <h1 className="mb-2 text-lg font-semibold">Kein Zugang</h1>
+          <p className="text-tg-hint text-sm">{denyReason}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Kinder werden erst gerendert, wenn die Session steht — sonst würden
+  // ihre Daten-Abfragen im useEffect gegen ein fehlendes Cookie laufen.
   return (
     <TelegramContext.Provider
       value={{
         user,
-        isReady,
+        helper,
+        isReady: true,
         initData,
         colorScheme,
         close,

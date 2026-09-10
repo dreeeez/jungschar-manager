@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { executeRotation } from '@/services/rotation'
 
+import { requireOperator } from '@/services/api-guard'
+
 export const dynamic = 'force-dynamic'
 
 /**
@@ -13,6 +15,9 @@ export const dynamic = 'force-dynamic'
  *   ?splitAt=YYYY-MM-DD      → 2 Nachrichten: Termine vor splitAt + ab splitAt
  */
 export async function POST(req: NextRequest) {
+  const denied = requireOperator(req)
+  if (denied) return denied
+
   try {
     const isTest = req.nextUrl.searchParams.get('test') === '1'
     const splitAt = req.nextUrl.searchParams.get('splitAt')

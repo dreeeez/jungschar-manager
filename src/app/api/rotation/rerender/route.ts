@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/services/database'
 import { rerenderRotationMessage } from '@/services/rotation'
 
+import { requireOperator } from '@/services/api-guard'
+
 export const dynamic = 'force-dynamic'
 
 /**
@@ -13,6 +15,9 @@ export const dynamic = 'force-dynamic'
  * oder noch keine Rotation gepostet), passiert nichts.
  */
 export async function POST(req: NextRequest) {
+  const denied = requireOperator(req)
+  if (denied) return denied
+
   try {
     const eventId = req.nextUrl.searchParams.get('event_id')
     if (!eventId) {

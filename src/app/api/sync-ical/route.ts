@@ -1,9 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { syncJungscharEvents } from '@/services/ical-sync'
+import { requireOperator } from '@/services/api-guard'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  const denied = requireOperator(req)
+  if (denied) return denied
+
   try {
     const result = await syncJungscharEvents()
     const status = result.errors.length > 0 ? 500 : 200
@@ -17,6 +21,6 @@ export async function POST() {
   }
 }
 
-export async function GET() {
-  return POST()
+export async function GET(req: NextRequest) {
+  return POST(req)
 }
