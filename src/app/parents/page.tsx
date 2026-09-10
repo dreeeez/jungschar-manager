@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import { Button, Empty, Input, List, Loading, Page, Row, Section } from '@/components/ui'
+import { Button, Disclosure, Empty, IconButton, Input, List, Loading, Page, Row, Section, SmallIcons } from '@/components/ui'
 
 interface Parent {
   id: string
@@ -22,6 +22,7 @@ export default function ParentsPage() {
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [newTag, setNewTag] = useState('')
+  const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTag, setEditTag] = useState('')
 
@@ -62,6 +63,7 @@ export default function ParentsPage() {
     } else {
       setNewName('')
       setNewTag('')
+      setAdding(false)
       fetchParents()
     }
   }
@@ -111,27 +113,25 @@ export default function ParentsPage() {
   if (loading) return <Loading />
 
   return (
-    <Page title="Eltern" back="/">
-      <Section title="Hinzufügen">
+    <Page title="Eltern" back="/" accent="parents">
+      <Disclosure label="Eltern hinzufügen" open={adding} onOpenChange={setAdding}>
         <div className="space-y-2">
           <Input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Name, z.B. Familie Müller"
+            autoFocus
           />
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              placeholder="Telegram-Name, optional"
-              className="flex-1"
-            />
-            <Button variant="primary" onClick={addParent}>Hinzufügen</Button>
-          </div>
+          <Input
+            type="text"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            placeholder="Telegram-Name, optional"
+          />
+          <Button variant="primary" block onClick={addParent}>Hinzufügen</Button>
         </div>
-      </Section>
+      </Disclosure>
 
       <Section title={`${parents.length} Eltern`}>
         {parents.length === 0 ? (
@@ -142,7 +142,7 @@ export default function ParentsPage() {
               const isEditing = editingId === parent.id
               if (isEditing) {
                 return (
-                  <div key={parent.id} className="space-y-2 py-3">
+                  <div key={parent.id} className="space-y-2 px-4 py-3">
                     <p className="font-medium">{parent.name}</p>
                     <Input
                       type="text"
@@ -166,8 +166,14 @@ export default function ParentsPage() {
                       {parent.telegram_username ? `@${parent.telegram_username}` : 'ohne Telegram-Name'}
                     </p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => startEdit(parent)}>Bearbeiten</Button>
-                  <Button variant="danger" size="sm" onClick={() => deleteParent(parent.id, parent.name)}>Löschen</Button>
+                  <div className="flex shrink-0 gap-1.5">
+                    <IconButton label="Bearbeiten" onClick={() => startEdit(parent)}>
+                      <SmallIcons.pencil />
+                    </IconButton>
+                    <IconButton label="Löschen" tone="danger" onClick={() => deleteParent(parent.id, parent.name)}>
+                      <SmallIcons.trash />
+                    </IconButton>
+                  </div>
                 </Row>
               )
             })}

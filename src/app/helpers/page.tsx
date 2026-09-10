@@ -72,6 +72,7 @@ export default function HelpersPage() {
     <Page
       title="Helfer"
       back="/"
+      accent="helpers"
       subtitle="Neue Helfer registrieren sich im Bot mit /register."
     >
       {helpers.length === 0 ? (

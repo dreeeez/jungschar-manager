@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react'
 
 /*
  * Gemeinsame UI-Bausteine der Mini-App: schlicht, monochrom, ohne Emojis.
@@ -12,6 +12,28 @@ function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(' ')
 }
 
+/** Eine Farbe pro Bereich: Kachel auf der Startseite und Akzent der Seite. */
+export const PAGE_COLORS = {
+  calendar: '#2f6fed',
+  helpers: '#2e9e5b',
+  parents: '#d98c1f',
+  children: '#e05585',
+  archive: '#7b5cd6',
+  status: '#0f9d9a',
+  settings: '#4f6d9a',
+} as const
+
+export type PageKey = keyof typeof PAGE_COLORS
+
+function accentStyle(key?: PageKey): CSSProperties | undefined {
+  if (!key) return undefined
+  const c = PAGE_COLORS[key]
+  return {
+    '--accent': c,
+    '--accent-soft': `color-mix(in srgb, ${c} 14%, transparent)`,
+  } as CSSProperties
+}
+
 /** Seitenrahmen mit Titel und optionalem Zurück-Link. */
 export function Page({
   title,
@@ -19,6 +41,7 @@ export function Page({
   subtitle,
   action,
   hero,
+  accent,
   children,
 }: {
   title: string
@@ -27,10 +50,12 @@ export function Page({
   action?: ReactNode
   /** Ersetzt den Standard-Header komplett (z.B. Startseite). */
   hero?: ReactNode
+  /** Färbt Akzent (Links, Badges, Buttons) dieser Seite. */
+  accent?: PageKey
   children: ReactNode
 }) {
   return (
-    <main className="mx-auto max-w-md px-5 pb-12 pt-8">
+    <main className="mx-auto max-w-md px-5 pb-12 pt-8" style={accentStyle(accent)}>
       {back && (
         <Link href={back} className="mb-3 inline-flex items-center gap-0.5 text-sm font-medium text-accent">
           <ChevronLeft />
@@ -382,6 +407,16 @@ const iconProps = {
 }
 
 export const Icons = {
+  plus: () => (
+    <svg {...iconProps} width={16} height={16}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  activity: () => (
+    <svg {...iconProps}>
+      <path d="M22 12h-4l-3 8-6-16-3 8H2" />
+    </svg>
+  ),
   calendar: () => (
     <svg {...iconProps}>
       <rect x="3" y="5" width="18" height="16" rx="2" />
@@ -445,4 +480,155 @@ export function Avatar({ src, name, size = 52 }: { src?: string | null; name: st
       {initials || '?'}
     </span>
   )
+}
+
+/** Kleiner runder Icon-Button für Zeilen-Aktionen (Bearbeiten, Löschen). */
+export function IconButton({
+  label,
+  tone = 'muted',
+  className,
+  children,
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; tone?: 'muted' | 'danger' | 'accent' }) {
+  const tones = { muted: 'text-muted', danger: 'text-danger', accent: 'text-accent' }
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={cx(
+        'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg active:opacity-60 disabled:opacity-40',
+        tones[tone],
+        className,
+      )}
+      {...rest}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Zweiteiliger Schieberegler (Segmented Control). value null = nichts gewählt. */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  className,
+}: {
+  options: { value: T; label: string }[]
+  value: T | null
+  onChange: (v: T) => void
+  className?: string
+}) {
+  return (
+    <div className={cx('inline-flex rounded-lg bg-bg p-0.5', className)}>
+      {options.map((o) => {
+        const active = o.value === value
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            className={cx(
+              'h-8 rounded-md px-3 text-sm font-medium transition-colors',
+              active ? 'bg-card text-accent shadow-sm' : 'text-muted',
+            )}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Ausklappbarer Bereich, z.B. für "Hinzufügen"-Formulare. Steuerung von außen. */
+export function Disclosure({
+  label,
+  open,
+  onOpenChange,
+  children,
+}: {
+  label: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  children: ReactNode
+}) {
+  return (
+    <div className="mb-6">
+      <Button variant={open ? 'ghost' : 'secondary'} block onClick={() => onOpenChange(!open)}>
+        {open ? 'Abbrechen' : (
+          <span className="inline-flex items-center gap-1.5">
+            <Icons.plus />
+            {label}
+          </span>
+        )}
+      </Button>
+      {open && <div className="card mt-3 p-4">{children}</div>}
+    </div>
+  )
+}
+
+/** Icon-Zeile: kleines farbiges Icon vor gedämpftem Text. */
+export function IconLine({ icon, color, children }: { icon: ReactNode; color?: string; children: ReactNode }) {
+  return (
+    <p className="mt-1 flex items-start gap-2 text-sm text-muted">
+      <span className="mt-[3px] shrink-0" style={color ? { color } : undefined}>{icon}</span>
+      <span className="min-w-0 flex-1">{children}</span>
+    </p>
+  )
+}
+
+const smallIcon = { ...iconProps, width: 14, height: 14 }
+
+export const SmallIcons = {
+  users: () => (
+    <svg {...smallIcon}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4.5-6.2" />
+    </svg>
+  ),
+  food: () => (
+    <svg {...smallIcon}>
+      <path d="M5 3v8a3 3 0 0 0 3 3v7M11 3v8a3 3 0 0 1-3 3M5 3v5M8 3v5" />
+      <path d="M19 3c-2 1-3 4-3 7v3h3v8" />
+    </svg>
+  ),
+  gift: () => (
+    <svg {...smallIcon}>
+      <rect x="3" y="8" width="18" height="4" rx="1" />
+      <path d="M5 12v8h14v-8M12 8v12" />
+      <path d="M12 8c-1.5-3-5-3-5-1s3 1 5 1zM12 8c1.5-3 5-3 5-1s-3 1-5 1z" />
+    </svg>
+  ),
+  check: () => (
+    <svg {...smallIcon}>
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  ),
+  pencil: () => (
+    <svg {...iconProps} width={16} height={16}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  ),
+  trash: () => (
+    <svg {...iconProps} width={16} height={16}>
+      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  ),
+  clock: () => (
+    <svg {...smallIcon}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  ),
+  send: () => (
+    <svg {...smallIcon}>
+      <path d="M22 2L11 13" />
+      <path d="M22 2l-7 20-4-9-9-4z" />
+    </svg>
+  ),
 }

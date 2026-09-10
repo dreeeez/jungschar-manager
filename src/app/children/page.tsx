@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import { Badge, Button, Empty, Input, List, Loading, Page, Row, Section } from '@/components/ui'
+import { Badge, Button, Disclosure, Empty, IconButton, Input, List, Loading, Page, Row, Section, SmallIcons } from '@/components/ui'
 
 interface Child {
   id: string
@@ -39,6 +39,7 @@ export default function ChildrenPage() {
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [newBirthday, setNewBirthday] = useState('')
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     fetchChildren()
@@ -77,6 +78,7 @@ export default function ChildrenPage() {
     } else {
       setNewName('')
       setNewBirthday('')
+      setAdding(false)
       fetchChildren()
     }
   }
@@ -110,26 +112,24 @@ export default function ChildrenPage() {
   })
 
   return (
-    <Page title="Kinder" back="/">
-      <Section title="Hinzufügen">
+    <Page title="Kinder" back="/" accent="children">
+      <Disclosure label="Kind hinzufügen" open={adding} onOpenChange={setAdding}>
         <div className="space-y-2">
           <Input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Name"
+            autoFocus
           />
-          <div className="flex gap-2">
-            <Input
-              type="date"
-              value={newBirthday}
-              onChange={(e) => setNewBirthday(e.target.value)}
-              className="flex-1"
-            />
-            <Button variant="primary" onClick={addChild}>Hinzufügen</Button>
-          </div>
+          <Input
+            type="date"
+            value={newBirthday}
+            onChange={(e) => setNewBirthday(e.target.value)}
+          />
+          <Button variant="primary" block onClick={addChild}>Hinzufügen</Button>
         </div>
-      </Section>
+      </Disclosure>
 
       <Section title={`${sortedChildren.length} Kinder`}>
         {sortedChildren.length === 0 ? (
@@ -154,9 +154,9 @@ export default function ChildrenPage() {
                   ) : isSoon && bday ? (
                     <Badge tone="warn">in {bday.daysUntil} Tagen</Badge>
                   ) : null}
-                  <Button variant="danger" size="sm" onClick={() => deleteChild(child.id, child.name)}>
-                    Löschen
-                  </Button>
+                  <IconButton label="Löschen" tone="danger" onClick={() => deleteChild(child.id, child.name)}>
+                    <SmallIcons.trash />
+                  </IconButton>
                 </Row>
               )
             })}

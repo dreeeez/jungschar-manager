@@ -4,6 +4,110 @@ import { fetchJungscharDatesFromIcs } from './ical-sync'
 
 const STAGES = ['stage1_sunday', 'stage2_wednesday', 'stage3_saturday']
 
+export type PingType = 'stage1_sunday' | 'stage2_wednesday' | 'poll_thursday' | 'stage3_saturday'
+
+export interface NextPing {
+  type: PingType
+  /** Zeitpunkt des Cron-Laufs, ISO UTC */
+  at: string
+  eventDate: string
+  label: string
+}
+
+const PING_LABELS: Record<PingType, string> = {
+  stage1_sunday: 'Heads-up (Sonntag)',
+  stage2_wednesday: 'Countdown (Mittwoch)',
+  poll_thursday: 'Nicht-Voter-Ping (Donnerstag)',
+  stage3_saturday: 'Aufwacher (Samstag)',
+}
+
+/** Cron-Uhrzeiten aus vercel.json (UTC). */
+const REMINDER_CRON_HOUR_UTC = 8
+const POLL_CRON_HOUR_UTC = 16
+const POLL_CRON_WEEKDAY = 4 // Donnerstag
+
+/** Wie viele Termine processReminders() pro Lauf betrachtet (getUpcomingEvents(5)). */
+const REMINDER_EVENT_WINDOW = 5
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function utcDate(iso: string): Date {
+  return new Date(iso + 'T00:00:00Z')
+}
+
+function isoDay(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * Spiegelt die Schedule-Logik aus reminders.ts / poll-reminder.ts und
+ * berechnet für ein Event die noch ausstehenden Cron-Pings.
+ *
+ * Der Reminder-Cron läuft täglich 08:00 UTC; an jedem Lauf gilt
+ *   Stage 1: Sonntag  und 6 <= daysUntil <= 8
+ *   Stage 2: Mittwoch und 3 <= daysUntil <= 4
+ *   Stage 3: daysUntil === 0
+ * Der Poll-Cron läuft Donnerstag 16:00 UTC und antwortet auf den zuletzt
+ * gesendeten Mittwochs-Reminder eines noch bevorstehenden Events.
+ */
+function predictPings(eventDate: string, sent: Set<string>, now: Date): NextPing[] {
+  const out: NextPing[] = []
+  const event = utcDate(eventDate)
+  const todayIso = isoDay(now)
+  const start = utcDate(todayIso)
+  const totalDays = Math.round((event.getTime() - start.getTime()) / DAY_MS)
+  if (totalDays < 0) return out
+
+  const pending = new Set<PingType>()
+  if (!sent.has('stage1_sunday')) pending.add('stage1_sunday')
+  if (!sent.has('stage2_wednesday')) pending.add('stage2_wednesday')
+  if (!sent.has('stage3_saturday')) pending.add('stage3_saturday')
+
+  let stage2Day: Date | null = null
+
+  for (let i = 0; i <= totalDays; i++) {
+    const day = new Date(start.getTime() + i * DAY_MS)
+    const at = new Date(day.getTime() + REMINDER_CRON_HOUR_UTC * 60 * 60 * 1000)
+    const dow = day.getUTCDay()
+    const daysUntil = totalDays - i
+    const future = at.getTime() > now.getTime()
+
+    if (pending.has('stage1_sunday') && dow === 0 && daysUntil >= 6 && daysUntil <= 8) {
+      if (future) out.push({ type: 'stage1_sunday', at: at.toISOString(), eventDate, label: PING_LABELS.stage1_sunday })
+      pending.delete('stage1_sunday')
+    }
+    if (pending.has('stage2_wednesday') && dow === 3 && daysUntil >= 3 && daysUntil <= 4) {
+      if (future) {
+        out.push({ type: 'stage2_wednesday', at: at.toISOString(), eventDate, label: PING_LABELS.stage2_wednesday })
+        stage2Day = day
+      }
+      pending.delete('stage2_wednesday')
+    }
+    if (pending.has('stage3_saturday') && daysUntil === 0) {
+      if (future) out.push({ type: 'stage3_saturday', at: at.toISOString(), eventDate, label: PING_LABELS.stage3_saturday })
+      pending.delete('stage3_saturday')
+    }
+  }
+
+  // Donnerstags-Ping: nur wenn der Mittwochs-Reminder gesendet ist oder
+  // noch ansteht. Nächster Donnerstag 16:00 UTC nach dem Mittwoch, vor dem Event.
+  if (sent.has('stage2_wednesday') || stage2Day) {
+    const from = stage2Day ?? start
+    for (let i = stage2Day ? 1 : 0; i <= 7; i++) {
+      const day = new Date(from.getTime() + i * DAY_MS)
+      if (day.getTime() > event.getTime()) break
+      if (day.getUTCDay() !== POLL_CRON_WEEKDAY) continue
+      const at = new Date(day.getTime() + POLL_CRON_HOUR_UTC * 60 * 60 * 1000)
+      if (at.getTime() > now.getTime()) {
+        out.push({ type: 'poll_thursday', at: at.toISOString(), eventDate, label: PING_LABELS.poll_thursday })
+      }
+      break
+    }
+  }
+
+  return out
+}
+
 export interface BotStatus {
   now: string
   calendar: {
@@ -23,6 +127,12 @@ export interface BotStatus {
     staleInDb: string[]
     missingFromDb: string[]
   }
+  health: {
+    ok: boolean
+    issues: string[]
+  }
+  nextPings: NextPing[]
+  nextEvent: { date: string; daysUntil: number; duo: string[] } | null
 }
 
 /**
@@ -88,7 +198,33 @@ export async function getBotStatus(): Promise<BotStatus> {
     try { lastSync = JSON.parse(rawSync) } catch { lastSync = rawSync }
   }
 
+  // Ausstehende Pings — nur für die Termine, die der Reminder-Cron überhaupt
+  // betrachtet (die nächsten 5), sonst würden Prognosen weit hinten auftauchen.
+  const now = new Date()
+  const nextPings = events
+    .slice(0, REMINDER_EVENT_WINDOW)
+    .flatMap(e => predictPings(e.event_date, new Set(remByEvent.get(e.id) ?? []), now))
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .slice(0, 8)
+
+  const nextEvent = upcoming.length
+    ? { date: upcoming[0].date, daysUntil: upcoming[0].daysUntil, duo: upcoming[0].duo }
+    : null
+
+  const issues: string[] = []
+  if (feed === null) issues.push('Kalender-Feed nicht erreichbar.')
+  if (staleInDb.length) issues.push(`${staleInDb.length} Termin(e) in der Datenbank stehen nicht mehr im Feed.`)
+  if (missingFromDb.length) issues.push(`${missingFromDb.length} Feed-Termin(e) fehlen in der Datenbank.`)
+  for (const ev of upcoming) {
+    if (ev.daysUntil <= 7 && ev.duo.length === 0) {
+      issues.push(`Termin am ${ev.date} in ${ev.daysUntil} Tag(en) hat noch keine Einteilung.`)
+    }
+  }
+
   return {
+    health: { ok: issues.length === 0, issues },
+    nextPings,
+    nextEvent,
     now: todayIso,
     calendar: {
       feedReachable: feed !== null,

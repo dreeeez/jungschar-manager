@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
 import { ARCHIVE_START_DATE } from '@/utils/format'
-import { Page, List, Row, Button, Textarea, Badge, Loading, Empty, Star } from '@/components/ui'
+import { Page, List, Row, Card, Button, Textarea, Loading, Empty, Star, Segmented, IconLine, SmallIcons } from '@/components/ui'
 
 interface Helper { id: string; name: string }
 interface Parent { id: string; name: string }
@@ -28,7 +28,19 @@ interface IdeaRecord {
   tags: string[] | null
 }
 
-const AVAILABLE_TAGS = ['drinnen', 'draußen'] as const
+/** Zwei exklusive Paare: innerhalb eines Paares ist höchstens ein Wert gesetzt. */
+const TAG_PAIRS = [
+  [
+    { value: 'drinnen', label: 'Drinnen' },
+    { value: 'draußen', label: 'Draußen' },
+  ],
+  [
+    { value: 'hell', label: 'Hell' },
+    { value: 'dunkel', label: 'Dunkel' },
+  ],
+] as const
+
+type TagValue = (typeof TAG_PAIRS)[number][number]['value']
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('de-DE', {
@@ -150,12 +162,19 @@ export default function ArchivePage() {
     updateIdea(idea, { rating: newRating })
   }
 
-  function toggleTag(idea: IdeaRecord, tag: string) {
+  /** Setzt innerhalb eines Paares exklusiv; erneutes Tippen auf den aktiven Wert entfernt ihn. */
+  function setPairTag(idea: IdeaRecord, pair: readonly { value: TagValue }[], tag: TagValue) {
     const current = idea.tags || []
-    const next = current.includes(tag)
-      ? current.filter(t => t !== tag)
-      : [...current, tag]
+    const pairValues = pair.map(p => p.value as string)
+    const rest = current.filter(t => !pairValues.includes(t))
+    const next = current.includes(tag) ? rest : [...rest, tag]
     updateIdea(idea, { tags: next })
+  }
+
+  function pairValue(idea: IdeaRecord, pair: readonly { value: TagValue }[]): TagValue | null {
+    const current = idea.tags || []
+    const hit = pair.find(p => current.includes(p.value))
+    return hit ? hit.value : null
   }
 
   function getHelperNames(event: PastEvent): string {
@@ -171,124 +190,81 @@ export default function ArchivePage() {
     return <Loading />
   }
 
+  const logged = events.filter(e => ideasMap.has(e.id))
+  const unlogged = events.filter(e => !ideasMap.has(e.id))
+
+  function renderEntryForm(eventId: string) {
+    return (
+      <div className="space-y-2 pt-1">
+        <Textarea
+          value={entryText}
+          onChange={(e) => setEntryText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              saveLog(eventId)
+            }
+          }}
+          placeholder="Was habt ihr gemacht? (Shift+Enter für Absatz)"
+          rows={3}
+          autoFocus
+        />
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setActiveEntryId(null); setEntryText('') }}
+          >
+            Abbrechen
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => saveLog(eventId)}
+            disabled={savingId === eventId || !entryText.trim()}
+          >
+            {savingId === eventId ? 'Speichert …' : 'Speichern'}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <Page
       back="/"
       title="Archiv"
-      subtitle={`${events.length} ${events.length === 1 ? 'Termin' : 'Termine'}`}
+      accent="archive"
+      subtitle={`${logged.length} ${logged.length === 1 ? 'Eintrag' : 'Einträge'}`}
     >
       {events.length === 0 ? (
         <Empty>Noch keine vergangenen Termine.</Empty>
+      ) : logged.length === 0 ? (
+        <Empty>Noch keine Einträge. Unten lässt sich eine Aktivität nachtragen.</Empty>
       ) : (
-        <List>
-          {events.map((event) => {
-            const idea = ideasMap.get(event.id)
-            const isAddingLog = activeEntryId === event.id
-            const parentName = getParentName(event)
-            return (
-              <Row key={event.id} className="flex-col items-stretch gap-2">
-                <div>
-                  <p className="font-medium">{formatDate(event.event_date)}</p>
-                  <p className="text-sm text-muted">Helfer: {getHelperNames(event)}</p>
-                  {parentName && (
-                    <p className="text-sm text-muted">Essen: {parentName}</p>
-                  )}
-                </div>
+        logged.map((event) => {
+          const idea = ideasMap.get(event.id)!
+          const parentName = getParentName(event)
+          return (
+            <Card key={event.id} className="mb-3 p-5">
+              <p className="font-semibold">{formatDate(event.event_date)}</p>
+              <IconLine icon={<SmallIcons.users />}>{getHelperNames(event)}</IconLine>
+              {parentName && (
+                <IconLine icon={<SmallIcons.food />}>{parentName}</IconLine>
+              )}
 
-                {idea ? (
-                  <div className="space-y-3 pt-1">
-                    {editingId === idea.id ? (
-                      <div className="space-y-2">
-                        <Textarea
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault()
-                              saveEdit(idea)
-                            }
-                          }}
-                          rows={3}
-                          autoFocus
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => { setEditingId(null); setEditText('') }}
-                          >
-                            Abbrechen
-                          </Button>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => saveEdit(idea)}
-                            disabled={!editText.trim()}
-                          >
-                            Speichern
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="flex-1 whitespace-pre-wrap text-sm">
-                            {idea.description || idea.title}
-                          </p>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="-mr-3 -mt-1 shrink-0"
-                            onClick={() => { setEditingId(idea.id); setEditText(idea.description || idea.title) }}
-                          >
-                            Bearbeiten
-                          </Button>
-                        </div>
-                        <p className="mt-1 text-xs text-muted">{sourceLabel(idea.source)}</p>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-1 text-fg">
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => toggleStar(idea, star)}
-                          className="p-0.5 transition-transform active:scale-90"
-                          aria-label={`${star} Sterne`}
-                        >
-                          <Star filled={(idea.rating ?? 0) >= star} />
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {AVAILABLE_TAGS.map(tag => {
-                        const active = (idea.tags || []).includes(tag)
-                        return (
-                          <Badge
-                            key={tag}
-                            tone={active ? 'accent' : 'outline'}
-                            onClick={() => toggleTag(idea, tag)}
-                          >
-                            {tag}
-                          </Badge>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ) : isAddingLog ? (
-                  <div className="space-y-2 pt-1">
+              <div className="mt-4 space-y-4">
+                {editingId === idea.id ? (
+                  <div className="space-y-2">
                     <Textarea
-                      value={entryText}
-                      onChange={(e) => setEntryText(e.target.value)}
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault()
-                          saveLog(event.id)
+                          saveEdit(idea)
                         }
                       }}
-                      placeholder="Was habt ihr gemacht? (Shift+Enter für Absatz)"
                       rows={3}
                       autoFocus
                     />
@@ -296,36 +272,100 @@ export default function ArchivePage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => { setActiveEntryId(null); setEntryText('') }}
+                        onClick={() => { setEditingId(null); setEditText('') }}
                       >
                         Abbrechen
                       </Button>
                       <Button
                         variant="primary"
                         size="sm"
-                        onClick={() => saveLog(event.id)}
-                        disabled={savingId === event.id || !entryText.trim()}
+                        onClick={() => saveEdit(idea)}
+                        disabled={!editText.trim()}
                       >
-                        {savingId === event.id ? 'Speichert …' : 'Speichern'}
+                        Speichern
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="-ml-3"
-                      onClick={() => { setActiveEntryId(event.id); setEntryText('') }}
-                    >
-                      Aktivität nachtragen
-                    </Button>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="flex-1 whitespace-pre-wrap text-[15px] leading-relaxed">
+                        {idea.description || idea.title}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="-mr-3 -mt-1 shrink-0"
+                        onClick={() => { setEditingId(idea.id); setEditText(idea.description || idea.title) }}
+                      >
+                        Bearbeiten
+                      </Button>
+                    </div>
+                    <p className="mt-1.5 text-xs text-muted">{sourceLabel(idea.source)}</p>
                   </div>
                 )}
-              </Row>
-            )
-          })}
-        </List>
+
+                <div className="flex items-center gap-1 text-accent">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => toggleStar(idea, star)}
+                      className="p-0.5 transition-transform active:scale-90"
+                      aria-label={`${star} Sterne`}
+                    >
+                      <Star filled={(idea.rating ?? 0) >= star} />
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {TAG_PAIRS.map((pair) => (
+                    <Segmented
+                      key={pair[0].value}
+                      options={[...pair]}
+                      value={pairValue(idea, pair)}
+                      onChange={(v) => setPairTag(idea, pair, v)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </Card>
+          )
+        })
+      )}
+
+      {unlogged.length > 0 && (
+        <details className="mt-4">
+          <summary className="cursor-pointer py-2 text-sm text-muted">
+            {unlogged.length} {unlogged.length === 1 ? 'Termin' : 'Termine'} ohne Eintrag
+          </summary>
+          <List className="mt-2">
+            {unlogged.map((event) => {
+              const isAddingLog = activeEntryId === event.id
+              return (
+                <div key={event.id}>
+                  <Row>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{formatDate(event.event_date)}</p>
+                      <p className="text-sm text-muted">{getHelperNames(event)}</p>
+                    </div>
+                    {!isAddingLog && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setActiveEntryId(event.id); setEntryText('') }}
+                      >
+                        Nachtragen
+                      </Button>
+                    )}
+                  </Row>
+                  {isAddingLog && <div className="px-4 pb-4">{renderEntryForm(event.id)}</div>}
+                </div>
+              )
+            })}
+          </List>
+        </details>
       )}
     </Page>
   )

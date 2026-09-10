@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import { ARCHIVE_START_DATE } from '@/utils/format'
 import {
   Page,
   Section,
@@ -19,6 +18,9 @@ import {
   Sheet,
   ChevronRight,
   DateTile,
+  IconLine,
+  SmallIcons,
+  PAGE_COLORS,
 } from '@/components/ui'
 
 interface Helper {
@@ -477,7 +479,6 @@ export default function CalendarPage() {
   }
 
   const upcomingEvents = events.filter(e => isUpcoming(e.event_date))
-  const pastEvents = events.filter(e => !isUpcoming(e.event_date) && e.event_date >= ARCHIVE_START_DATE)
   const selectedLocked = selectedEvent ? isPastEvent(selectedEvent.event_date) : false
 
   const syncSubtitle = lastSyncAt
@@ -489,7 +490,7 @@ export default function CalendarPage() {
     : 'Noch nie synchronisiert. In den Einstellungen synchronisieren.'
 
   return (
-    <Page back="/" title="Kalender" subtitle={syncSubtitle}>
+    <Page back="/" title="Kalender" subtitle={syncSubtitle} accent="calendar">
       <Section title="Kommende Termine">
         {upcomingEvents.length === 0 ? (
           <Empty>Keine kommenden Termine</Empty>
@@ -507,14 +508,18 @@ export default function CalendarPage() {
                       <span className="font-semibold">{formatDate(event.event_date)}</span>
                       {idea && <Badge tone="success">Log</Badge>}
                     </div>
-                    <p className="mt-0.5 text-sm text-muted">{getAssignedHelperNames(event)}</p>
+                    <IconLine icon={<SmallIcons.users />} color={PAGE_COLORS.helpers}>
+                      {getAssignedHelperNames(event)}
+                    </IconLine>
                     {parentName && (
-                      <p className="text-sm text-muted">Essen: {parentName}</p>
+                      <IconLine icon={<SmallIcons.food />} color={PAGE_COLORS.parents}>
+                        {parentName}
+                      </IconLine>
                     )}
                     {birthdays.map((b, i) => (
-                      <p key={i} className="text-sm text-muted">
-                        Geburtstag: {b.name}, {b.dayMonth} (wird {b.age})
-                      </p>
+                      <IconLine key={i} icon={<SmallIcons.gift />} color={PAGE_COLORS.children}>
+                        {b.name} wird {b.age} ({b.dayMonth})
+                      </IconLine>
                     ))}
                   </div>
                   <ChevronRight />
@@ -528,21 +533,6 @@ export default function CalendarPage() {
         )}
       </Section>
 
-      {pastEvents.length > 0 && (
-        <Section title="Archiv">
-          <List>
-            <Row href="/ideas">
-              <div className="flex-1">
-                <p className="font-medium">Vergangene Termine</p>
-                <p className="text-sm text-muted">
-                  {pastEvents.length} {pastEvents.length === 1 ? 'Termin' : 'Termine'}
-                </p>
-              </div>
-              <ChevronRight />
-            </Row>
-          </List>
-        </Section>
-      )}
 
       <details className="mb-8">
         <summary className="cursor-pointer py-2 text-sm text-muted">

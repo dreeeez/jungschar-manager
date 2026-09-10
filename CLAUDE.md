@@ -28,6 +28,7 @@ src/
     calendar/       Mini-App: Termine, Zuweisungen, Aktivitäten-Tracking
     ideas/          Mini-App: Aktivitäten-History
     settings/       Mini-App: Wetter-Ort, ICS-Upload
+  components/ui.tsx UI-Bausteine der Mini-App (Page mit Seitenfarbe, Karten, Badges, Sheet, Icons) — keine Emojis in der UI
   services/         Server-side Business-Logik
     reminders.ts          Reminder-Engine (Stage 1/2/3)
     poll-reminder.ts      Donnerstag-Ping mit 20 Templates

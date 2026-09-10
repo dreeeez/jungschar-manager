@@ -1,15 +1,16 @@
 'use client'
 
 import { useTelegram } from '@/components/TelegramProvider'
-import { Avatar, ChevronRight, IconTile, Icons, List, Page, Row } from '@/components/ui'
+import { Avatar, ChevronRight, IconTile, Icons, List, PAGE_COLORS, Page, Row } from '@/components/ui'
 
 const NAV = [
-  { href: '/calendar', title: 'Kalender', description: 'Termine und Zuweisungen', color: '#2f6fed', icon: Icons.calendar },
-  { href: '/helpers', title: 'Helfer', description: 'Registrierte Helfer', color: '#2e9e5b', icon: Icons.users },
-  { href: '/parents', title: 'Eltern', description: 'Elterndienst', color: '#d98c1f', icon: Icons.home },
-  { href: '/children', title: 'Kinder', description: 'Kinder und Geburtstage', color: '#e05585', icon: Icons.smile },
-  { href: '/ideas', title: 'Archiv', description: 'Vergangene Termine', color: '#7b5cd6', icon: Icons.archive },
-  { href: '/settings', title: 'Einstellungen', description: 'Sync, Wetter, Bot-Status', color: '#6b7280', icon: Icons.settings },
+  { href: '/calendar', title: 'Kalender', description: 'Termine und Zuweisungen', color: PAGE_COLORS.calendar, icon: Icons.calendar },
+  { href: '/helpers', title: 'Helfer', description: 'Registrierte Helfer', color: PAGE_COLORS.helpers, icon: Icons.users },
+  { href: '/parents', title: 'Eltern', description: 'Elterndienst', color: PAGE_COLORS.parents, icon: Icons.home },
+  { href: '/children', title: 'Kinder', description: 'Kinder und Geburtstage', color: PAGE_COLORS.children, icon: Icons.smile },
+  { href: '/ideas', title: 'Archiv', description: 'Vergangene Termine', color: PAGE_COLORS.archive, icon: Icons.archive },
+  { href: '/status', title: 'Bot-Status', description: 'Health, nächste Nachricht, Pings', color: PAGE_COLORS.status, icon: Icons.activity },
+  { href: '/settings', title: 'Einstellungen', description: 'Termin-Sync, Wetter', color: PAGE_COLORS.settings, icon: Icons.settings },
 ]
 
 export default function Home() {
