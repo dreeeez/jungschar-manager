@@ -111,6 +111,10 @@ curl -H "..." "https://<preview-url>/api/cron/reminder?test=2&live=1"  # Stage 2
 - Feature-Branches → automatische Preview-URLs (`<project>-git-<short>-<team>.vercel.app`).
 - Vercel-Cron läuft **nur auf Production**. Preview-Deployments triggern keine Crons.
 
+## Ideen teilen
+
+Ideenpool → „Auswählen“ (nur Admins) → bis zu 10 Ideen markieren → „In Helfer-Gruppe teilen“ (oder „Test“ → Sandbox). `POST /api/pool/share { ids, test }` prüft Session-Admin, postet die Ideen als Nachricht (`services/pool-share.ts`) und bei ≥ 2 Ideen eine Umfrage mit Mehrfachauswahl.
+
 ## Bot-Befehle und Rollen
 
 `services/bot-commands.ts` prüft pro Befehl die Rolle: Admin (Zugangsliste `admins.ts`), Helfer (`helpers`), Elternteil (`parents` per `telegram_user_id` oder `telegram_username`, Logik in `services/parents-bot.ts`).

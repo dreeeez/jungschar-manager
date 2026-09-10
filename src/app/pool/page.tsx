@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import { Badge, Button, ChevronRight, Disclosure, Empty, Input, Label, List, Loading, Page, Row, Segmented, Textarea } from '@/components/ui'
+import { Badge, Button, Check, ChevronRight, Disclosure, Empty, Input, Label, List, Loading, Page, Row, Segmented, Textarea } from '@/components/ui'
 
 /*
  * Ideenpool: Aktivitäten, die noch keinem Termin zugeordnet sind.
@@ -90,6 +90,49 @@ export default function PoolPage() {
   const [category, setCategory] = useState<string | null>(null)
   const [sort, setSort] = useState<Sort>('newest')
   const [openId, setOpenId] = useState<string | null>(null)
+
+  // Auswahlmodus (nur Admins): Ideen markieren und in die Helfer-Gruppe teilen.
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [sharing, setSharing] = useState(false)
+  const canShare = !!helper?.isAdmin
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else if (next.size < 10) next.add(id)
+      else showAlert('Höchstens 10 Ideen auf einmal.')
+      return next
+    })
+  }
+
+  function stopSelecting() {
+    setSelecting(false)
+    setSelected(new Set())
+  }
+
+  async function shareSelected(test: boolean) {
+    if (selected.size === 0) return
+    const target = test ? 'Sandbox-Gruppe' : 'Helfer-Gruppe'
+    const ok = await showConfirm(`${selected.size} ${selected.size === 1 ? 'Idee' : 'Ideen'} in die ${target} posten?`)
+    if (!ok) return
+    setSharing(true)
+    try {
+      const res = await fetch('/api/pool/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...selected], test }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body?.error ?? `HTTP ${res.status}`)
+      showAlert(`In der ${target} gepostet${body.poll ? ', mit Umfrage' : ''}.`)
+      stopSelecting()
+    } catch (e: any) {
+      showAlert('Fehler: ' + e.message)
+    }
+    setSharing(false)
+  }
 
   const [formOpen, setFormOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -198,6 +241,13 @@ export default function PoolPage() {
       title="Ideenpool"
       accent="pool"
       subtitle={`${filtered.length} von ${ideas.length} Ideen`}
+      action={
+        canShare && ideas.length > 0 ? (
+          <Button variant="ghost" size="sm" onClick={() => (selecting ? stopSelecting() : setSelecting(true))}>
+            {selecting ? 'Fertig' : 'Auswählen'}
+          </Button>
+        ) : undefined
+      }
     >
       <Disclosure label="Idee hinzufügen" open={formOpen} onOpenChange={(open) => { setFormOpen(open); if (!open) resetForm() }}>
         <div className="space-y-3">
@@ -282,9 +332,20 @@ export default function PoolPage() {
             const placeTag = tags.find((t) => t === 'drinnen' || t === 'draußen')
             const categoryTags = tags.filter((t) => CATEGORY_LABEL.has(t))
             const open = openId === idea.id
+            const isSelected = selected.has(idea.id)
             return (
               <div key={idea.id}>
-                <Row onClick={() => setOpenId(open ? null : idea.id)}>
+                <Row onClick={() => (selecting ? toggleSelected(idea.id) : setOpenId(open ? null : idea.id))}>
+                  {selecting && (
+                    <span
+                      className={cx(
+                        'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2',
+                        isSelected ? 'border-accent bg-accent text-accent-fg' : 'border-line',
+                      )}
+                    >
+                      {isSelected && <Check />}
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">{idea.title}</p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
@@ -293,11 +354,13 @@ export default function PoolPage() {
                       <span>{shortOrigin(idea)}</span>
                     </p>
                   </div>
-                  <span className={cx('shrink-0 text-muted transition-transform', open && 'rotate-90')}>
-                    <ChevronRight />
-                  </span>
+                  {!selecting && (
+                    <span className={cx('shrink-0 text-muted transition-transform', open && 'rotate-90')}>
+                      <ChevronRight />
+                    </span>
+                  )}
                 </Row>
-                {open && (
+                {open && !selecting && (
                   <div className="space-y-3 px-4 pb-4">
                     {idea.description && (
                       <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{idea.description}</p>
@@ -319,6 +382,23 @@ export default function PoolPage() {
             )
           })}
         </List>
+      )}
+
+      {selecting && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card px-5 pb-6 pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
+          <div className="mx-auto flex max-w-md items-center gap-2">
+            <p className="flex-1 text-sm">
+              <span className="font-semibold">{selected.size}</span>
+              <span className="text-muted"> {selected.size === 1 ? 'Idee' : 'Ideen'} ausgewählt</span>
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => shareSelected(true)} disabled={sharing || selected.size === 0}>
+              Test
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => shareSelected(false)} disabled={sharing || selected.size === 0}>
+              {sharing ? 'Sende …' : 'In Helfer-Gruppe teilen'}
+            </Button>
+          </div>
+        </div>
       )}
     </Page>
   )
