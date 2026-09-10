@@ -8,6 +8,14 @@
     {
       "path": "/api/cron/poll-reminder",
       "schedule": "0 16 * * 4"
+    },
+    {
+      "path": "/api/cron/review-ping",
+      "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/review-ping",
+      "schedule": "0 19 * * *"
     }
   ]
 }

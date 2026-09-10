@@ -4,6 +4,7 @@ import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './h
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { getSupabase } from './database'
 import { recordVote } from './attendance'
+import { handleReviewCallback, handleReviewText } from './review-ping'
 
 // Track pending registrations (in-memory, resets on cold start)
 const pendingRegistrations = new Set<number>()
@@ -217,6 +218,17 @@ Fragen? Sprich einen Admin an!
 
     if (text.startsWith('/')) return
 
+    // Offene Abend-Bewertung im privaten Chat? Dann ist der Text der Freitext.
+    if (telegramUserId && ctx.chat?.type === 'private') {
+      const handled = await handleReviewText(
+        telegramUserId,
+        text,
+        (html) => ctx.reply(html, { parse_mode: 'HTML' }),
+        ctx.from?.first_name || ctx.from?.username || 'Jemand',
+      )
+      if (handled) return
+    }
+
     if (telegramUserId && pendingRegistrations.has(telegramUserId)) {
       pendingRegistrations.delete(telegramUserId)
 
@@ -237,7 +249,15 @@ Fragen? Sprich einen Admin an!
     const userName = user.first_name || user.username || 'Jemand'
 
     try {
-      const [action, eventId] = callbackData.split('_')
+      const [action, eventId, value] = callbackData.split('_')
+
+      // Abend-Bewertung (Sterne / Drinnen-Draußen) — eigener Pfad, kein Event-Lookup nötig.
+      if (action === 'rvs' || action === 'rvp') {
+        const toast = await handleReviewCallback(action, eventId, value ?? '', telegramUserId)
+        await ctx.answerCallbackQuery({ text: toast })
+        return
+      }
+
       const event = await getEventById(eventId)
       const eventInfo = event ? formatDate(event.event_date) : 'dem Termin'
 

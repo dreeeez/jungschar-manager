@@ -625,6 +625,11 @@ export const SmallIcons = {
       <path d="M12 7v5l3 2" />
     </svg>
   ),
+  weather: () => (
+    <svg {...smallIcon}>
+      <path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.3 12.1 3.5 3.5 0 0 0 7 19z" />
+    </svg>
+  ),
   send: () => (
     <svg {...smallIcon}>
       <path d="M22 2L11 13" />

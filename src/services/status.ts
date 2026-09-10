@@ -4,7 +4,7 @@ import { fetchJungscharDatesFromIcs } from './ical-sync'
 
 const STAGES = ['stage1_sunday', 'stage2_wednesday', 'stage3_saturday']
 
-export type PingType = 'stage1_sunday' | 'stage2_wednesday' | 'poll_thursday' | 'stage3_saturday'
+export type PingType = 'stage1_sunday' | 'stage2_wednesday' | 'poll_thursday' | 'stage3_saturday' | 'review_evening'
 
 export interface NextPing {
   type: PingType
@@ -18,6 +18,7 @@ const PING_LABELS: Record<PingType, string> = {
   stage1_sunday: 'Heads-up (Sonntag)',
   stage2_wednesday: 'Countdown (Mittwoch)',
   poll_thursday: 'Nicht-Voter-Ping (Donnerstag)',
+  review_evening: 'Bewertungs-Ping per DM (20:00)',
   stage3_saturday: 'Aufwacher (Samstag)',
 }
 
@@ -105,7 +106,26 @@ function predictPings(eventDate: string, sent: Set<string>, now: Date): NextPing
     }
   }
 
+  // Abend-Bewertung: 20:00 Ortszeit am Tag des Termins.
+  const review = berlinLocalToUtc(eventDate, 20)
+  if (review.getTime() > now.getTime()) {
+    out.push({ type: 'review_evening', at: review.toISOString(), eventDate, label: PING_LABELS.review_evening })
+  }
+
   return out
+}
+
+/** Ortszeit Europe/Berlin (volle Stunde) → UTC-Date, Sommer-/Winterzeit-sicher. */
+function berlinLocalToUtc(dateIso: string, hour: number): Date {
+  const hh = String(hour).padStart(2, '0')
+  for (const off of ['+02:00', '+01:00']) {
+    const d = new Date(`${dateIso}T${hh}:00:00${off}`)
+    const local = Number(
+      new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour: '2-digit', hourCycle: 'h23' }).format(d),
+    )
+    if (local === hour) return d
+  }
+  return new Date(`${dateIso}T${hh}:00:00+01:00`)
 }
 
 export interface BotStatus {

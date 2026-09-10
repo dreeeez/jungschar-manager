@@ -26,6 +26,8 @@ interface IdeaRecord {
   created_at: string
   rating: number | null
   tags: string[] | null
+  weather_description?: string | null
+  temperature?: number | null
 }
 
 /** Zwei exklusive Paare: innerhalb eines Paares ist höchstens ein Wert gesetzt. */
@@ -33,10 +35,6 @@ const TAG_PAIRS = [
   [
     { value: 'drinnen', label: 'Drinnen' },
     { value: 'draußen', label: 'Draußen' },
-  ],
-  [
-    { value: 'hell', label: 'Hell' },
-    { value: 'dunkel', label: 'Dunkel' },
   ],
 ] as const
 
@@ -52,6 +50,7 @@ function sourceLabel(source: string): string {
   switch (source) {
     case 'elterngruppe': return 'Elterngruppe'
     case 'manual': return 'Manuell'
+    case 'bot': return 'Per Bot'
     default: return 'Idee'
   }
 }
@@ -251,6 +250,12 @@ export default function ArchivePage() {
               <IconLine icon={<SmallIcons.users />}>{getHelperNames(event)}</IconLine>
               {parentName && (
                 <IconLine icon={<SmallIcons.food />}>{parentName}</IconLine>
+              )}
+              {idea.weather_description && (
+                <IconLine icon={<SmallIcons.weather />}>
+                  {idea.weather_description}
+                  {idea.temperature != null && `, ${idea.temperature} °C`}
+                </IconLine>
               )}
 
               <div className="mt-4 space-y-4">
