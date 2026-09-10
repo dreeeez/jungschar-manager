@@ -558,6 +558,12 @@ export default function CalendarPage() {
               </div>
             </div>
 
+            {selectedEvent.invitations?.[0]?.parent && (
+              <div className="mb-5">
+                <Note tone="accent">Einladung: {selectedEvent.invitations[0].parent.name} lädt die Jungschar zu sich ein.</Note>
+              </div>
+            )}
+
             {selectedLocked && (
               <div className="mb-5">
                 <Note>

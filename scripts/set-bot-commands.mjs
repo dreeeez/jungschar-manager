@@ -24,6 +24,8 @@ const commands = [
   { command: 'next', description: 'Termine mit Team (Helfer)' },
   { command: 'mystatus', description: 'Meine Einsätze (Helfer)' },
   { command: 'register', description: 'Als Helfer registrieren (mit Code)' },
+  { command: 'bilder', description: 'Gesammelte Fotos ansehen (Admin)' },
+  { command: 'senden', description: 'Fotos in den Elternchat posten (Admin)' },
 ]
 
 const res = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {

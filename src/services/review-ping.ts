@@ -174,7 +174,7 @@ export async function processReviewPings(opts: {
   for (const uid of recipients) {
     if (alreadyPinged.has(uid) && !isTest) continue
 
-    const text = `${header(event)}\n\nBewerte mit Sternen:`
+    const text = `${header(event)}\n\nBewerte mit Sternen:\n\n<i>Fotos von heute? Schick sie mir einfach hier rein, /senden postet sie später in den Elternchat.</i>`
     const res = await sendTelegramMessage(String(uid), text, starsKeyboard((event as any).id))
     if (!res?.ok) {
       result.failed.push({ userId: uid, error: res?.description ?? 'unbekannt' })

@@ -7,6 +7,16 @@ import { handleReviewCallback, handleReviewText } from './review-ping'
 import { ADMIN_TELEGRAM_USER_IDS, APP_URL, isAdmin } from './admins'
 import { sendTelegramMessage } from './reminders'
 import {
+  eventForNewPhoto,
+  eventForPosting,
+  notifyAdminsAboutPhotos,
+  photoCounts,
+  postPhotos,
+  previewPhotos,
+  savePhoto,
+  shortDate,
+} from './photos'
+import {
   IDEA_PROMPT,
   checkRegisterCode,
   ensureParentForAdmin,
@@ -34,6 +44,8 @@ import {
 const pendingRegistrations = new Set<number>()
 // Wartet auf den Freitext nach /idee — Fallback, falls jemand nicht "antwortet"
 const pendingIdeas = new Set<number>()
+// Alben kommen als mehrere Nachrichten mit gleicher media_group_id: nur einmal antworten.
+const answeredAlbums = new Set<string>()
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -93,13 +105,13 @@ const UNKNOWN =
 function helpFor(role: Role): string {
   const lines: string[] = []
   if (role.helper) {
-    lines.push('<b>Helfer</b>', '/next – nächste Termine mit Team', '/status – nächste Jungschar', '/mystatus – meine Einsätze')
+    lines.push('<b>Helfer</b>', '/next – nächste Termine mit Team', '/status – nächste Jungschar', '/mystatus – meine Einsätze', 'Fotos von der Jungschar? Einfach hier reinschicken.')
   }
   if (role.parent || role.helper || role.admin) {
     lines.push('', '<b>Eltern</b>', '/termine – nächste Jungschar-Termine', '/idee – Programm-Idee vorschlagen', '/einladen – die Jungschar zu euch einladen')
   }
   if (role.admin) {
-    lines.push('', '<b>Admin</b>', '/chatid – Chat-ID anzeigen', `Mini-App: ${APP_URL}`)
+    lines.push('', '<b>Admin</b>', '/bilder – gesammelte Fotos ansehen', '/senden – Fotos in den Elternchat posten', '/chatid – Chat-ID anzeigen', `Mini-App: ${APP_URL}`)
   }
   if (!role.helper && !role.parent) {
     lines.push('/register CODE – als Helfer registrieren')
@@ -268,6 +280,83 @@ export function setupBotCommands(bot: Bot) {
     })
   })
 
+  // /bilder – gesammelte Fotos ansehen (Admins, privat)
+  bot.command('bilder', async (ctx) => {
+    if (!isAdmin(ctx.from?.id ?? 0) || ctx.chat.type !== 'private') return
+    const event = await eventForPosting()
+    if (!event) {
+      await ctx.reply('Kein Termin gefunden.')
+      return
+    }
+    const counts = await photoCounts(event.id)
+    if (counts.pending === 0) {
+      await ctx.reply(`Für ${shortDate(event.event_date)} liegen keine ungeposteten Bilder vor (${counts.total} insgesamt).`)
+      return
+    }
+    const shown = await previewPhotos(String(ctx.chat.id), event)
+    await ctx.reply(
+      `${counts.pending} ungepostete Bilder für ${shortDate(event.event_date)}${shown < counts.pending ? `, die ersten ${shown} als Vorschau` : ''}.\n` +
+      '/senden postet sie in den Elternchat.',
+    )
+  })
+
+  // /senden – Fotos in den Elternchat posten (Admins, privat, mit Rückfrage)
+  bot.command('senden', async (ctx) => {
+    if (!isAdmin(ctx.from?.id ?? 0) || ctx.chat.type !== 'private') return
+    if (!process.env.TELEGRAM_ELTERN_CHAT_ID) {
+      await ctx.reply('Die Elterngruppe ist nicht konfiguriert (TELEGRAM_ELTERN_CHAT_ID).')
+      return
+    }
+    const event = await eventForPosting()
+    if (!event) {
+      await ctx.reply('Kein Termin gefunden.')
+      return
+    }
+    const counts = await photoCounts(event.id)
+    if (counts.pending === 0) {
+      await ctx.reply(`Für ${shortDate(event.event_date)} gibt es nichts zu posten.`)
+      return
+    }
+    await ctx.reply(`${counts.pending} Bilder für ${shortDate(event.event_date)} in den Elternchat posten?`, {
+      reply_markup: {
+        inline_keyboard: [[
+          { text: 'Ja, posten', callback_data: `phs_${event.id}` },
+          { text: 'Nein', callback_data: `phn_${event.id}` },
+        ]],
+      },
+    })
+  })
+
+  // Fotos im privaten Chat: von Helfern, Admins und Eltern sammeln.
+  bot.on('message:photo', async (ctx) => {
+    if (ctx.chat.type !== 'private' || !ctx.from) return
+    const role = await roleOf(ctx)
+    if (!role.helper && !role.admin && !role.parent) {
+      await ctx.reply(UNKNOWN)
+      return
+    }
+    const event = await eventForNewPhoto()
+    if (!event) {
+      await ctx.reply('In den letzten drei Tagen war keine Jungschar, deshalb kann ich das Bild keinem Termin zuordnen.')
+      return
+    }
+    const sizes = ctx.message.photo
+    const best = sizes[sizes.length - 1]
+    const name = role.helper?.name ?? role.parent?.name ?? ctx.from.first_name
+    const result = await savePhoto(event, { fileId: best.file_id, uniqueId: best.file_unique_id }, { telegramUserId: ctx.from.id, name })
+
+    const groupKey = ctx.message.media_group_id ?? `single_${ctx.message.message_id}`
+    if (answeredAlbums.has(groupKey)) return
+    answeredAlbums.add(groupKey)
+
+    if (result === 'duplicate' && !ctx.message.media_group_id) {
+      await ctx.reply('Das Bild hatte ich schon.')
+      return
+    }
+    await ctx.reply(`Danke! Gespeichert für ${shortDate(event.event_date)}. Die Admins posten die Bilder gesammelt in den Elternchat.`)
+    await notifyAdminsAboutPhotos(event, name, ctx.from.id)
+  })
+
   // /chatid – nur Admins
   bot.command('chatid', async (ctx) => {
     if (!isAdmin(ctx.from?.id ?? 0)) return
@@ -343,6 +432,36 @@ export function setupBotCommands(bot: Bot) {
       if (action === 'rvs' || action === 'rvp') {
         const toast = await handleReviewCallback(action, eventId, value ?? '', telegramUserId)
         await ctx.answerCallbackQuery({ text: toast })
+        return
+      }
+
+      // /senden: Rückfrage beantwortet
+      if (action === 'phs' || action === 'phn') {
+        if (!isAdmin(telegramUserId)) {
+          await ctx.answerCallbackQuery({ text: 'Nur für Admins.' })
+          return
+        }
+        if (action === 'phn') {
+          await ctx.answerCallbackQuery()
+          try { await ctx.editMessageText('Alles klar, nichts gepostet.') } catch {}
+          return
+        }
+        const chatId = process.env.TELEGRAM_ELTERN_CHAT_ID
+        const event = await getEventById(eventId)
+        if (!chatId || !event) {
+          await ctx.answerCallbackQuery({ text: 'Nicht möglich.' })
+          return
+        }
+        try {
+          const result = await postPhotos(chatId, { id: event.id, event_date: event.event_date })
+          await ctx.answerCallbackQuery({ text: 'Gepostet!' })
+          try {
+            await ctx.editMessageText(`${result.posted} Bilder für ${shortDate(event.event_date)} im Elternchat gepostet.`)
+          } catch {}
+        } catch (e: any) {
+          await ctx.answerCallbackQuery({ text: 'Fehler beim Posten.' })
+          try { await ctx.editMessageText(`Posten hat nicht geklappt: ${escapeHtml(e.message ?? 'unbekannt')}`) } catch {}
+        }
         return
       }
 

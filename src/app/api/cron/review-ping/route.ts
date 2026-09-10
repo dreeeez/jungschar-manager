@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processReviewPings } from '@/services/review-ping'
 import { ADMIN_TELEGRAM_USER_IDS } from '@/services/admins'
+import { sendPhotoNudges } from '@/services/photos'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,17 @@ export async function GET(req: NextRequest) {
     }
 
     const result = await processReviewPings({ force, date, testUserId })
-    return NextResponse.json(result)
+
+    // Foto-Erinnerung an die eingeteilten Helfer des Tages (nur live, einmal pro Termin).
+    let photoNudges: number[] = []
+    if (!isTest && result.eventId && !result.skipped) {
+      try {
+        photoNudges = await sendPhotoNudges(result.eventId)
+      } catch (e) {
+        console.error('photo nudges failed:', e)
+      }
+    }
+    return NextResponse.json({ ...result, photoNudges })
   } catch (error) {
     console.error('Error in review-ping cron:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
