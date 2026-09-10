@@ -4,6 +4,7 @@ import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './h
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { getSupabase } from './database'
 import { recordVote } from './attendance'
+import { APP_URL, isAdmin } from './admins'
 
 // Track pending registrations (in-memory, resets on cold start)
 const pendingRegistrations = new Set<number>()
@@ -54,6 +55,18 @@ function rebuildHtml(text: string, entities: any[]): string {
 export function setupBotCommands(bot: Bot) {
   // /start
   bot.command('start', async (ctx) => {
+    // Admins bekommen im privaten Chat den Menü-Button "Admin", der die
+    // Mini-App öffnet. Pro Chat gesetzt, damit ihn sonst niemand sieht —
+    // der globale Button bleibt auf "commands".
+    if (ctx.chat.type === 'private' && ctx.from && isAdmin(ctx.from.id)) {
+      await ctx.api
+        .setChatMenuButton({
+          chat_id: ctx.chat.id,
+          menu_button: { type: 'web_app', text: 'Admin', web_app: { url: APP_URL } },
+        })
+        .catch((e) => console.error('setChatMenuButton failed:', e))
+    }
+
     await ctx.reply(`
 Willkommen beim Jungschar Bot!
 
