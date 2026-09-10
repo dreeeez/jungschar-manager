@@ -533,16 +533,10 @@ export default function CalendarPage() {
       </Section>
 
 
-      <Section
-        title="Einteilung"
-        hint="Alle Termine des Halbjahres, immer Senior mit Junior, jeder gleich oft. Erst in die Sandbox-Gruppe, dann in die Helfer-Gruppe."
-      >
+      <Section title="Einteilung">
         <Button variant="primary" block onClick={loadRotationPreview} disabled={rotationLoading}>
           {rotationLoading ? 'Berechne …' : 'Halbjahr einteilen'}
         </Button>
-        <p className="mt-3 text-xs text-muted">
-          Tauschen nach dem Posten: Termin oben antippen und Helfer ändern. Die gepinnte Nachricht in der Gruppe wird dabei editiert, es geht keine neue Nachricht raus.
-        </p>
       </Section>
 
       {/* Termin-Sheet */}
@@ -616,8 +610,7 @@ export default function CalendarPage() {
           <>
             <p className="mb-1 font-medium">{rotationWindow?.label}</p>
             <p className="mb-4 text-sm text-muted">
-              {rotationPreview.length} Termine, {rotationHelpers.seniors} Senioren und {rotationHelpers.juniors} Junioren.
-              Bestehende Zuweisungen im Halbjahr werden beim Posten ersetzt.
+              {rotationPreview.length} Termine · {rotationHelpers.seniors} Senioren · {rotationHelpers.juniors} Junioren
             </p>
 
             {rotationPreview.length === 0 ? (
@@ -668,10 +661,6 @@ export default function CalendarPage() {
                 >
                   {rotationCommitting ? 'Sende …' : 'In Sandbox-Gruppe posten'}
                 </Button>
-                <p className="text-xs text-muted">
-                  Danach im Termin-Sheet Helfer tauschen, die Nachricht in der Sandbox zieht automatisch nach.
-                  Wenn alles passt:
-                </p>
                 <Button
                   variant="danger"
                   block
