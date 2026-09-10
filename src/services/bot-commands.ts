@@ -242,7 +242,7 @@ export function setupBotCommands(bot: Bot) {
     }
     if (ctx.from) pendingIdeas.add(ctx.from.id)
     await ctx.reply(IDEA_PROMPT, {
-      reply_markup: { force_reply: true, input_field_placeholder: 'Deine Idee' },
+      reply_markup: { force_reply: true, input_field_placeholder: 'Worauf hat dein Kind Lust?' },
     })
   })
 
@@ -300,7 +300,7 @@ export function setupBotCommands(bot: Bot) {
       const name = role.parent?.name ?? role.helper?.name ?? ctx.from?.first_name ?? 'Unbekannt'
       try {
         await saveParentIdea(text, { name, telegramUserId })
-        await ctx.reply('Danke, deine Idee ist notiert! Wir schauen sie uns an.')
+        await ctx.reply('Danke, das ist notiert! Wir schauen uns die Idee an und melden uns, wenn wir sie einplanen.')
       } catch (e) {
         console.error('saveParentIdea failed:', e)
         await ctx.reply('Speichern hat nicht geklappt. Magst du es später noch einmal versuchen?')

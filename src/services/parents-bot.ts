@@ -59,7 +59,9 @@ export async function checkRegisterCode(input: string | undefined): Promise<'ok'
 
 /* ---------- /idee ---------- */
 
-export const IDEA_PROMPT = 'Was schlägst du vor? Schreib deine Idee einfach als Antwort auf diese Nachricht.'
+export const IDEA_PROMPT =
+  'Worauf hätte dein Kind richtig Lust? Ein Ausflug, ein Spiel, etwas Selbstgebautes, ein Ort, den ihr kennt?\n\n' +
+  'Schreib es einfach als Antwort auf diese Nachricht. Es muss nicht ausgereift sein, ein Stichwort reicht uns.'
 
 export async function saveParentIdea(
   text: string,
