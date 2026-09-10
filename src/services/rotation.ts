@@ -1,7 +1,25 @@
 import { getSupabase } from './database'
 import { sendTelegramMessage } from './reminders'
 
-const ROTATION_WINDOW_DAYS = 240 // ~8 Monate, deckt alle aktuellen iCal-Termine
+/**
+ * Halbjahres-Einteilung.
+ *
+ * Bewusst einfach gehalten:
+ *  - Ein Halbjahr = alle Termine bis Ende Februar (HJ 1, ab September)
+ *    bzw. bis Ende August (HJ 2, ab März).
+ *  - Zwei Helfer pro Termin, immer Senior + Junior. Zwei Senioren sind
+ *    erlaubt, wenn die Verteilung es verlangt. Zwei Junioren nie.
+ *  - Fair: jeder kommt im Halbjahr gleich oft dran. Gezählt wird nur
+ *    innerhalb des Halbjahres, die Vergangenheit spielt keine Rolle.
+ *  - Kein Automatismus. Ausgelöst wird ausschließlich über den Button
+ *    "Halbjahr einteilen" in der Mini-App.
+ *
+ * Ablauf: Vorschau → in die Sandbox-Gruppe posten (speichert die
+ * Einteilung, damit Tausche in der App die Nachricht aktualisieren) →
+ * wenn alles passt, in die Helfer-Gruppe posten (postet den aktuellen
+ * Stand, keine Neuberechnung).
+ */
+
 const HELPERS_PER_EVENT = 2
 
 export interface RotationCandidate {
@@ -19,255 +37,156 @@ export interface RotationProposal {
   helpers: RotationCandidate[]
 }
 
+export interface HalfYearWindow {
+  number: 1 | 2
+  label: string
+  from: string
+  until: string
+}
+
 export interface RotationResult {
+  window: HalfYearWindow
   proposals: RotationProposal[]
   skipped: { eventId: string; eventDate: string; reason: string }[]
+  helpers: { seniors: number; juniors: number }
 }
 
-function todayLocal(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function localDateString(d: Date): string {
+function localIso(d: Date): string {
   return new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Europe/Berlin',
     year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(d)
 }
 
-function pickPartner(
-  picked: RotationCandidate,
-  pool: RotationCandidate[],
-): RotationCandidate | null {
-  const others = pool.filter(h => h.id !== picked.id)
-  if (others.length === 0) return null
-
-  const sortByScore = (a: RotationCandidate, b: RotationCandidate) => {
-    if (a.count !== b.count) return a.count - b.count
-    if (a.lastAssigned !== b.lastAssigned) {
-      return (a.lastAssigned ?? '').localeCompare(b.lastAssigned ?? '')
-    }
-    return a.name.localeCompare(b.name)
-  }
-
-  // Bevorzuge anderen Tier (Senior+Junior). 2 gleiche Tier wenn der beste
-  // gleiche Tier mindestens 1 Einsatz weniger hat als der beste andere Tier
-  // — sorgt für gelegentliche 2-Senior- (oder 2-Junior-) Pärchen, wenn
-  // die Verteilung das verlangt.
-  const oppositeTier = others.filter(h => h.isSenior !== picked.isSenior).sort(sortByScore)
-  const sameTier = others.filter(h => h.isSenior === picked.isSenior).sort(sortByScore)
-
-  if (oppositeTier.length === 0) return sameTier[0]
-  if (sameTier.length === 0) return oppositeTier[0]
-
-  const bestOpp = oppositeTier[0]
-  const bestSame = sameTier[0]
-  if (bestSame.count + 1 <= bestOpp.count) return bestSame
-  return bestOpp
+function lastDayOfFeb(year: number): string {
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+  return leap ? '29' : '28'
 }
 
-function pickFirst(pool: RotationCandidate[]): RotationCandidate | null {
+/** Halbjahr, in das {today} fällt. HJ 1 = Sep–Feb, HJ 2 = Mär–Aug. */
+export function halfYearWindow(today = new Date()): HalfYearWindow {
+  const iso = localIso(today)
+  const y = Number(iso.slice(0, 4))
+  const m = Number(iso.slice(5, 7))
+  if (m >= 9) {
+    return { number: 1, from: iso, until: `${y + 1}-02-${lastDayOfFeb(y + 1)}`, label: `Halbjahr 1 · Sep ${y} – Feb ${y + 1}` }
+  }
+  if (m <= 2) {
+    return { number: 1, from: iso, until: `${y}-02-${lastDayOfFeb(y)}`, label: `Halbjahr 1 · Sep ${y - 1} – Feb ${y}` }
+  }
+  return { number: 2, from: iso, until: `${y}-08-31`, label: `Halbjahr 2 · Mär – Aug ${y}` }
+}
+
+/** Wer am wenigsten dran war; bei Gleichstand wer am längsten nicht, dann Name. */
+function pickLowest(pool: RotationCandidate[]): RotationCandidate | null {
   if (pool.length === 0) return null
-  const sorted = [...pool].sort((a, b) => {
+  return [...pool].sort((a, b) => {
     if (a.count !== b.count) return a.count - b.count
-    if (a.lastAssigned !== b.lastAssigned) {
-      return (a.lastAssigned ?? '').localeCompare(b.lastAssigned ?? '')
-    }
+    if (a.lastAssigned !== b.lastAssigned) return (a.lastAssigned ?? '').localeCompare(b.lastAssigned ?? '')
     return a.name.localeCompare(b.name)
-  })
-  return sorted[0]
+  })[0]
 }
 
 /**
- * Generiert einen Rotations-Vorschlag für die nächsten 12 Wochen.
- * Schreibt nichts in die DB — nur Vorschlag.
+ * Partner nach der Regel Senior + Junior. Erster Helfer Junior → Partner
+ * muss Senior sein. Erster Helfer Senior → Junior, außer ein anderer
+ * Senior liegt mindestens einen Einsatz zurück (dann zwei Senioren).
  */
-export async function generateRotation(): Promise<RotationResult> {
-  const db = getSupabase()
-  const today = todayLocal()
-  const horizon = new Date(today.getTime() + ROTATION_WINDOW_DAYS * 24 * 3600 * 1000)
+function pickPartner(first: RotationCandidate, pool: RotationCandidate[]): RotationCandidate | null {
+  const others = pool.filter(h => h.id !== first.id)
+  const seniors = others.filter(h => h.isSenior)
+  const juniors = others.filter(h => !h.isSenior)
+  if (!first.isSenior) return pickLowest(seniors)
+  const bestJ = pickLowest(juniors)
+  const bestS = pickLowest(seniors)
+  if (!bestJ) return bestS
+  if (bestS && bestS.count + 1 <= bestJ.count) return bestS
+  return bestJ
+}
 
-  const todayIso = localDateString(today)
-  const horizonIso = localDateString(horizon)
-
-  // 1. Helfer laden
-  const { data: helpersData, error: helpersErr } = await db
+async function loadHelpers() {
+  const { data, error } = await getSupabase()
     .from('helpers')
-    .select('id, name, telegram_username, is_admin, is_senior')
-  if (helpersErr) throw helpersErr
-
-  // is_senior ist über Migration 006 hinzugekommen — als any lesen.
-  const helpers = (helpersData ?? []).map((h: any) => ({
+    .select('id, name, telegram_username, is_senior')
+    .order('name')
+  if (error) throw error
+  return (data ?? []).map((h: any) => ({
     id: h.id as string,
     name: h.name as string,
-    username: h.telegram_username as string | null,
+    username: (h.telegram_username as string | null) ?? null,
     isSenior: !!h.is_senior,
   }))
+}
 
-  if (helpers.length < HELPERS_PER_EVENT) {
-    return { proposals: [], skipped: [] }
-  }
-
-  // 2. Score: NUR bestehende Assignments im Planungs-Fenster zählen.
-  //    Historie wird ignoriert — User-Intent: "alle 9 gleich oft" für die
-  //    kommende Runde, unabhängig von dem was vorher war.
-  const { data: scopeEvents, error: scopeErr } = await db
+async function loadWindowEvents(win: HalfYearWindow) {
+  const { data, error } = await getSupabase()
     .from('events')
-    .select('id, event_date')
-    .gte('event_date', todayIso)
-    .lte('event_date', horizonIso)
-  if (scopeErr) throw scopeErr
-
-  const eventDateById = new Map<string, string>()
-  for (const e of (scopeEvents ?? []) as any[]) {
-    eventDateById.set(e.id, e.event_date)
-  }
-
-  const eventIds = [...eventDateById.keys()]
-  const scopeAssign = eventIds.length > 0
-    ? (await db.from('assignments').select('helper_id, event_id').in('event_id', eventIds)).data
-    : []
-
-  const counts = new Map<string, number>()
-  const lastAssigned = new Map<string, string>()
-  for (const a of (scopeAssign ?? []) as any[]) {
-    const date = eventDateById.get(a.event_id)
-    if (!date) continue
-    counts.set(a.helper_id, (counts.get(a.helper_id) ?? 0) + 1)
-    const prev = lastAssigned.get(a.helper_id)
-    if (!prev || date > prev) {
-      lastAssigned.set(a.helper_id, date)
-    }
-  }
-
-  // 4. Zukünftige Events im 12-Wochen-Fenster
-  const { data: futureEvents, error: eventsErr } = await db
-    .from('events')
-    .select('id, event_date, assignments(helper_id, helper:helpers(id, name, telegram_username))')
-    .gte('event_date', todayIso)
-    .lte('event_date', horizonIso)
+    .select('id, event_date, assignments(helper_id, helper:helpers(id, name, telegram_username, is_senior))')
+    .gte('event_date', win.from)
+    .lte('event_date', win.until)
     .order('event_date', { ascending: true })
-  if (eventsErr) throw eventsErr
-
-  const proposals: RotationProposal[] = []
-  const skipped: RotationResult['skipped'] = []
-
-  // Mutable-Score während wir iterativ einteilen
-  const candidates = (): RotationCandidate[] => helpers.map(h => ({
-    ...h,
-    count: counts.get(h.id) ?? 0,
-    lastAssigned: lastAssigned.get(h.id) ?? null,
-  }))
-
-  for (const evt of (futureEvents ?? []) as any[] ) {
-    const existingHelperIds = (evt.assignments ?? []).map((a: any) => a.helper_id) as string[]
-
-    if (existingHelperIds.length >= HELPERS_PER_EVENT) {
-      skipped.push({
-        eventId: evt.id,
-        eventDate: evt.event_date,
-        reason: `bereits ${existingHelperIds.length} Helfer eingeteilt`,
-      })
-      continue
-    }
-
-    const slotsNeeded = HELPERS_PER_EVENT - existingHelperIds.length
-    const pool = candidates().filter(c => !existingHelperIds.includes(c.id))
-
-    const chosen: RotationCandidate[] = []
-    if (slotsNeeded === 1 && existingHelperIds.length === 1) {
-      // Es gibt schon einen Helfer — wähle Partner mit Tier-Präferenz.
-      const existingHelper = helpers.find(h => h.id === existingHelperIds[0])
-      if (existingHelper) {
-        const stub: RotationCandidate = {
-          ...existingHelper,
-          count: counts.get(existingHelper.id) ?? 0,
-          lastAssigned: lastAssigned.get(existingHelper.id) ?? null,
-        }
-        const partner = pickPartner(stub, pool)
-        if (partner) chosen.push(partner)
-      }
-    } else {
-      // 2 Slots offen — pick first, dann Partner
-      const first = pickFirst(pool)
-      if (first) {
-        chosen.push(first)
-        const partner = pickPartner(first, pool)
-        if (partner) chosen.push(partner)
-      }
-    }
-
-    if (chosen.length < slotsNeeded) {
-      skipped.push({
-        eventId: evt.id,
-        eventDate: evt.event_date,
-        reason: 'nicht genug verfügbare Helfer',
-      })
-      continue
-    }
-
-    // Existierende Helfer in die Anzeige mit reinnehmen
-    const existingDisplay: RotationCandidate[] = (evt.assignments ?? [])
-      .filter((a: any) => a.helper)
-      .map((a: any) => ({
-        id: a.helper.id,
-        name: a.helper.name,
-        username: a.helper.telegram_username ?? null,
-        isSenior: helpers.find(h => h.id === a.helper.id)?.isSenior ?? false,
-        count: counts.get(a.helper.id) ?? 0,
-        lastAssigned: lastAssigned.get(a.helper.id) ?? null,
-      }))
-
-    proposals.push({
-      eventId: evt.id,
-      eventDate: evt.event_date,
-      helpers: [...existingDisplay, ...chosen],
-    })
-
-    // Score updaten für nächste Iteration
-    for (const c of chosen) {
-      counts.set(c.id, (counts.get(c.id) ?? 0) + 1)
-      if (!lastAssigned.get(c.id) || evt.event_date > lastAssigned.get(c.id)!) {
-        lastAssigned.set(c.id, evt.event_date)
-      }
-    }
-  }
-
-  return { proposals, skipped }
+  if (error) throw error
+  return (data ?? []) as any[]
 }
 
 /**
- * Schreibt den Vorschlag in assignments und gibt die geschriebenen Pärchen zurück.
- * Existierende Assignments werden NICHT angefasst — nur fehlende Slots aufgefüllt.
+ * Frischer Vorschlag für das laufende Halbjahr. Bestehende Zuweisungen im
+ * Fenster werden ignoriert (und beim Speichern ersetzt). Schreibt nichts.
  */
-export async function commitRotation(proposals: RotationProposal[]): Promise<{ inserted: number }> {
-  const db = getSupabase()
-  let inserted = 0
+export async function generateHalfYearRotation(): Promise<RotationResult> {
+  const win = halfYearWindow()
+  const helpers = await loadHelpers()
+  const events = await loadWindowEvents(win)
 
-  for (const p of proposals) {
-    const { data: existing } = await db
-      .from('assignments')
-      .select('helper_id')
-      .eq('event_id', p.eventId)
-    const existingIds = new Set(((existing ?? []) as any[]).map(a => a.helper_id))
+  const seniors = helpers.filter(h => h.isSenior).length
+  const juniors = helpers.length - seniors
+  const result: RotationResult = { window: win, proposals: [], skipped: [], helpers: { seniors, juniors } }
+  if (helpers.length < HELPERS_PER_EVENT) return result
 
-    const toInsert = p.helpers
-      .filter(h => !existingIds.has(h.id))
-      .map(h => ({ event_id: p.eventId, helper_id: h.id }))
+  const counts = new Map<string, number>()
+  const last = new Map<string, string>()
+  const pool = (): RotationCandidate[] =>
+    helpers.map(h => ({ ...h, count: counts.get(h.id) ?? 0, lastAssigned: last.get(h.id) ?? null }))
 
-    if (toInsert.length === 0) continue
-
-    const { error } = await db.from('assignments').insert(toInsert as any)
-    if (error) {
-      console.error(`Insert failed for event ${p.eventId}:`, error)
+  for (const evt of events) {
+    const first = pickLowest(pool())
+    const partner = first ? pickPartner(first, pool()) : null
+    if (!first || !partner) {
+      result.skipped.push({ eventId: evt.id, eventDate: evt.event_date, reason: 'kein passendes Senior/Junior-Paar verfügbar' })
       continue
     }
-    inserted += toInsert.length
+    const pair = first.isSenior ? [first, partner] : [partner, first]
+    result.proposals.push({ eventId: evt.id, eventDate: evt.event_date, helpers: pair })
+    for (const h of pair) {
+      counts.set(h.id, (counts.get(h.id) ?? 0) + 1)
+      last.set(h.id, evt.event_date)
+    }
   }
+  return result
+}
 
-  return { inserted }
+/** Aktuelle Zuweisungen im Halbjahr als Proposals (für den Live-Post). */
+async function currentHalfYearAssignments(): Promise<{ window: HalfYearWindow; proposals: RotationProposal[] }> {
+  const win = halfYearWindow()
+  const events = await loadWindowEvents(win)
+  const proposals: RotationProposal[] = events
+    .filter(e => (e.assignments?.length ?? 0) > 0)
+    .map(e => ({
+      eventId: e.id,
+      eventDate: e.event_date,
+      helpers: (e.assignments ?? [])
+        .filter((a: any) => a.helper)
+        .map((a: any) => ({
+          id: a.helper.id,
+          name: a.helper.name,
+          username: a.helper.telegram_username ?? null,
+          isSenior: !!a.helper.is_senior,
+          count: 0,
+          lastAssigned: null,
+        }))
+        .sort((a: RotationCandidate, b: RotationCandidate) => Number(b.isSenior) - Number(a.isSenior)),
+    }))
+  return { window: win, proposals }
 }
 
 /**
@@ -290,7 +209,7 @@ export async function tagEventsWithRotationMessage(
 
 /**
  * Pinnt eine Telegram-Nachricht. Best-effort — Failures werden geloggt, nicht
- * propagiert. Verhindert disable_notification ist true → kein Push für alle.
+ * propagiert. disable_notification ist true → kein Push für alle.
  */
 export async function pinTelegramMessage(chatId: string | number, messageId: number): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN
@@ -359,10 +278,12 @@ export async function rerenderRotationMessage(messageId: number): Promise<{ ok: 
         isSenior: !!a.helper.is_senior,
         count: 0,
         lastAssigned: null,
-      })),
+      }))
+      .sort((a: RotationCandidate, b: RotationCandidate) => Number(b.isSenior) - Number(a.isSenior)),
   }))
 
-  const text = formatRotationMessage(proposals)
+  const title = halfYearWindow(new Date(proposals[0].eventDate + 'T12:00:00')).label
+  const text = formatRotationMessage(proposals, title)
   const token = process.env.TELEGRAM_BOT_TOKEN
 
   try {
@@ -475,7 +396,7 @@ const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
  * Baut den Telegram-Nachrichten-Text für die Einteilung.
  * Gruppiert nach Monat mit Emoji-Header.
  */
-export function formatRotationMessage(proposals: RotationProposal[]): string {
+export function formatRotationMessage(proposals: RotationProposal[], title?: string): string {
   if (proposals.length === 0) return 'Keine Termine im Planungsfenster.'
 
   const fmtDay = (iso: string) => {
@@ -500,7 +421,7 @@ export function formatRotationMessage(proposals: RotationProposal[]): string {
   }
 
   const lines: string[] = []
-  lines.push('📅 <b>Jungschar-Einteilung</b>')
+  lines.push(`📅 <b>Jungschar-Einteilung${title ? ` · ${title}` : ''}</b>`)
   lines.push('')
 
   for (const [, ps] of groups) {
@@ -520,181 +441,104 @@ export function formatRotationMessage(proposals: RotationProposal[]): string {
   return lines.join('\n')
 }
 
-export interface ExecuteRotationOptions {
-  chatId: string | number
+export interface ExecuteHalfYearOptions {
+  chatId: string
+  /** true = Sandbox-Gruppe: neu berechnen, speichern, posten. false = Helfer-Gruppe: aktuellen Stand posten. */
   isTest: boolean
-  splitAt?: string | null
-  untilDate?: string | null
 }
 
-export interface ExecuteRotationResult {
+export interface ExecuteHalfYearResult {
+  mode: 'sandbox' | 'live'
+  window: HalfYearWindow
   proposals: RotationProposal[]
   skipped: RotationResult['skipped']
+  replaced: number
   inserted: number
-  messageIds: number[]
-  telegram: any[]
+  messageId: number | null
+  telegram: any
 }
 
-/**
- * End-to-end Rotation: generieren → alte unpinnen → Posts senden → tagen +
- * pinnen → DB-Writes (außer im Test-Mode). Wird sowohl von der API-Route
- * als auch vom Daily-Cron aufgerufen.
- */
-/**
- * Baut Proposals aus bereits eingeteilten Events (für den Fall, dass
- * nichts Neues mehr zu generieren ist, aber wir die aktuelle Einteilung
- * trotzdem als Übersichts-Nachricht posten wollen).
- */
-async function buildProposalsFromExisting(untilDate?: string | null): Promise<RotationProposal[]> {
+async function postAndPin(chatId: string, text: string, eventIds: string[]): Promise<{ messageId: number | null; telegram: any }> {
   const db = getSupabase()
-  const today = new Date()
-  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const targetChatId = parseInt(chatId)
 
-  let query: any = (db as any)
+  // Alte Pins dieses Chats lösen.
+  const { data: oldMsgs } = await db
     .from('events')
-    .select('id, event_date, assignments(helper_id, helper:helpers(id, name, telegram_username, is_senior))')
-    .gte('event_date', todayIso)
-    .order('event_date', { ascending: true })
-  if (untilDate) query = query.lte('event_date', untilDate)
-  const { data } = await query
-
-  return (data ?? [])
-    .filter((e: any) => (e.assignments?.length ?? 0) > 0)
-    .map((e: any) => ({
-      eventId: e.id,
-      eventDate: e.event_date,
-      helpers: (e.assignments ?? [])
-        .filter((a: any) => a.helper)
-        .map((a: any) => ({
-          id: a.helper.id,
-          name: a.helper.name,
-          username: a.helper.telegram_username ?? null,
-          isSenior: !!a.helper.is_senior,
-          count: 0,
-          lastAssigned: null,
-        })),
-    }))
-}
-
-export async function executeRotation(opts: ExecuteRotationOptions): Promise<ExecuteRotationResult> {
-  const { chatId, isTest, splitAt, untilDate } = opts
-  const rotation = await generateRotation()
-
-  // untilDate: nur Termine bis inklusive dieses Datums posten/persistieren
-  let filteredProposals = untilDate
-    ? rotation.proposals.filter(p => p.eventDate <= untilDate)
-    : rotation.proposals
-
-  // Fallback: wenn es nichts Neues zu posten gibt, aber bestehende
-  // Einteilungen im Fenster vorhanden sind, posten wir die als Übersicht.
-  if (filteredProposals.length === 0) {
-    filteredProposals = await buildProposalsFromExisting(untilDate)
-  }
-
-  const result: ExecuteRotationResult = {
-    proposals: filteredProposals,
-    skipped: rotation.skipped,
-    inserted: 0,
-    messageIds: [],
-    telegram: [],
-  }
-
-  if (filteredProposals.length === 0) return result
-
-  const batches = splitAt
-    ? [
-        filteredProposals.filter(p => p.eventDate < splitAt),
-        filteredProposals.filter(p => p.eventDate >= splitAt),
-      ].filter(b => b.length > 0)
-    : [filteredProposals]
-
-  // Alte Rotations-Pins in dem Ziel-Chat unpinnen (sowohl Test als auch Live).
-  {
-    const db = getSupabase()
-    const targetChatId = typeof chatId === 'string' ? parseInt(chatId) : chatId
-    const { data: oldMsgs } = await db
-      .from('events')
-      .select('rotation_message_id, rotation_chat_id')
-      .eq('rotation_chat_id', targetChatId)
-      .not('rotation_message_id', 'is', null)
-    const seen = new Set<string>()
-    for (const row of (oldMsgs ?? []) as any[]) {
-      const key = `${row.rotation_chat_id}:${row.rotation_message_id}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      await unpinTelegramMessage(row.rotation_chat_id, row.rotation_message_id)
-    }
-  }
-
-  for (const batch of batches) {
-    const text = formatRotationMessage(batch)
-    const sendResult = await sendTelegramMessage(chatId as string, text)
-    result.telegram.push(sendResult)
-
-    const messageId = sendResult?.result?.message_id
-    const resolvedChatId = sendResult?.result?.chat?.id ?? chatId
-    if (messageId) {
-      result.messageIds.push(messageId)
-      // Auch im Test-Modus taggen, damit Auto-Edit-Funktion testbar ist.
-      // Beim späteren Live-Post wird das Tagging sauber überschrieben.
-      await tagEventsWithRotationMessage(
-        batch.map(p => p.eventId),
-        messageId,
-        typeof resolvedChatId === 'string' ? parseInt(resolvedChatId) : resolvedChatId,
-      )
-      await pinTelegramMessage(resolvedChatId, messageId)
-    }
-  }
-
-  if (!isTest) {
-    const commit = await commitRotation(filteredProposals)
-    result.inserted = commit.inserted
-  }
-
-  return result
-}
-
-/**
- * Daily-Cron-Hook: prüft, ob die letzte aktive Rotations-Nachricht durch
- * ist (alle Events past) und es zukünftige Events ohne Rotation gibt. Wenn
- * ja: postet die nächste Rotation in den Live-Chat (mit Halbjahr-Split).
- */
-export async function maybeAutoRotate(chatId: string): Promise<{ triggered: boolean; reason?: string; result?: ExecuteRotationResult }> {
-  const db = getSupabase()
-
-  const today = new Date()
-  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-
-  // 1. Latest pinned rotation: spätestes event_date mit message_id NOT NULL
-  const { data: latestPinned } = await (db as any)
-    .from('events')
-    .select('event_date')
+    .select('rotation_message_id, rotation_chat_id')
+    .eq('rotation_chat_id', targetChatId)
     .not('rotation_message_id', 'is', null)
-    .order('event_date', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (!latestPinned) return { triggered: false, reason: 'noch nie eine Rotation gepostet' }
-  if (latestPinned.event_date >= todayIso) {
-    return { triggered: false, reason: 'aktuelle Rotation noch nicht durch' }
+  const seen = new Set<number>()
+  for (const row of (oldMsgs ?? []) as any[]) {
+    if (seen.has(row.rotation_message_id)) continue
+    seen.add(row.rotation_message_id)
+    await unpinTelegramMessage(row.rotation_chat_id, row.rotation_message_id)
   }
 
-  // 2. Gibt es überhaupt zukünftige Events ohne rotation_message_id?
-  const { data: futureUnassigned } = await (db as any)
-    .from('events')
-    .select('id')
-    .gte('event_date', todayIso)
-    .is('rotation_message_id', null)
-    .limit(1)
+  const send = await sendTelegramMessage(chatId, text)
+  const messageId: number | null = send?.result?.message_id ?? null
+  const resolvedChatId: number = send?.result?.chat?.id ?? targetChatId
+  if (messageId) {
+    await tagEventsWithRotationMessage(eventIds, messageId, resolvedChatId)
+    await pinTelegramMessage(resolvedChatId, messageId)
+  }
+  return { messageId, telegram: send }
+}
 
-  if (!futureUnassigned || futureUnassigned.length === 0) {
-    return { triggered: false, reason: 'keine zukünftigen Events ohne Rotation' }
+/**
+ * Sandbox: Halbjahr neu berechnen, Zuweisungen im Fenster ersetzen, in die
+ * Sandbox-Gruppe posten und pinnen. Tausche in der App editieren danach
+ * diese Nachricht.
+ * Live: den aktuellen Stand der Zuweisungen in die Helfer-Gruppe posten und
+ * pinnen. Keine Neuberechnung, damit Korrekturen aus der Sandbox-Phase
+ * erhalten bleiben. Gibt es noch keine Zuweisungen, wird einmal berechnet.
+ */
+export async function executeHalfYearRotation(opts: ExecuteHalfYearOptions): Promise<ExecuteHalfYearResult> {
+  const db = getSupabase()
+  let replaced = 0
+  let inserted = 0
+  let proposals: RotationProposal[]
+  let skipped: RotationResult['skipped'] = []
+  let win: HalfYearWindow
+
+  const current = await currentHalfYearAssignments()
+  const needsFresh = opts.isTest || current.proposals.length === 0
+
+  if (needsFresh) {
+    const plan = await generateHalfYearRotation()
+    win = plan.window
+    proposals = plan.proposals
+    skipped = plan.skipped
+    const eventIds = proposals.map(p => p.eventId)
+    if (eventIds.length > 0) {
+      const { data: old } = await db.from('assignments').select('id').in('event_id', eventIds)
+      replaced = old?.length ?? 0
+      await db.from('assignments').delete().in('event_id', eventIds)
+      const rows = proposals.flatMap(p => p.helpers.map(h => ({ event_id: p.eventId, helper_id: h.id })))
+      const { error } = await db.from('assignments').insert(rows as any)
+      if (error) throw error
+      inserted = rows.length
+    }
+  } else {
+    win = current.window
+    proposals = current.proposals
   }
 
-  const splitDate = new Date()
-  splitDate.setMonth(splitDate.getMonth() + 6)
-  const splitAt = `${splitDate.getFullYear()}-${String(splitDate.getMonth() + 1).padStart(2, '0')}-${String(splitDate.getDate()).padStart(2, '0')}`
+  const result: ExecuteHalfYearResult = {
+    mode: opts.isTest ? 'sandbox' : 'live',
+    window: win,
+    proposals,
+    skipped,
+    replaced,
+    inserted,
+    messageId: null,
+    telegram: null,
+  }
+  if (proposals.length === 0) return result
 
-  const result = await executeRotation({ chatId, isTest: false, splitAt })
-  return { triggered: true, result }
+  const text = formatRotationMessage(proposals, win.label)
+  const posted = await postAndPin(opts.chatId, text, proposals.map(p => p.eventId))
+  result.messageId = posted.messageId
+  result.telegram = posted.telegram
+  return result
 }

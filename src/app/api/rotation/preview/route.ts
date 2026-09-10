@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateRotation } from '@/services/rotation'
-
+import { generateHalfYearRotation } from '@/services/rotation'
 import { requireOperator } from '@/services/api-guard'
 
 export const dynamic = 'force-dynamic'
 
+/** Vorschau der Halbjahres-Einteilung. Schreibt nichts, sendet nichts. */
 export async function POST(req: NextRequest) {
   const denied = requireOperator(req)
   if (denied) return denied
 
   try {
-    const result = await generateRotation()
+    const result = await generateHalfYearRotation()
     return NextResponse.json(result)
   } catch (e: any) {
     console.error('rotation preview failed:', e)

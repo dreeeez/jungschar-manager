@@ -60,6 +60,15 @@ Schedule-Logik in `services/reminders.ts:processReminders()`:
 
 `reminder_log` mit UNIQUE(event_id, reminder_type) verhindert Duplikate. Im Test-Modus wird upserted, nicht insert-only — sonst kannst du `?test=N` nicht mehrfach feuern.
 
+## Halbjahres-Einteilung
+
+Kein Automatismus. Button „Halbjahr einteilen“ im Kalender (`services/rotation.ts`):
+- Fenster: HJ 1 = heute bis Ende Februar (ab September), HJ 2 = heute bis Ende August (ab März). Alle Termine im Fenster.
+- Paare: immer Senior + Junior (`helpers.is_senior`). Zwei Senioren nur, wenn ein Senior mindestens einen Einsatz zurückliegt. Zwei Junioren nie, sonst wird der Termin übersprungen.
+- Fair: pro Halbjahr gleich oft, Zähler startet bei 0, Vergangenheit zählt nicht.
+- Ablauf: Vorschau → „In Sandbox-Gruppe posten“ (`/api/rotation/commit?test=1`: neu berechnen, Zuweisungen im Fenster **ersetzen**, in `TELEGRAM_TEST_CHAT_ID` posten + pinnen) → Helfer im Termin-Sheet tauschen (editiert die gepinnte Nachricht über `rotation_message_id`) → „In Helfer-Gruppe posten“ (`/api/rotation/commit`: postet den **aktuellen Stand**, keine Neuberechnung).
+- Bei Termin-Ausfall rückt der Reminder-Cron die Duos weiter (`shiftRotationOnCancellation`).
+
 ## Vote-Tracking
 
 Mittwoch-Stage-2 sendet Inline-Buttons `votey_<event_id>` / `voten_<event_id>`. Klick:

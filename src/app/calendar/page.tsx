@@ -102,7 +102,8 @@ export default function CalendarPage() {
   const [rotationPreview, setRotationPreview] = useState<RotationProposal[] | null>(null)
   const [rotationSkipped, setRotationSkipped] = useState<{ eventDate: string; reason: string }[]>([])
   const [rotationCommitting, setRotationCommitting] = useState(false)
-  const [rotationTestMode, setRotationTestMode] = useState(true)
+  const [rotationWindow, setRotationWindow] = useState<{ label: string; from: string; until: string } | null>(null)
+  const [rotationHelpers, setRotationHelpers] = useState<{ seniors: number; juniors: number }>({ seniors: 0, juniors: 0 })
 
   useEffect(() => {
     fetchData()
@@ -422,6 +423,8 @@ export default function CalendarPage() {
       }
       setRotationPreview(body.proposals ?? [])
       setRotationSkipped(body.skipped ?? [])
+      setRotationWindow(body.window ?? null)
+      setRotationHelpers(body.helpers ?? { seniors: 0, juniors: 0 })
     } catch (e: any) {
       showAlert('Fehler: ' + e.message)
     }
@@ -431,27 +434,20 @@ export default function CalendarPage() {
   async function commitRotation(testMode: boolean) {
     setRotationCommitting(true)
     try {
-      // Split-Datum: heute + 6 Monate. Termine davor in 1. Nachricht,
-      // Rest in 2. Nachricht — damit lange Listen nicht erschlagen.
-      const splitDate = new Date()
-      splitDate.setMonth(splitDate.getMonth() + 6)
-      const splitAt = `${splitDate.getFullYear()}-${String(splitDate.getMonth() + 1).padStart(2, '0')}-${String(splitDate.getDate()).padStart(2, '0')}`
-      const params = new URLSearchParams()
-      if (testMode) params.set('test', '1')
-      params.set('splitAt', splitAt)
-      const res = await fetch('/api/rotation/commit?' + params.toString(), { method: 'POST' })
+      const res = await fetch('/api/rotation/commit' + (testMode ? '?test=1' : ''), { method: 'POST' })
       const body = await res.json()
       if (!res.ok) {
         showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
         return
       }
+      const n = body.proposals?.length ?? 0
       if (testMode) {
-        showAlert(`Test-Nachricht in den Test-Chat gesendet (${body.proposals?.length ?? 0} Termine).`)
+        showAlert(`In der Sandbox-Gruppe gepostet und gespeichert: ${n} Termine. Tausche in der App aktualisieren die Nachricht.`)
       } else {
-        showAlert(`Einteilung gepostet. ${body.inserted ?? 0} Helfer-Slots eingetragen.`)
-        setRotationPreview(null)
-        await fetchData()
+        showAlert(`In der Helfer-Gruppe gepostet: ${n} Termine.`)
       }
+      setRotationPreview(null)
+      await fetchData()
     } catch (e: any) {
       showAlert('Fehler: ' + e.message)
     }
@@ -534,26 +530,14 @@ export default function CalendarPage() {
       </Section>
 
 
-      <details className="mb-8">
-        <summary className="cursor-pointer py-2 text-sm text-muted">
-          Erweitert: Einteilung manuell neu generieren
-        </summary>
-        <p className="mb-3 mt-2 text-sm text-muted">
-          Der Auto-Modus läuft täglich. Nur nutzen, wenn die aktuelle gepinnte Einteilung
-          ersetzt werden soll (z.B. neuer Helfer). Die alte Pin-Nachricht wird entfernt, eine neue erstellt.
-        </p>
-        <Button
-          variant="secondary"
-          block
-          onClick={async () => {
-            const ok = await showConfirm('Aktuelle gepinnte Einteilung wirklich ersetzen?')
-            if (ok) loadRotationPreview()
-          }}
-          disabled={rotationLoading}
-        >
-          {rotationLoading ? 'Berechne …' : 'Einteilung neu generieren'}
+      <Section
+        title="Einteilung"
+        hint="Alle Termine des Halbjahres, immer Senior mit Junior, jeder gleich oft. Erst in die Sandbox-Gruppe, dann in die Helfer-Gruppe."
+      >
+        <Button variant="primary" block onClick={loadRotationPreview} disabled={rotationLoading}>
+          {rotationLoading ? 'Berechne …' : 'Halbjahr einteilen'}
         </Button>
-      </details>
+      </Section>
 
       {/* Termin-Sheet */}
       <Sheet open={!!selectedEvent} onClose={() => setSelectedEvent(null)} title="Termin">
@@ -624,13 +608,14 @@ export default function CalendarPage() {
       >
         {rotationPreview && (
           <>
+            <p className="mb-1 font-medium">{rotationWindow?.label}</p>
             <p className="mb-4 text-sm text-muted">
-              Weniger eingesetzte Helfer zuerst, Senior und Junior bevorzugt.
-              Bestehende Zuweisungen bleiben unangetastet.
+              {rotationPreview.length} Termine, {rotationHelpers.seniors} Senioren und {rotationHelpers.juniors} Junioren.
+              Bestehende Zuweisungen im Halbjahr werden beim Posten ersetzt.
             </p>
 
             {rotationPreview.length === 0 ? (
-              <Empty>Keine offenen Slots im 12-Wochen-Fenster.</Empty>
+              <Empty>Keine Termine im Halbjahr.</Empty>
             ) : (
               <List className="mb-5">
                 {rotationPreview.map(p => (
@@ -669,28 +654,30 @@ export default function CalendarPage() {
                 <Button
                   variant="primary"
                   block
-                  onClick={() => commitRotation(true)}
+                  onClick={async () => {
+                    const ok = await showConfirm('Einteilung speichern und in die Sandbox-Gruppe posten? Bestehende Zuweisungen im Halbjahr werden ersetzt.')
+                    if (ok) commitRotation(true)
+                  }}
                   disabled={rotationCommitting}
                 >
-                  {rotationCommitting ? 'Sende …' : 'Test in Test-Chat senden'}
+                  {rotationCommitting ? 'Sende …' : 'In Sandbox-Gruppe posten'}
                 </Button>
-                <details>
-                  <summary className="cursor-pointer text-sm text-muted">
-                    Live in Hauptgruppe posten (nur nach erfolgreichem Test)
-                  </summary>
-                  <Button
-                    variant="danger"
-                    block
-                    className="mt-2 border border-line"
-                    onClick={async () => {
-                      const ok = await showConfirm('Wirklich LIVE in die Hauptgruppe posten und Assignments speichern?')
-                      if (ok) commitRotation(false)
-                    }}
-                    disabled={rotationCommitting}
-                  >
-                    {rotationCommitting ? 'Sende …' : 'Live in Hauptgruppe posten'}
-                  </Button>
-                </details>
+                <p className="text-xs text-muted">
+                  Danach im Termin-Sheet Helfer tauschen, die Nachricht in der Sandbox zieht automatisch nach.
+                  Wenn alles passt:
+                </p>
+                <Button
+                  variant="danger"
+                  block
+                  className="border border-line"
+                  onClick={async () => {
+                    const ok = await showConfirm('Aktuellen Stand der Einteilung in die Helfer-Gruppe posten und pinnen?')
+                    if (ok) commitRotation(false)
+                  }}
+                  disabled={rotationCommitting}
+                >
+                  {rotationCommitting ? 'Sende …' : 'In Helfer-Gruppe posten'}
+                </Button>
               </div>
             )}
           </>
