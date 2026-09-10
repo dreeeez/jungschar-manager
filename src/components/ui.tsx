@@ -18,29 +18,34 @@ export function Page({
   back,
   subtitle,
   action,
+  hero,
   children,
 }: {
   title: string
   back?: string
   subtitle?: ReactNode
   action?: ReactNode
+  /** Ersetzt den Standard-Header komplett (z.B. Startseite). */
+  hero?: ReactNode
   children: ReactNode
 }) {
   return (
-    <main className="mx-auto max-w-md px-4 pb-10 pt-3 safe-area-top safe-area-bottom">
+    <main className="mx-auto max-w-md px-4 pb-10 pt-5 safe-area-top safe-area-bottom">
       {back && (
         <Link href={back} className="mb-3 inline-flex items-center gap-0.5 text-sm font-medium text-accent">
           <ChevronLeft />
           Zurück
         </Link>
       )}
-      <header className="mb-6 flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-[22px] font-semibold leading-tight tracking-tight">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
-        </div>
-        {action}
-      </header>
+      {hero ?? (
+        <header className="mb-6 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold leading-tight tracking-tight">{title}</h1>
+            {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+          </div>
+          {action}
+        </header>
+      )}
       {children}
     </main>
   )
@@ -417,4 +422,27 @@ export const Icons = {
       <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
     </svg>
   ),
+}
+
+/** Runder Avatar: Telegram-Profilbild, sonst Initialen auf Farbverlauf. */
+export function Avatar({ src, name, size = 52 }: { src?: string | null; name: string; size?: number }) {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('')
+  const style = { width: size, height: size }
+  if (src) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" style={style} className="shrink-0 rounded-full object-cover shadow-sm" />
+  }
+  return (
+    <span
+      style={{ ...style, background: 'linear-gradient(135deg, var(--accent), #7b5cd6)', fontSize: size * 0.36 }}
+      className="flex shrink-0 items-center justify-center rounded-full font-semibold text-white shadow-sm"
+    >
+      {initials || '?'}
+    </span>
+  )
 }

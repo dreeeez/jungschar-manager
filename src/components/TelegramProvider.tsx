@@ -8,6 +8,7 @@ interface TelegramUser {
   last_name?: string
   username?: string
   language_code?: string
+  photo_url?: string
 }
 
 /** Serverseitig bestätigte Identität (aus /api/auth/me). */
