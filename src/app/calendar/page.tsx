@@ -102,6 +102,7 @@ export default function CalendarPage() {
   const [rotationPreview, setRotationPreview] = useState<RotationProposal[] | null>(null)
   const [rotationSkipped, setRotationSkipped] = useState<{ eventDate: string; reason: string }[]>([])
   const [rotationCommitting, setRotationCommitting] = useState(false)
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false)
   const [rotationWindow, setRotationWindow] = useState<{ label: string; from: string; until: string } | null>(null)
   const [rotationHelpers, setRotationHelpers] = useState<{ seniors: number; juniors: number }>({ seniors: 0, juniors: 0 })
 
@@ -492,7 +493,7 @@ export default function CalendarPage() {
           <Empty>Keine kommenden Termine</Empty>
         ) : (
           <List>
-            {upcomingEvents.slice(0, 5).map((event) => {
+            {(showAllUpcoming ? upcomingEvents : upcomingEvents.slice(0, 5)).map((event) => {
               const idea = ideasMap.get(event.id)
               const birthdays = getBirthdaysNearEvent(event.event_date)
               const parentName = getParentDutyName(event)
@@ -525,7 +526,9 @@ export default function CalendarPage() {
           </List>
         )}
         {upcomingEvents.length > 5 && (
-          <p className="mt-2 text-xs text-muted">{upcomingEvents.length - 5} weitere folgen</p>
+          <Button variant="ghost" size="sm" className="mt-2" onClick={() => setShowAllUpcoming(v => !v)}>
+            {showAllUpcoming ? 'Weniger anzeigen' : `Alle ${upcomingEvents.length} Termine anzeigen`}
+          </Button>
         )}
       </Section>
 
@@ -537,6 +540,9 @@ export default function CalendarPage() {
         <Button variant="primary" block onClick={loadRotationPreview} disabled={rotationLoading}>
           {rotationLoading ? 'Berechne …' : 'Halbjahr einteilen'}
         </Button>
+        <p className="mt-3 text-xs text-muted">
+          Tauschen nach dem Posten: Termin oben antippen und Helfer ändern. Die gepinnte Nachricht in der Gruppe wird dabei editiert, es geht keine neue Nachricht raus.
+        </p>
       </Section>
 
       {/* Termin-Sheet */}
