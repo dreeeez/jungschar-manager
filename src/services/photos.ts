@@ -221,18 +221,6 @@ async function sendSinglePhoto(chatId: string, fileId: string, caption?: string)
   return res.json()
 }
 
-/** Admins kurz informieren, dass Bilder da sind. */
-export async function notifyAdminsAboutPhotos(event: PhotoEvent, senderName: string, exceptUserId?: number): Promise<void> {
-  const counts = await photoCounts(event.id)
-  const text =
-    `📸 <b>${senderName}</b> hat Bilder für ${shortDate(event.event_date)} geschickt. ` +
-    `Jetzt ${counts.pending} ungepostet. /bilder zeigt sie, /senden postet sie in den Elternchat.`
-  for (const id of ADMIN_TELEGRAM_USER_IDS) {
-    if (id === exceptUserId) continue
-    sendTelegramMessage(String(id), text).catch((e) => console.error('photo notice failed:', e))
-  }
-}
-
 /**
  * Abend-Erinnerung an die eingeteilten Helfer des Tages: Fotos schicken.
  * Einmal pro Termin (reminder_log, Typ photo_nudge).

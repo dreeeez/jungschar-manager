@@ -9,7 +9,6 @@ import { sendTelegramMessage } from './reminders'
 import {
   eventForNewPhoto,
   eventForPosting,
-  notifyAdminsAboutPhotos,
   photoCounts,
   photoTargetChat,
   postPhotos,
@@ -335,13 +334,16 @@ export function setupBotCommands(bot: Bot) {
     }
     const counts = await photoCounts(event.id)
     if (counts.pending === 0) {
-      await ctx.reply(`Für ${shortDate(event.event_date)} liegen keine ungeposteten Bilder vor (${counts.total} insgesamt).`)
+      await ctx.reply(
+        counts.total > 0
+          ? `Alle ${counts.total} Bilder für ${shortDate(event.event_date)} sind schon gepostet.`
+          : `Bis jetzt keine Bilder für ${shortDate(event.event_date)}.`,
+      )
       return
     }
     const shown = await previewPhotos(String(ctx.chat.id), event)
     await ctx.reply(
-      `${counts.pending} ungepostete Bilder für ${shortDate(event.event_date)}${shown < counts.pending ? `, die ersten ${shown} als Vorschau` : ''}.\n` +
-      '/senden postet sie in den Elternchat.',
+      `${counts.pending} ${counts.pending === 1 ? 'Bild' : 'Bilder'} für ${shortDate(event.event_date)}${shown < counts.pending ? `, die ersten ${shown} als Vorschau` : ''}. /senden postet sie.`,
     )
   })
 
@@ -408,8 +410,8 @@ export function setupBotCommands(bot: Bot) {
       await ctx.reply('Das Bild hatte ich schon.')
       return
     }
+    // Keine Info-DM an die Admins: die sehen den Stand über /bilder.
     await ctx.reply(`Danke! Gespeichert für ${shortDate(event.event_date)}. Die Admins posten die Bilder gesammelt in den Elternchat.`)
-    await notifyAdminsAboutPhotos(event, name, ctx.from.id)
   })
 
   // /chatid – nur Admins
