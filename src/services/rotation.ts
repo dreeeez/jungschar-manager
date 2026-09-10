@@ -26,6 +26,7 @@ export interface RotationCandidate {
   id: string
   name: string
   username: string | null
+  telegramUserId: number | null
   isSenior: boolean
   count: number
   lastAssigned: string | null
@@ -107,13 +108,14 @@ function pickPartner(first: RotationCandidate, pool: RotationCandidate[]): Rotat
 async function loadHelpers() {
   const { data, error } = await getSupabase()
     .from('helpers')
-    .select('id, name, telegram_username, is_senior')
+    .select('id, name, telegram_username, telegram_user_id, is_senior')
     .order('name')
   if (error) throw error
   return (data ?? []).map((h: any) => ({
     id: h.id as string,
     name: h.name as string,
     username: (h.telegram_username as string | null) ?? null,
+    telegramUserId: h.telegram_user_id ? Number(h.telegram_user_id) : null,
     isSenior: !!h.is_senior,
   }))
 }
@@ -121,7 +123,7 @@ async function loadHelpers() {
 async function loadWindowEvents(win: HalfYearWindow) {
   const { data, error } = await getSupabase()
     .from('events')
-    .select('id, event_date, assignments(helper_id, helper:helpers(id, name, telegram_username, is_senior))')
+    .select('id, event_date, assignments(helper_id, helper:helpers(id, name, telegram_username, telegram_user_id, is_senior))')
     .gte('event_date', win.from)
     .lte('event_date', win.until)
     .order('event_date', { ascending: true })
@@ -180,6 +182,7 @@ async function currentHalfYearAssignments(): Promise<{ window: HalfYearWindow; p
           id: a.helper.id,
           name: a.helper.name,
           username: a.helper.telegram_username ?? null,
+          telegramUserId: a.helper.telegram_user_id ? Number(a.helper.telegram_user_id) : null,
           isSenior: !!a.helper.is_senior,
           count: 0,
           lastAssigned: null,
@@ -256,7 +259,7 @@ export async function rerenderRotationMessage(messageId: number): Promise<{ ok: 
 
   const { data: events, error } = await db
     .from('events')
-    .select('id, event_date, rotation_chat_id, assignments(helper_id, helper:helpers(id, name, telegram_username, is_senior))')
+    .select('id, event_date, rotation_chat_id, assignments(helper_id, helper:helpers(id, name, telegram_username, telegram_user_id, is_senior))')
     .eq('rotation_message_id', messageId)
     .order('event_date', { ascending: true })
 
@@ -275,6 +278,7 @@ export async function rerenderRotationMessage(messageId: number): Promise<{ ok: 
         id: a.helper.id,
         name: a.helper.name,
         username: a.helper.telegram_username ?? null,
+        telegramUserId: a.helper.telegram_user_id ? Number(a.helper.telegram_user_id) : null,
         isSenior: !!a.helper.is_senior,
         count: 0,
         lastAssigned: null,
@@ -409,8 +413,13 @@ export function formatRotationMessage(proposals: RotationProposal[], title?: str
     const year = d.getFullYear()
     return { name, year, num: d.getMonth() + 1 }
   }
-  const tag = (h: RotationCandidate) =>
-    h.username ? `@${h.username}` : `<i>${h.name}</i>`
+  // @username löst einen Push aus; ohne Username tut das auch der ID-Link.
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const tag = (h: RotationCandidate) => {
+    if (h.username) return `@${h.username}`
+    if (h.telegramUserId) return `<a href="tg://user?id=${h.telegramUserId}">${esc(h.name)}</a>`
+    return `<i>${esc(h.name)}</i>`
+  }
 
   const groups = new Map<string, RotationProposal[]>()
   for (const p of proposals) {
