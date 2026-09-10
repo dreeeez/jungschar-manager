@@ -45,6 +45,22 @@ const CATEGORIES: { value: string; label: string }[] = [
 ]
 const CATEGORY_LABEL = new Map(CATEGORIES.map((c) => [c.value, c.label]))
 
+type Sort = 'newest' | 'oldest' | 'title'
+const SORT_OPTIONS: { value: Sort; label: string }[] = [
+  { value: 'newest', label: 'Neueste zuerst' },
+  { value: 'oldest', label: 'Älteste zuerst' },
+  { value: 'title', label: 'A bis Z' },
+]
+const SORT_KEY = 'pool.sort'
+
+function loadSort(): Sort {
+  try {
+    const v = localStorage.getItem(SORT_KEY)
+    if (v === 'newest' || v === 'oldest' || v === 'title') return v
+  } catch {}
+  return 'newest'
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -62,6 +78,7 @@ export default function PoolPage() {
   const [query, setQuery] = useState('')
   const [place, setPlace] = useState<Place | null>(null)
   const [category, setCategory] = useState<string | null>(null)
+  const [sort, setSort] = useState<Sort>('newest')
 
   const [formOpen, setFormOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -71,7 +88,12 @@ export default function PoolPage() {
   const [newCategories, setNewCategories] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { fetchIdeas() }, [])
+  useEffect(() => { setSort(loadSort()); fetchIdeas() }, [])
+
+  function changeSort(next: Sort) {
+    setSort(next)
+    try { localStorage.setItem(SORT_KEY, next) } catch {}
+  }
 
   async function fetchIdeas() {
     const { data, error } = await (supabase as any)
@@ -79,7 +101,7 @@ export default function PoolPage() {
       .select('id, title, description, material, source, tags, suggested_by, created_at')
       .is('event_id', null)
       .eq('was_used', false)
-      .order('title', { ascending: true })
+      .order('created_at', { ascending: false })
     if (error) {
       showAlert('Fehler: ' + error.message)
     } else {
@@ -90,7 +112,7 @@ export default function PoolPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return ideas.filter((idea) => {
+    const list = ideas.filter((idea) => {
       const tags = idea.tags || []
       if (place && !tags.includes(place)) return false
       if (category && !tags.includes(category)) return false
@@ -98,7 +120,12 @@ export default function PoolPage() {
       const haystack = `${idea.title} ${idea.description ?? ''} ${idea.material ?? ''}`.toLowerCase()
       return haystack.includes(q)
     })
-  }, [ideas, query, place, category])
+    return list.sort((a, b) => {
+      if (sort === 'title') return a.title.localeCompare(b.title, 'de')
+      const diff = a.created_at.localeCompare(b.created_at)
+      return sort === 'newest' ? -diff : diff
+    })
+  }, [ideas, query, place, category, sort])
 
   function resetForm() {
     setNewTitle('')
@@ -132,7 +159,7 @@ export default function PoolPage() {
       showAlert('Fehler: ' + error.message)
       return
     }
-    setIdeas((prev) => [...prev, data].sort((a, b) => a.title.localeCompare(b.title, 'de')))
+    setIdeas((prev) => [...prev, data])
     resetForm()
     setFormOpen(false)
   }
@@ -203,15 +230,28 @@ export default function PoolPage() {
         </div>
       </Disclosure>
 
-      <div className="mb-3 space-y-3">
+      <div className="mb-3 space-y-2.5">
         <Input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Suchen …"
         />
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
           <Segmented options={PLACE_OPTIONS} value={place} onChange={(v) => setPlace(place === v ? null : v)} />
+          <select
+            value={sort}
+            onChange={(e) => changeSort(e.target.value as Sort)}
+            aria-label="Sortierung"
+            className="h-9 rounded-lg bg-bg px-2.5 text-sm font-medium text-accent outline-none"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <Badge tone={category === null ? 'solid' : 'outline'} onClick={() => setCategory(null)}>Alle</Badge>
           {CATEGORIES.map((c) => (
             <Badge key={c.value} tone={category === c.value ? 'solid' : 'outline'} onClick={() => setCategory(category === c.value ? null : c.value)}>
               {c.label}

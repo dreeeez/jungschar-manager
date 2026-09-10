@@ -226,7 +226,7 @@ export function Badge({
     solid: 'bg-accent text-accent-fg',
     outline: 'border border-line text-muted',
   }
-  const cls = cx('inline-flex h-6 items-center rounded-md px-2 text-xs font-medium', tones[tone])
+  const cls = cx('inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-md px-2 text-xs font-medium', tones[tone])
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={cx(cls, 'active:opacity-60')}>
