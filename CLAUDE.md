@@ -115,6 +115,10 @@ curl -H "..." "https://<preview-url>/api/cron/reminder?test=2&live=1"  # Stage 2
 
 Ideenpool → Button „Ideen in Helfer-Gruppe teilen“ (nur Admins) → bis zu 10 Ideen antippen → Leiste unten „In Helfer-Gruppe teilen“ (oder „Test“ → Sandbox). `POST /api/pool/share { ids, test }` prüft Session-Admin und postet eine knappe Nachricht (`services/pool-share.ts`: Titel, Tags, gekürzter Inhalt, Mitbringen, „von X“). Keine Umfrage.
 
+## Offene Punkte
+
+- **Fotos gehen vorläufig in die Sandbox.** `PHOTOS_GO_TO_SANDBOX = true` in `services/photos.ts` lenkt `/senden` in `TELEGRAM_TEST_CHAT_ID`, weil der Bot die Elterngruppe „Elternjet“ verlassen hat. Sobald der Bot wieder in der Elterngruppe ist (prüfen mit `node scripts/check-chats.mjs`): Konstante auf `false`, ggf. neue Chat-ID in `TELEGRAM_ELTERN_CHAT_ID`, falls Telegram die Gruppe zur Supergruppe gemacht hat. Der Geburtstagsgruß zielt weiterhin direkt auf `TELEGRAM_ELTERN_CHAT_ID` und läuft bis dahin ins Leere.
+
 ## Bot-Befehle und Rollen
 
 `services/bot-commands.ts` prüft pro Befehl die Rolle: Admin (Zugangsliste `admins.ts`), Helfer (`helpers`), Elternteil (`parents` per `telegram_user_id` oder `telegram_username`, Logik in `services/parents-bot.ts`).

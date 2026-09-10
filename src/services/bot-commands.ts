@@ -11,6 +11,7 @@ import {
   eventForPosting,
   notifyAdminsAboutPhotos,
   photoCounts,
+  photoTargetChat,
   postPhotos,
   previewPhotos,
   savePhoto,
@@ -349,8 +350,9 @@ export function setupBotCommands(bot: Bot) {
   bot.command('senden', async (ctx) => {
     if (!isAdmin(ctx.from?.id ?? 0) || ctx.chat.type !== 'private') return
     const isTest = (ctx.match ?? '').trim().toLowerCase() === 'test'
-    if (!isTest && !process.env.TELEGRAM_ELTERN_CHAT_ID) {
-      await ctx.reply('Die Elterngruppe ist nicht konfiguriert (TELEGRAM_ELTERN_CHAT_ID).')
+    const target = photoTargetChat()
+    if (!isTest && !target.chatId) {
+      await ctx.reply('Ziel-Gruppe für Fotos ist nicht konfiguriert.')
       return
     }
     if (isTest && !process.env.TELEGRAM_TEST_CHAT_ID) {
@@ -368,7 +370,7 @@ export function setupBotCommands(bot: Bot) {
       return
     }
     await ctx.reply(
-      `${counts.pending} Bilder für ${shortDate(event.event_date)} in ${isTest ? 'die Sandbox-Gruppe (Test)' : 'den Elternchat'} posten?`,
+      `${counts.pending} Bilder für ${shortDate(event.event_date)} in ${isTest ? 'die Sandbox-Gruppe (Test, ohne Markierung)' : target.label} posten?`,
       {
         reply_markup: {
           inline_keyboard: [[
@@ -500,7 +502,8 @@ export function setupBotCommands(bot: Bot) {
           return
         }
         const isTest = action === 'pht'
-        const chatId = isTest ? process.env.TELEGRAM_TEST_CHAT_ID : process.env.TELEGRAM_ELTERN_CHAT_ID
+        const target = photoTargetChat()
+        const chatId = isTest ? process.env.TELEGRAM_TEST_CHAT_ID : target.chatId
         const event = await getEventById(eventId)
         if (!chatId || !event) {
           await ctx.answerCallbackQuery({ text: 'Nicht möglich.' })
@@ -511,7 +514,7 @@ export function setupBotCommands(bot: Bot) {
           await ctx.answerCallbackQuery({ text: 'Gepostet!' })
           try {
             await ctx.editMessageText(
-              `${result.posted} Bilder für ${shortDate(event.event_date)} in ${isTest ? 'der Sandbox-Gruppe gepostet (Test, Bilder bleiben offen)' : 'den Elternchat gepostet'}.`,
+              `${result.posted} Bilder für ${shortDate(event.event_date)} in ${isTest ? 'der Sandbox-Gruppe gepostet (Test, Bilder bleiben offen)' : `${target.label} gepostet`}.`,
             )
           } catch {}
         } catch (e: any) {
