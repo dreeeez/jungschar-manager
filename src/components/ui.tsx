@@ -19,6 +19,7 @@ export const PAGE_COLORS = {
   parents: '#d98c1f',
   children: '#e05585',
   archive: '#7b5cd6',
+  pool: '#6f8f1a',
   status: '#0f9d9a',
   settings: '#4f6d9a',
 } as const
@@ -442,6 +443,12 @@ export const Icons = {
       <circle cx="12" cy="12" r="9" />
       <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
       <path d="M9 10h.01M15 10h.01" />
+    </svg>
+  ),
+  bulb: () => (
+    <svg {...iconProps}>
+      <path d="M9 18h6M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" />
     </svg>
   ),
   archive: () => (

@@ -9,6 +9,7 @@ const NAV = [
   { href: '/parents', title: 'Eltern', description: 'Elterndienst', color: PAGE_COLORS.parents, icon: Icons.home },
   { href: '/children', title: 'Kinder', description: 'Kinder und Geburtstage', color: PAGE_COLORS.children, icon: Icons.smile },
   { href: '/ideas', title: 'Archiv', description: 'Vergangene Termine', color: PAGE_COLORS.archive, icon: Icons.archive },
+  { href: '/pool', title: 'Ideenpool', description: 'Was wir mal machen könnten', color: PAGE_COLORS.pool, icon: Icons.bulb },
   { href: '/status', title: 'Bot-Status', description: 'Health, nächste Nachricht, Pings', color: PAGE_COLORS.status, icon: Icons.activity },
   { href: '/settings', title: 'Einstellungen', description: 'Termin-Sync, Wetter', color: PAGE_COLORS.settings, icon: Icons.settings },
 ]

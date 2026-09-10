@@ -155,6 +155,7 @@ export interface Database {
           was_used: boolean
           rating: string | null
           source: string
+          tags: string[] | null
           created_at: string
         }
         Insert: {
@@ -166,6 +167,7 @@ export interface Database {
           was_used?: boolean
           rating?: string | null
           source?: string
+          tags?: string[] | null
           created_at?: string
         }
         Update: {
@@ -177,6 +179,7 @@ export interface Database {
           was_used?: boolean
           rating?: string | null
           source?: string
+          tags?: string[] | null
           created_at?: string
         }
       }
