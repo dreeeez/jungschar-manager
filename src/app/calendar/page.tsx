@@ -53,6 +53,8 @@ interface Event {
   imported_at: string
   assignments: Assignment[]
   parent_duties: ParentDuty[]
+  /** Eltern, die die Jungschar zu sich eingeladen haben (/einladen im Bot). */
+  invitations?: { id: string; parent: Parent | null }[]
 }
 
 interface IdeaRecord {
@@ -114,7 +116,7 @@ export default function CalendarPage() {
     const [eventsResult, helpersResult, parentsResult, childrenResult] = await Promise.all([
       supabase
         .from('events')
-        .select('*, assignments(id, helper_id, helper:helpers(id, name)), parent_duties(id, parent_id, parent:parents(id, name))')
+        .select('*, assignments(id, helper_id, helper:helpers(id, name)), parent_duties(id, parent_id, parent:parents(id, name)), invitations(id, parent:parents(id, name))')
         .order('event_date', { ascending: true }),
       supabase
         .from('helpers')
@@ -462,7 +464,7 @@ export default function CalendarPage() {
 
     const { data } = await supabase
       .from('events')
-      .select('*, assignments(id, helper_id, helper:helpers(id, name)), parent_duties(id, parent_id, parent:parents(id, name))')
+      .select('*, assignments(id, helper_id, helper:helpers(id, name)), parent_duties(id, parent_id, parent:parents(id, name)), invitations(id, parent:parents(id, name))')
       .eq('id', selectedEvent.id)
       .single()
 
@@ -511,6 +513,11 @@ export default function CalendarPage() {
                     {parentName && (
                       <IconLine icon={<SmallIcons.food />} color={PAGE_COLORS.parents}>
                         {parentName}
+                      </IconLine>
+                    )}
+                    {event.invitations?.[0]?.parent && (
+                      <IconLine icon={<SmallIcons.home />} color={PAGE_COLORS.parents}>
+                        Einladung: {event.invitations[0].parent.name}
                       </IconLine>
                     )}
                     {birthdays.map((b, i) => (

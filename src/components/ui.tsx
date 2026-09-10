@@ -602,6 +602,13 @@ export const SmallIcons = {
       <path d="M19 3c-2 1-3 4-3 7v3h3v8" />
     </svg>
   ),
+  home: () => (
+    <svg {...smallIcon}>
+      <path d="M3 11l9-7 9 7" />
+      <path d="M5 10v10h14V10" />
+      <path d="M10 20v-6h4v6" />
+    </svg>
+  ),
   gift: () => (
     <svg {...smallIcon}>
       <rect x="3" y="8" width="18" height="4" rx="1" />

@@ -8,9 +8,12 @@ import { ADMIN_TELEGRAM_USER_IDS, APP_URL, isAdmin } from './admins'
 import { sendTelegramMessage } from './reminders'
 import {
   IDEA_PROMPT,
-  INVITE_PROMPT,
   checkRegisterCode,
   findParentByTelegram,
+  getEventDate,
+  inviteConfirmKeyboard,
+  inviteDateKeyboard,
+  openInviteEvents,
   saveInvitation,
   saveParentIdea,
 } from './parents-bot'
@@ -28,9 +31,8 @@ import {
 
 // Wartet auf den Namen nach erfolgreichem /register (in-memory, Cold-Start setzt zurück)
 const pendingRegistrations = new Set<number>()
-// Warten auf den Freitext nach /idee bzw. /einladen — Fallback, falls jemand nicht "antwortet"
+// Wartet auf den Freitext nach /idee — Fallback, falls jemand nicht "antwortet"
 const pendingIdeas = new Set<number>()
-const pendingInvites = new Set<number>()
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -255,9 +257,13 @@ export function setupBotCommands(bot: Bot) {
       await ctx.reply('Schreib mir dafür gern privat.')
       return
     }
-    if (ctx.from) pendingInvites.add(ctx.from.id)
-    await ctx.reply(INVITE_PROMPT, {
-      reply_markup: { force_reply: true, input_field_placeholder: 'Wann passt es euch?' },
+    const events = await openInviteEvents()
+    if (events.length === 0) {
+      await ctx.reply('Gerade ist kein Termin frei. Danke euch!')
+      return
+    }
+    await ctx.reply('Schön! Zu welcher Jungschar möchtet ihr uns einladen?', {
+      reply_markup: inviteDateKeyboard(events),
     })
   })
 
@@ -286,25 +292,6 @@ export function setupBotCommands(bot: Bot) {
     if (!telegramUserId || ctx.chat?.type !== 'private') return
 
     const repliedTo = ctx.message.reply_to_message?.text
-
-    // Antwort auf /einladen: Einladung in den Ideenpool, Admins per DM informieren.
-    if (repliedTo === INVITE_PROMPT || pendingInvites.has(telegramUserId)) {
-      pendingInvites.delete(telegramUserId)
-      const role = await roleOf(ctx)
-      const name = role.parent?.name ?? ctx.from?.first_name ?? 'Unbekannt'
-      try {
-        await saveInvitation(text, { name, telegramUserId })
-        await ctx.reply('Danke für die Einladung! Wir melden uns, sobald wir einen Termin dafür planen.')
-        const note = `🏠 <b>${escapeHtml(name)}</b> lädt die Jungschar zu sich ein:\n${escapeHtml(text.trim())}`
-        for (const adminId of ADMIN_TELEGRAM_USER_IDS) {
-          sendTelegramMessage(String(adminId), note).catch((e) => console.error('admin invite notice failed:', e))
-        }
-      } catch (e) {
-        console.error('saveInvitation failed:', e)
-        await ctx.reply('Speichern hat nicht geklappt. Magst du es später noch einmal versuchen?')
-      }
-      return
-    }
 
     // Antwort auf /idee (per "Antworten" oder direkt danach)
     if (repliedTo === IDEA_PROMPT || pendingIdeas.has(telegramUserId)) {
@@ -355,6 +342,48 @@ export function setupBotCommands(bot: Bot) {
       if (action === 'rvs' || action === 'rvp') {
         const toast = await handleReviewCallback(action, eventId, value ?? '', telegramUserId)
         await ctx.answerCallbackQuery({ text: toast })
+        return
+      }
+
+      // /einladen: Termin gewählt → Rückfrage, bestätigt → eintragen + Admins per DM.
+      if (action === 'inv' || action === 'invy' || action === 'invn') {
+        const parent = await findParentByTelegram(telegramUserId, user.username)
+        if (!parent) {
+          await ctx.answerCallbackQuery({ text: 'Ich kenne dich noch nicht.' })
+          return
+        }
+        if (action === 'inv') {
+          const date = await getEventDate(eventId)
+          if (!date) {
+            await ctx.answerCallbackQuery({ text: 'Termin nicht gefunden.' })
+            return
+          }
+          await ctx.answerCallbackQuery()
+          try {
+            await ctx.editMessageText(`Ihr ladet die Jungschar am ${formatDate(date)} zu euch ein?`, {
+              reply_markup: inviteConfirmKeyboard(eventId),
+            })
+          } catch {}
+          return
+        }
+        if (action === 'invn') {
+          await ctx.answerCallbackQuery()
+          try {
+            await ctx.editMessageText('Alles klar, nichts eingetragen. Mit /einladen könnt ihr es jederzeit neu starten.')
+          } catch {}
+          return
+        }
+        const result = await saveInvitation(eventId, parent)
+        await ctx.answerCallbackQuery({ text: result.ok ? 'Eingetragen!' : 'Nicht möglich' })
+        try {
+          await ctx.editMessageText(result.text)
+        } catch {}
+        if (result.ok && result.eventDate) {
+          const note = `🏠 <b>${escapeHtml(parent.name)}</b> lädt die Jungschar am ${formatDate(result.eventDate)} zu sich ein.`
+          for (const adminId of ADMIN_TELEGRAM_USER_IDS) {
+            sendTelegramMessage(String(adminId), note).catch((e) => console.error('admin invite notice failed:', e))
+          }
+        }
         return
       }
 

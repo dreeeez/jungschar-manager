@@ -1,4 +1,4 @@
-import { getSupabase } from './database'
+import { getSupabase, getTodayISO } from './database'
 import { sendTelegramMessage } from './reminders'
 import { berlinNow } from './review-ping'
 
@@ -78,32 +78,71 @@ export async function saveParentIdea(
   if (error) throw error
 }
 
-/* ---------- /einladen ---------- */
+/* ---------- /einladen (nur Buttons) ---------- */
 
-export const INVITE_PROMPT =
-  'Schön, dass ihr die Jungschar zu euch einladen wollt! Wann passt es euch, und gibt es etwas zu beachten? ' +
-  'Schreib es einfach als Antwort auf diese Nachricht, z.B. „gerne im Oktober, wir grillen“.'
+export function shortDate(iso: string): string {
+  const d = new Date(iso + 'T12:00:00')
+  const wd = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][d.getDay()]
+  return `${wd} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`
+}
+
+/** Kommende Termine, an denen noch niemand eingeladen hat. */
+export async function openInviteEvents(limit = 8): Promise<{ id: string; event_date: string }[]> {
+  const { data } = await getSupabase()
+    .from('events')
+    .select('id, event_date, invitations(id)')
+    .gte('event_date', getTodayISO())
+    .order('event_date', { ascending: true })
+    .limit(30)
+  return ((data ?? []) as any[])
+    .filter(e => (e.invitations?.length ?? 0) === 0)
+    .slice(0, limit)
+    .map(e => ({ id: e.id, event_date: e.event_date }))
+}
+
+export function inviteDateKeyboard(events: { id: string; event_date: string }[]) {
+  const buttons = events.map(e => ({ text: shortDate(e.event_date), callback_data: `inv_${e.id}` }))
+  const rows: typeof buttons[] = []
+  for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2))
+  return { inline_keyboard: rows }
+}
+
+export function inviteConfirmKeyboard(eventId: string) {
+  return {
+    inline_keyboard: [[
+      { text: 'Ja, einladen', callback_data: `invy_${eventId}` },
+      { text: 'Nein', callback_data: `invn_${eventId}` },
+    ]],
+  }
+}
+
+export async function getEventDate(eventId: string): Promise<string | null> {
+  const { data } = await getSupabase().from('events').select('event_date').eq('id', eventId).maybeSingle()
+  return ((data as any)?.event_date as string | undefined) ?? null
+}
 
 /**
- * Einladung „kommt zu uns“: landet als Idee im Pool (Kategorie Essen),
- * damit das Team sie beim Planen sieht.
+ * Trägt die Einladung ein, wenn der Termin noch frei ist.
+ * @returns Text für die Rückmeldung an das Elternteil.
  */
 export async function saveInvitation(
-  text: string,
-  by: { name: string; telegramUserId: number },
-): Promise<void> {
-  const clean = text.trim()
-  const { error } = await getSupabase().from('ideas').insert({
-    event_id: null,
-    title: `Einladung bei ${by.name}`.slice(0, 200),
-    description: clean,
-    was_used: false,
-    source: 'elterngruppe',
-    tags: ['essen'],
-    suggested_by: by.name,
-    suggested_by_telegram_id: by.telegramUserId,
-  } as any)
-  if (error) throw error
+  eventId: string,
+  parent: BotParent,
+): Promise<{ ok: boolean; text: string; eventDate?: string }> {
+  const db = getSupabase()
+  const { data: event } = await db
+    .from('events')
+    .select('id, event_date, invitations(parent:parents(name))')
+    .eq('id', eventId)
+    .maybeSingle()
+  if (!event) return { ok: false, text: 'Diesen Termin gibt es nicht mehr.' }
+  const eventDate = (event as any).event_date as string
+  const taken = ((event as any).invitations ?? [])[0]?.parent?.name
+  if (taken) return { ok: false, text: `Am ${shortDate(eventDate)} hat schon ${taken} eingeladen.`, eventDate }
+
+  const { error } = await db.from('invitations').insert({ event_id: eventId, parent_id: parent.id } as any)
+  if (error) return { ok: false, text: 'Eintragen hat nicht geklappt, bitte später noch einmal.', eventDate }
+  return { ok: true, text: `Danke! Die Jungschar kommt am ${shortDate(eventDate)} zu euch. Wir melden uns wegen der Details.`, eventDate }
 }
 
 /* ---------- Geburtstagsgruß ---------- */

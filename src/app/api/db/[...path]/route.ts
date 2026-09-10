@@ -28,6 +28,7 @@ const ALLOWED_TABLES = new Set([
   'parent_duties',
   'attendance_votes',
   'reminder_log',
+  'invitations',
 ])
 
 /** Header, die der Client setzen darf (PostgREST-Steuerung). */
