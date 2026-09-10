@@ -20,19 +20,19 @@ export default function Home() {
   const today = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const hero = (
-    <header className="mb-6 flex items-center justify-between gap-4">
-      <div className="min-w-0">
+    <header className="mb-6 flex items-center gap-4">
+      <Avatar src={user?.photo_url} name={name} size={60} />
+      <div className="min-w-0 flex-1">
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{today}</p>
-        <h1 className="mt-1 truncate text-[30px] font-bold leading-none tracking-tight">
+        <h1 className="mt-0.5 truncate text-[28px] font-bold leading-tight tracking-tight">
           {firstName ? `Hallo, ${firstName}` : 'Jungschar'}
         </h1>
-        <div className="mt-2.5 flex items-center gap-2 text-sm text-muted">
+        <div className="flex items-center gap-2 text-sm text-muted">
           {user?.username && <span className="truncate">@{user.username}</span>}
           {user?.username && helper?.isAdmin && <span className="opacity-50">·</span>}
           {helper?.isAdmin && <span className="font-medium text-accent">Admin</span>}
         </div>
       </div>
-      <Avatar src={user?.photo_url} name={name} size={56} />
     </header>
   )
 
