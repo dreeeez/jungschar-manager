@@ -327,12 +327,12 @@ export function setupBotCommands(bot: Bot) {
     })
   })
 
-  // Fotos im privaten Chat: von Helfern, Admins und Eltern sammeln.
+  // Fotos im privaten Chat: nur von Helfern (Admins sind Helfer). Eltern sind hier bewusst raus.
   bot.on('message:photo', async (ctx) => {
     if (ctx.chat.type !== 'private' || !ctx.from) return
     const role = await roleOf(ctx)
-    if (!role.helper && !role.admin && !role.parent) {
-      await ctx.reply(UNKNOWN)
+    if (!role.helper && !role.admin) {
+      await ctx.reply(role.parent ? 'Fotos sammeln nur die Helfer. Danke dir trotzdem!' : UNKNOWN)
       return
     }
     const event = await eventForNewPhoto()
@@ -342,7 +342,7 @@ export function setupBotCommands(bot: Bot) {
     }
     const sizes = ctx.message.photo
     const best = sizes[sizes.length - 1]
-    const name = role.helper?.name ?? role.parent?.name ?? ctx.from.first_name
+    const name = role.helper?.name ?? ctx.from.first_name
     const result = await savePhoto(event, { fileId: best.file_id, uniqueId: best.file_unique_id }, { telegramUserId: ctx.from.id, name })
 
     const groupKey = ctx.message.media_group_id ?? `single_${ctx.message.message_id}`

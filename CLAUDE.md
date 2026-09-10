@@ -129,7 +129,9 @@ Ideenpool → „Auswählen“ (nur Admins) → bis zu 10 Ideen markieren → �
 | `/einladen` | Eltern, privat | „Kommt zu uns“, nur Buttons: Termin wählen (`inv_<event_id>`) → Ja/Nein (`invy_`/`invn_`) → `invitations` (eine pro Termin); Admins bekommen eine DM, Kalender zeigt „Einladung: Name“. Der Elterndienst (`parent_duties`) bleibt davon unberührt |
 | `/chatid` | Admin | Chat-ID |
 
-Fotos (`services/photos.ts`, Tabelle `event_photos`, Migration 013): Helfer/Admins/Eltern schicken Bilder privat an den Bot → nur `file_id` gespeichert, zugeordnet zum Termin des Tages (bis 3 Tage danach). Abends 20:00 erinnert der review-ping-Cron die eingeteilten Helfer per DM (`reminder_log` Typ `photo_nudge`). Admins: `/bilder` (Vorschau), `/senden` (Rückfrage → Album(s) à 10 in `TELEGRAM_ELTERN_CHAT_ID` mit Caption „Coole Jungschar … /idee … /einladen“, `posted_at` gesetzt).
+**Grundsatz Eltern:** der Bot schreibt Eltern nie aktiv per DM an. Eltern schreiben dem Bot (`/idee`, `/einladen`, `/termine`); Gruppen-Posts in die Elterngruppe (Fotos, Geburtstagsgruß) sind davon unberührt. Bewertung (review-ping) nur Admins, Fotos nur Helfer.
+
+Fotos (`services/photos.ts`, Tabelle `event_photos`, Migration 013): nur Helfer/Admins schicken Bilder privat an den Bot → nur `file_id` gespeichert, zugeordnet zum Termin des Tages (bis 3 Tage danach). Abends 20:00 erinnert der review-ping-Cron die eingeteilten Helfer per DM (`reminder_log` Typ `photo_nudge`). Admins: `/bilder` (Vorschau), `/senden` (Rückfrage → Album(s) à 10 in `TELEGRAM_ELTERN_CHAT_ID` mit Caption „Coole Jungschar … /idee … /einladen“, `posted_at` gesetzt).
 
 Geburtstagsgruß: der tägliche Reminder-Cron postet in `TELEGRAM_ELTERN_CHAT_ID` für Kinder mit Geburtstag heute, einmal pro Tag (`settings.last_birthday_greeting`).
 

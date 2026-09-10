@@ -6,7 +6,8 @@ import { ADMIN_TELEGRAM_USER_IDS } from './admins'
 /**
  * Fotos zur Jungschar.
  *
- * Helfer schicken Bilder privat an den Bot. Der Bot speichert nur die
+ * Nur Helfer (inkl. Admins) schicken Bilder privat an den Bot; Eltern sind
+ * hier bewusst raus und werden vom Bot nie aktiv angeschrieben. Der Bot speichert nur die
  * Telegram-file_id und ordnet sie dem Termin des Tages zu (bis drei Tage
  * danach). Admins sehen mit /bilder den Stand und posten mit /senden alle
  * noch nicht geposteten Bilder als Album in die Elterngruppe, mit einer
