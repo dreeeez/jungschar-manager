@@ -454,6 +454,33 @@ export interface ExecuteHalfYearOptions {
   chatId: string
   /** true = Sandbox-Gruppe: neu berechnen, speichern, posten. false = Helfer-Gruppe: aktuellen Stand posten. */
   isTest: boolean
+  /** Sandbox: in der Vorschau manuell angepasste Einteilung statt Neuberechnung. */
+  override?: { eventId: string; helperIds: string[] }[]
+}
+
+/** Baut aus der (manuell angepassten) Vorschau vollständige Proposals. */
+async function proposalsFromOverride(
+  override: NonNullable<ExecuteHalfYearOptions['override']>,
+): Promise<{ window: HalfYearWindow; proposals: RotationProposal[] }> {
+  const win = halfYearWindow()
+  const helpers = new Map((await loadHelpers()).map(h => [h.id, h]))
+  const events = new Map((await loadWindowEvents(win)).map(e => [e.id as string, e.event_date as string]))
+  const proposals: RotationProposal[] = []
+  for (const o of override) {
+    const eventDate = events.get(o.eventId)
+    if (!eventDate) continue
+    const picked = Array.from(new Set(o.helperIds)).flatMap(id => helpers.get(id) ?? [])
+    if (picked.length === 0) continue
+    proposals.push({
+      eventId: o.eventId,
+      eventDate,
+      helpers: picked
+        .map(h => ({ ...h, count: 0, lastAssigned: null }))
+        .sort((a, b) => Number(b.isSenior) - Number(a.isSenior)),
+    })
+  }
+  proposals.sort((a, b) => a.eventDate.localeCompare(b.eventDate))
+  return { window: win, proposals }
 }
 
 export interface ExecuteHalfYearResult {
@@ -514,7 +541,9 @@ export async function executeHalfYearRotation(opts: ExecuteHalfYearOptions): Pro
   const needsFresh = opts.isTest || current.proposals.length === 0
 
   if (needsFresh) {
-    const plan = await generateHalfYearRotation()
+    const plan = opts.isTest && opts.override
+      ? { ...(await proposalsFromOverride(opts.override)), skipped: [] }
+      : await generateHalfYearRotation()
     win = plan.window
     proposals = plan.proposals
     skipped = plan.skipped
