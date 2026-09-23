@@ -26,6 +26,7 @@ import {
 interface Helper {
   id: string
   name: string
+  is_senior?: boolean
 }
 
 interface Parent {
@@ -60,9 +61,13 @@ interface Event {
   invitations?: { id: string; parent: Parent | null }[] | { id: string; parent: Parent | null } | null
 }
 
-function getInvitationName(event: Event): string | null {
+function getInvitation(event: Event) {
   const inv = Array.isArray(event.invitations) ? event.invitations[0] : event.invitations
-  return inv?.parent?.name ?? null
+  return inv?.parent ? { id: inv.id, name: inv.parent.name } : null
+}
+
+function getInvitationName(event: Event): string | null {
+  return getInvitation(event)?.name ?? null
 }
 
 interface IdeaRecord {
@@ -128,7 +133,7 @@ export default function CalendarPage() {
         .order('event_date', { ascending: true }),
       supabase
         .from('helpers')
-        .select('id, name')
+        .select('id, name, is_senior')
         .order('name', { ascending: true }),
       (supabase as any)
         .from('parents')
@@ -442,10 +447,25 @@ export default function CalendarPage() {
     setRotationLoading(false)
   }
 
+  function swapRotationHelper(eventId: string, index: number, helperId: string) {
+    const helper = helpers.find(h => h.id === helperId)
+    if (!helper) return
+    setRotationPreview(prev => prev?.map(p => {
+      if (p.eventId !== eventId) return p
+      const next = [...p.helpers]
+      next[index] = { ...next[index], id: helper.id, name: helper.name, isSenior: !!helper.is_senior }
+      return { ...p, helpers: next }
+    }) ?? null)
+  }
+
   async function commitRotation(testMode: boolean) {
     setRotationCommitting(true)
     try {
-      const res = await fetch('/api/rotation/commit' + (testMode ? '?test=1' : ''), { method: 'POST' })
+      const res = await fetch('/api/rotation/commit' + (testMode ? '?test=1' : ''), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposals: (rotationPreview ?? []).map(p => ({ eventId: p.eventId, helperIds: p.helpers.map(h => h.id) })) }),
+      })
       const body = await res.json()
       if (!res.ok) {
         showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
@@ -463,6 +483,21 @@ export default function CalendarPage() {
       showAlert('Fehler: ' + e.message)
     }
     setRotationCommitting(false)
+  }
+
+  async function removeInvitation(id: string) {
+    if (!selectedEvent || saving) return
+    const ok = await showConfirm('Einladung entfernen?')
+    if (!ok) return
+    setSaving(true)
+    try {
+      const { error } = await (supabase as any).from('invitations').delete().eq('id', id)
+      if (error) throw error
+      await refreshSelectedEvent()
+    } catch (error: any) {
+      showAlert('Fehler: ' + error.message)
+    }
+    setSaving(false)
   }
 
   async function refreshSelectedEvent() {
@@ -598,7 +633,7 @@ export default function CalendarPage() {
               )}
             </Section>
 
-            <Section title="Elterndienst (Essen)" className="mb-0">
+            <Section title="Elterndienst (Essen)" className={getInvitation(selectedEvent) ? undefined : 'mb-0'}>
               {parents.length === 0 ? (
                 <Empty>Keine Eltern vorhanden. Unter &quot;Eltern&quot; hinzufügen.</Empty>
               ) : (
@@ -615,6 +650,22 @@ export default function CalendarPage() {
                 </List>
               )}
             </Section>
+
+            {getInvitation(selectedEvent) && (
+              <Section title="Einladung" className="mb-0">
+                <Row>
+                  <span className="flex-1 text-sm">{getInvitation(selectedEvent)!.name} lädt die Jungschar zu sich ein</span>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => removeInvitation(getInvitation(selectedEvent)!.id)}
+                    disabled={saving || selectedLocked}
+                  >
+                    Entfernen
+                  </Button>
+                </Row>
+              </Section>
+            )}
 
           </>
         )}
@@ -647,9 +698,19 @@ export default function CalendarPage() {
                         })}
                       </p>
                       <div className="mt-1 space-y-1">
-                        {p.helpers.map(h => (
-                          <p key={h.id} className="flex items-center justify-between gap-2 text-sm">
-                            <span>{h.name}</span>
+                        {p.helpers.map((h, i) => (
+                          <p key={i} className="flex items-center justify-between gap-2 text-sm">
+                            <select
+                              value={h.id}
+                              onChange={e => swapRotationHelper(p.eventId, i, e.target.value)}
+                              disabled={rotationCommitting}
+                              aria-label="Helfer"
+                              className="rounded-lg bg-bg px-2 py-1 text-sm outline-none"
+                            >
+                              {helpers.map(opt => (
+                                <option key={opt.id} value={opt.id}>{opt.name}</option>
+                              ))}
+                            </select>
                             <Badge tone={h.isSenior ? 'warn' : 'outline'}>{h.isSenior ? 'Senior' : 'Junior'}</Badge>
                           </p>
                         ))}
