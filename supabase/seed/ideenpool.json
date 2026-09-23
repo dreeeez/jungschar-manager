@@ -8,6 +8,8 @@
       "sport"
     ],
     "done": [
+      "2018-11",
+      "2019-05",
       "2022-04",
       "2022-10",
       "2024-01",
@@ -15,9 +17,9 @@
       "2025-11",
       "2026-06"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2022-03-17",
-    "chat_message_id": 346
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-11-09",
+    "chat_message_id": -999881170
   },
   {
     "title": "Nerf-Schlacht in der Burg am Eberg mit Punsch",
@@ -63,18 +65,19 @@
       "ausflug"
     ],
     "done": [
+      "2019-02",
       "2022-01",
       "2023-02",
       "2024-06",
       "2026-01"
     ],
-    "suggested_by": "Felix Schniepp",
-    "proposed_at": "2022-01-15",
-    "chat_message_id": 324
+    "suggested_by": "Johann Kern",
+    "proposed_at": "2019-02-23",
+    "chat_message_id": -999865345
   },
   {
     "title": "Sprungbude Trampolinhalle Stuttgart",
-    "description": "Längere Anfahrt, deshalb pünktlich 17:20 am Saal zur Abfahrt. Einverständniserklärung vorab online unter waiver.roller.app ausfüllen.",
+    "description": "Längere Anfahrt, deshalb pünktlich 17:20 am Saal zur Abfahrt. Einverständniserklärung vorab online unter waiver.roller.app ausfüllen. 2018 war es noch eine andere Trampolinhalle, Formular von allen Eltern nötig.",
     "material": "Online-Waiver pro Kind, Sprungsocken falls vorhanden",
     "tags": [
       "drinnen",
@@ -82,55 +85,60 @@
       "sport"
     ],
     "done": [
+      "2018-02",
       "2022-11",
       "2024-03"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2022-11-03",
-    "chat_message_id": 463
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-02-24",
+    "chat_message_id": -999908170
   },
   {
     "title": "Kegeln",
-    "description": "Kegelbahn im UG. Treffpunkt wie immer, Abholung am Saal.",
+    "description": "Kegelbahn im UG. Treffpunkt wie immer, Abholung am Saal. 2019 spontan statt Nerf-Schlacht.",
     "material": null,
     "tags": [
       "drinnen"
     ],
     "done": [
+      "2019-04",
       "2021-11"
     ],
-    "suggested_by": "Felix Schniepp",
-    "proposed_at": "2021-11-25",
-    "chat_message_id": 312
+    "suggested_by": "Andi Keller",
+    "proposed_at": "2019-04-26",
+    "chat_message_id": -999859397
   },
   {
     "title": "Kinoabend",
-    "description": "Gemütlicher Filmabend im Saal, davor 10 bis 20 Minuten raus zum Austoben.",
+    "description": "Gemütlicher Filmabend im Saal, davor 10 bis 20 Minuten raus zum Austoben. 2019 als Filmabend bei einer Helferfamilie zuhause, passend zum Regenwetter.",
     "material": "Warme Kleidung für die Runde draußen",
     "tags": [
       "drinnen",
       "winter"
     ],
     "done": [
+      "2019-10",
       "2024-01"
     ],
-    "suggested_by": "Wing",
-    "proposed_at": "2024-01-12",
-    "chat_message_id": 624
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2019-10-18",
+    "chat_message_id": -999844578
   },
   {
     "title": "Brettspiele-Abend",
-    "description": "Ruhiger Ausklang nach Action, z. B. nach der Nerf-Schlacht.",
+    "description": "Ruhiger Ausklang nach Action, z. B. nach der Nerf-Schlacht. Kinder bringen gerne ihre Lieblingsspiele mit. 2018 bei einer Helferfamilie zuhause, 2019 im oberen Saal.",
     "material": "Brettspiele",
     "tags": [
       "drinnen"
     ],
     "done": [
+      "2018-01",
+      "2019-05",
       "2024-01"
     ],
-    "suggested_by": "Marco Schneider",
-    "proposed_at": "2024-01-19",
-    "chat_message_id": 629
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-01-19",
+    "chat_message_id": -999912419
   },
   {
     "title": "Soccerhalle (Göppingen oder MC Arena Schorndorf)",
@@ -142,29 +150,34 @@
       "ausflug"
     ],
     "done": [
+      "2018-02",
       "2020-09",
       "2021-11",
       "2022-10"
     ],
-    "suggested_by": "Jörg Höfer",
-    "proposed_at": "2020-09-26",
-    "chat_message_id": 84
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-02-12",
+    "chat_message_id": -999909043
   },
   {
     "title": "Sport im Saal",
-    "description": "Bewegungsprogramm im großen Saal, geht auch nach dem Adventskalender-Basteln.",
+    "description": "Bewegungsprogramm im großen Saal, geht auch nach dem Adventskalender-Basteln. Gut kombinierbar mit Waffeln (2019) oder Pizza in der Küche (2020).",
     "material": "Hallenschuhe",
     "tags": [
       "drinnen",
       "sport"
     ],
     "done": [
+      "2018-09",
+      "2019-03",
+      "2020-01",
+      "2020-02",
       "2020-11",
       "2025-11"
     ],
-    "suggested_by": "Wing",
-    "proposed_at": "2020-11-06",
-    "chat_message_id": 116
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-09-28",
+    "chat_message_id": -999885659
   },
   {
     "title": "Sport und Spiele auf dem Hartplatz",
@@ -175,15 +188,17 @@
       "sport"
     ],
     "done": [
+      "2018-11",
+      "2019-03",
       "2023-02",
       "2023-11",
       "2024-10",
       "2025-04",
       "2025-11"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2023-02-04",
-    "chat_message_id": 524
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2018-11-03",
+    "chat_message_id": -999882103
   },
   {
     "title": "Jungschar-Fußballturnier",
@@ -215,13 +230,17 @@
   },
   {
     "title": "Hallenbad Oskar-Frech-Bad Schorndorf",
-    "description": "Vorher im Elternchat fragen, wer nicht schwimmen kann. Mehrere Kinder brauchen Schwimmflügel, ziehen sie aber nur an, wenn andere auch welche tragen. Kein Ausweis nötig.",
+    "description": "Vorher im Elternchat fragen, wer nicht schwimmen kann. Mehrere Kinder brauchen Schwimmflügel, ziehen sie aber nur an, wenn andere auch welche tragen. Kein Ausweis nötig. 2019 einmal zusammen mit der großen Jungschar.",
     "material": "Badesachen, Schwimmflügel für Nichtschwimmer",
     "tags": [
       "drinnen",
       "wasser"
     ],
     "done": [
+      "2018-02",
+      "2019-01",
+      "2019-03",
+      "2020-03",
       "2022-02",
       "2022-09",
       "2023-01",
@@ -229,26 +248,27 @@
       "2024-02",
       "2026-02"
     ],
-    "suggested_by": "Felix Schniepp",
-    "proposed_at": "2022-02-04",
-    "chat_message_id": 334
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2019-01-12",
+    "chat_message_id": -999868670
   },
   {
     "title": "Freibad (Bud-Spencer-Bad oder Gmünd)",
-    "description": "Sommer-Variante vom Schwimmen. Nichtschwimmer vorher abfragen.",
+    "description": "Sommer-Variante vom Schwimmen. Nichtschwimmer vorher abfragen. 2018 im Seebad Schorndorf, pünktlich 18:00 am Saal los.",
     "material": "Badesachen, Sonnencreme, Schwimmflügel",
     "tags": [
       "draußen",
       "wasser"
     ],
     "done": [
+      "2018-06",
       "2022-07",
       "2023-07",
       "2025-06"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2022-07-14",
-    "chat_message_id": 416
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-06-30",
+    "chat_message_id": -999895228
   },
   {
     "title": "Kanu fahren (Brenz)",
@@ -269,7 +289,7 @@
   },
   {
     "title": "Tretboot am Ebnisee mit Grillen",
-    "description": "Start 16:00 am Saal, Tretboot fahren, danach Grillen an der Jungscharhütte mit Würsten am Stecken. Ein Helfer pro Boot. Ebnisee ist tief, Eltern wünschen Schwimmwesten, dort gibt es welche zum Leihen. Feuer früh genug anzünden.",
+    "description": "Start 16:00 am Saal, Tretboot fahren, danach Grillen an der Jungscharhütte mit Würsten am Stecken. Ein Helfer pro Boot. Ebnisee ist tief, Eltern wünschen Schwimmwesten, dort gibt es welche zum Leihen. Feuer früh genug anzünden. 2018 und 2019 ohne Grillen, Handtuch und Badekleidung zum Wechseln mitbringen.",
     "material": "Badesachen, Spritzpistolen, Schwimmwesten, Messer zum Stecken schnitzen, Grillwürste",
     "tags": [
       "draußen",
@@ -277,11 +297,13 @@
       "essen"
     ],
     "done": [
+      "2018-07",
+      "2019-07",
       "2026-07"
     ],
-    "suggested_by": "Tobias Schneider",
-    "proposed_at": "2026-07-08",
-    "chat_message_id": 1204
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-07-07",
+    "chat_message_id": -999894642
   },
   {
     "title": "Bachwanderung",
@@ -334,20 +356,22 @@
   },
   {
     "title": "Fahrradtour zur Eisdiele",
-    "description": "Radtour nach Urbach oder Waldhausen mit Eis. Start meist 17:00 am Saal. Vorher prüfen, dass die Räder funktionieren. Bei Regenrisiko Regenjacke mitgeben.",
+    "description": "Radtour nach Urbach oder Waldhausen mit Eis. Start meist 17:00 am Saal. Vorher prüfen, dass die Räder funktionieren. Bei Regenrisiko Regenjacke mitgeben. Früher als Fahrrad- oder Inlinertour nach Lorch, vorher im Chat abfragen wer mit welchem Gefährt kommt. Helm Pflicht.",
     "material": "Funktionsfähiges Fahrrad, Helm, Regenjacke",
     "tags": [
       "draußen",
       "sport"
     ],
     "done": [
+      "2018-05",
+      "2019-04",
       "2023-06",
       "2024-06",
       "2026-06"
     ],
-    "suggested_by": "Marco Schneider",
-    "proposed_at": "2023-06-17",
-    "chat_message_id": 566
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-05-03",
+    "chat_message_id": -999900786
   },
   {
     "title": "Fahrradtour in Kleingruppen",
@@ -565,11 +589,12 @@
       "wald"
     ],
     "done": [
+      "2019-05",
       "2025-05"
     ],
-    "suggested_by": "Marco Schneider",
-    "proposed_at": "2024-06-21",
-    "chat_message_id": 663
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2019-05-23",
+    "chat_message_id": -999857130
   },
   {
     "title": "Wental bei Bartholomä",
@@ -596,11 +621,12 @@
       "ausflug"
     ],
     "done": [
+      "2020-03",
       "2023-02"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2023-02-11",
-    "chat_message_id": 529
+    "suggested_by": "Felix Schniepp",
+    "proposed_at": "2020-03-14",
+    "chat_message_id": -999825033
   },
   {
     "title": "Burg Rechberg",
@@ -682,7 +708,7 @@
   },
   {
     "title": "Nacht-Action im Wald mit Kopflampen",
-    "description": "Raus in den Wald bei Dunkelheit, 'Stimmung und Action'. Gute Winter-Alternative ohne Anfahrt.",
+    "description": "Raus in den Wald bei Dunkelheit, 'Stimmung und Action'. Gute Winter-Alternative ohne Anfahrt. 2020 als Waldabend mit Taschenlampen, kam bei den Eltern sehr gut an.",
     "material": "Kopflampe, warme Kleidung",
     "tags": [
       "draußen",
@@ -690,11 +716,12 @@
       "winter"
     ],
     "done": [
+      "2020-01",
       "2026-02"
     ],
-    "suggested_by": "Marco Schneider",
-    "proposed_at": "2026-02-28",
-    "chat_message_id": 1018
+    "suggested_by": "Jens Müller",
+    "proposed_at": "2020-01-31",
+    "chat_message_id": -999832535
   },
   {
     "title": "Geländespiele",
@@ -792,17 +819,18 @@
   },
   {
     "title": "Abend auf einem Grundstück (Stückle)",
-    "description": "Nach Sport auf dem Hartplatz weiter auf das Stückle von Marcus. Etwas Wärmeres für danach mitbringen.",
+    "description": "Nach Sport auf dem Hartplatz weiter auf das Stückle von Marcus. Etwas Wärmeres für danach mitbringen. 2019 Spiele auf dem Baumstückle am Eberg.",
     "material": "Warme Kleidung",
     "tags": [
       "draußen"
     ],
     "done": [
+      "2019-03",
       "2024-10"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2024-10-26",
-    "chat_message_id": 706
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2019-03-22",
+    "chat_message_id": -999862884
   },
   {
     "title": "Kürbisse schnitzen",
@@ -847,12 +875,13 @@
       "essen"
     ],
     "done": [
+      "2020-02",
       "2021-02",
       "2024-02"
     ],
     "suggested_by": "Jörg Höfer",
-    "proposed_at": "2021-02-07",
-    "chat_message_id": 166
+    "proposed_at": "2020-02-28",
+    "chat_message_id": -999827285
   },
   {
     "title": "Stationen zur Wahl (A-Team-Format)",
@@ -897,12 +926,13 @@
       "kreativ"
     ],
     "done": [
+      "2018-03",
       "2020-06",
       "2022-02"
     ],
-    "suggested_by": "Jörg Höfer",
-    "proposed_at": "2020-06-18",
-    "chat_message_id": 54
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-03-17",
+    "chat_message_id": -999906408
   },
   {
     "title": "Adventskalender basteln",
@@ -923,22 +953,25 @@
   },
   {
     "title": "Wichteln zur Weihnachtsfeier",
-    "description": "Jedes Kind wählt im Elternchat eine Nummer, Zuordnung per PN. Richtwert 10 bis 15 Euro. Nicht vergessen, wurde zweimal verpasst und nachgeholt.",
+    "description": "Jedes Kind wählt im Elternchat eine Nummer, Zuordnung per PN. Richtwert 10 bis 15 Euro. Nicht vergessen, wurde zweimal verpasst und nachgeholt. Früher 5 bis 10 Euro; für abwesende Kinder mitgewichtelt und Eltern per PN informiert.",
     "material": "Wichtelgeschenk",
     "tags": [
       "drinnen",
       "feier"
     ],
     "done": [
+      "2017-12",
+      "2018-11",
+      "2019-11",
       "2020-12",
       "2021-12",
       "2022-12",
       "2023-12",
       "2025-12"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2020-12-04",
-    "chat_message_id": 122
+    "suggested_by": "Andi Keller",
+    "proposed_at": "2017-12-04",
+    "chat_message_id": -999917187
   },
   {
     "title": "Weihnachtsfeier mit Fackelwanderung",
@@ -1037,68 +1070,72 @@
   },
   {
     "title": "Drachen steigen lassen",
-    "description": "Im Herbst auf einer Wiese Drachen steigen lassen, kam beim Explorer-Tag vor.",
+    "description": "Im Herbst auf einer Wiese Drachen steigen lassen, kam beim Explorer-Tag vor. Drachen sind vorhanden. Bei Nässe Wechselsocken und -schuhe.",
     "material": "Drachen",
     "tags": [
       "draußen",
       "herbst"
     ],
     "done": [
+      "2019-09",
       "2022-11"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2022-11-04",
-    "chat_message_id": 473
+    "suggested_by": "Felix Schniepp",
+    "proposed_at": "2019-09-27",
+    "chat_message_id": -999846829
   },
   {
     "title": "Übernachtung im Saal",
-    "description": "Nach dem Tagesausflug im Saal übernachten, Abholung nach dem Frühstück um 10:30. Übernachtungssachen gleich morgens mitbringen. Braucht genug Helfer, 2020 wurde einmal abgesagt.",
+    "description": "Nach dem Tagesausflug im Saal übernachten, Abholung nach dem Frühstück um 10:30. Übernachtungssachen gleich morgens mitbringen. Braucht genug Helfer, 2020 wurde einmal abgesagt. 2018 zusammen mit der großen Jungschar nach dem Brunstad-Fest.",
     "material": "Matratze oder Luma, Schlafsack, Frühstück",
     "tags": [
       "drinnen",
       "ausflug"
     ],
     "done": [
+      "2018-04",
       "2020-09",
       "2022-05"
     ],
-    "suggested_by": "Jörg Höfer",
-    "proposed_at": "2020-08-31",
-    "chat_message_id": 65
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-04-13",
+    "chat_message_id": -999903045
   },
   {
     "title": "Tagesausflug Tripsdrill",
-    "description": "Erlebnispark und Wildpark, mit dem Ticket geht beides. Tickets vorab bestellen, deshalb Abmeldung bis Mittwoch. Start 8:30 bis 10:00 am Saal, Ende ca. 21:00. Abschluss am Saal oder auf dem Kernshof. Lange Schlangen einplanen. Bei Helfermangel helfen Eltern mit.",
+    "description": "Erlebnispark und Wildpark, mit dem Ticket geht beides. Tickets vorab bestellen, deshalb Abmeldung bis Mittwoch. Start 8:30 bis 10:00 am Saal, Ende ca. 21:00. Abschluss am Saal oder auf dem Kernshof. Lange Schlangen einplanen. Bei Helfermangel helfen Eltern mit. 2018 danach noch auf den Kernhof und Übernachtung im Saal.",
     "material": "Kindersitze, Sonnenschutz, Verpflegung wird gestellt",
     "tags": [
       "draußen",
       "ausflug"
     ],
     "done": [
+      "2018-07",
       "2020-09",
       "2020-10",
       "2021-09",
       "2022-08",
       "2025-09"
     ],
-    "suggested_by": "Jörg Höfer",
-    "proposed_at": "2020-08-31",
-    "chat_message_id": 65
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-07-09",
+    "chat_message_id": -999894560
   },
   {
     "title": "Tagesausflug Schwabenpark mit Fackelwanderung",
-    "description": "Start 10:00 am Saal, abends noch eine Fackelwanderung, Ende 21:00 mit Heimfahrt. Bei Hitze Kopfbedeckung.",
+    "description": "Start 10:00 am Saal, abends noch eine Fackelwanderung, Ende 21:00 mit Heimfahrt. Bei Hitze Kopfbedeckung. 2019 kurzfristig als Regen-Alternative zum Breitenauer See, danach Kernhof und Übernachtung. Rucksack mit Trinkflasche und Wechselkleidung.",
     "material": "Kopfbedeckung, Fackeln",
     "tags": [
       "draußen",
       "ausflug"
     ],
     "done": [
+      "2019-06",
       "2024-09"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2024-09-05",
-    "chat_message_id": 677
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2019-06-20",
+    "chat_message_id": -999855083
   },
   {
     "title": "Tagesausflug Tractor-Pulling und Eisenbachsee",
@@ -1339,11 +1376,309 @@
       "winter"
     ],
     "done": [
+      "2019-01",
       "2021-12",
       "2024-09"
     ],
-    "suggested_by": "Jugsen",
-    "proposed_at": "2021-12-10",
-    "chat_message_id": 317
+    "suggested_by": "Johann Kern",
+    "proposed_at": "2019-01-18",
+    "chat_message_id": -999867606
+  },
+  {
+    "title": "Film für die Weihnachtsfeier drehen",
+    "description": "Die Kinder drehen einen Kurzfilm mit verteilten Rollen (Weihnachtsmann, Wichtel, Weihnachtspolizei, Gangster) und zeigen ihn an der Jungschar-Weihnachtsfeier. Braucht zwei Termine: einen zum Besprechen und Rollen verteilen, einen zum Drehen.",
+    "material": "Eigene Verkleidung und Utensilien der Kinder, keine Messer oder Luftgewehre",
+    "tags": [
+      "drinnen",
+      "kreativ",
+      "feier"
+    ],
+    "done": [
+      "2017-12"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2017-11-30",
+    "chat_message_id": -999917645
+  },
+  {
+    "title": "Weihnachtsfeier mit Indoor-Spielpark",
+    "description": "Jungschar-Weihnachtsfeier am Samstagnachmittag: zuerst rund zwei Stunden gemeinsam in einen Indoor-Spielpark (2017 Spieleland Waldrems, 2018 Sensapolis), danach im Saal weiter bis ca. 21:00 mit Wichteln. Helfer bringen die Kinder am Ende heim.",
+    "material": "Wichtelgeschenk, bequeme Kleidung",
+    "tags": [
+      "drinnen",
+      "feier",
+      "ausflug"
+    ],
+    "done": [
+      "2017-12",
+      "2018-12"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2017-12-09",
+    "chat_message_id": -999916606
+  },
+  {
+    "title": "Zügle-Tour mit Kinderfeuerwerk",
+    "description": "Kleine Tour mit dem Zügle, anschließend Kinderfeuerwerk. Winterprogramm im Januar.",
+    "material": "Warme Kleidung, die auch schmutzig werden darf",
+    "tags": [
+      "draußen",
+      "winter"
+    ],
+    "done": [
+      "2018-01"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2018-01-12",
+    "chat_message_id": -999913290
+  },
+  {
+    "title": "Tagesausflug Kernhof mit Lagerfeuer",
+    "description": "Action-reicher Tag auf dem Kernhof in Scheppach, abends Lagerfeuer in Waldhausen und Übernachtung im Saal, bei gutem Wetter Zelten auf der Saalwiese. Treffpunkt 10:00 am Saal, Abholung Sonntag 10:00.",
+    "material": "Matratze oder Isomatte, Schlafsachen, Ersatzkleidung, Pulli oder Jacke, Kindersitze",
+    "tags": [
+      "draußen",
+      "ausflug",
+      "essen"
+    ],
+    "done": [
+      "2018-05"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-05-05",
+    "chat_message_id": -999900484
+  },
+  {
+    "title": "Minigolf Welzheim",
+    "description": "Minigolfanlage in Welzheim, Samstagabend 18:00 bis 20:00.",
+    "material": null,
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2018-06"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-06-02",
+    "chat_message_id": -999896961
+  },
+  {
+    "title": "Abenteuerspielplatz Welzheim",
+    "description": "Ausflug zum Abenteuerspielplatz nach Welzheim, Abholung an der Jungscharhütte. Kürzere Variante: Spielplatz in der Nähe vom Saal (2018).",
+    "material": null,
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2018-06",
+      "2018-09"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-09-15",
+    "chat_message_id": -999886815
+  },
+  {
+    "title": "Schnitzeljagd im Wald",
+    "description": "Schnitzeljagd draußen im Wald zwischen Saal und Mühle, 17:00 bis 20:00.",
+    "material": "Outdoor-Kleidung",
+    "tags": [
+      "draußen",
+      "wald"
+    ],
+    "done": [
+      "2018-10"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-10-06",
+    "chat_message_id": -999884809
+  },
+  {
+    "title": "Flieger basteln und bemalen",
+    "description": "Flieger zusammenbauen und anmalen, danach fliegen lassen.",
+    "material": "Flieger-Bausätze, Farben, Kleidung die Farbe abkann",
+    "tags": [
+      "drinnen",
+      "kreativ"
+    ],
+    "done": [
+      "2018-11"
+    ],
+    "suggested_by": "Felix Schniepp",
+    "proposed_at": "2018-11-23",
+    "chat_message_id": -999879275
+  },
+  {
+    "title": "Lebkuchenhäuser bauen",
+    "description": "Lebkuchenhäuser bauen und verzieren, im Advent. Lässt sich mit dem Proben eines Beitrags für die Weihnachtsfeier kombinieren.",
+    "material": "Lebkuchenplatten, Zuckerguss, Süßigkeiten zum Verzieren",
+    "tags": [
+      "drinnen",
+      "kreativ",
+      "essen",
+      "winter"
+    ],
+    "done": [
+      "2018-11"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-11-30",
+    "chat_message_id": -999878221
+  },
+  {
+    "title": "Vorspiel für die Weihnachtsfeier einstudieren",
+    "description": "Die Kinder studieren ein Vorspiel oder Lied für die Jungschar- oder Gemeindeweihnachtsfeier ein. Braucht mehrere Proben plus Soundcheck, Text und Lied zuhause üben lassen. 2018 mit Küchenschürze, Sonnenbrille und Schildkappe, 2019 ein historisches Stück (Anfang 20. Jahrhundert, Waisenkinder).",
+    "material": "Verkleidung je nach Stück, Liedtext für die Eltern",
+    "tags": [
+      "drinnen",
+      "feier",
+      "kreativ"
+    ],
+    "done": [
+      "2018-12",
+      "2019-12"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2018-11-30",
+    "chat_message_id": -999878153
+  },
+  {
+    "title": "Talentshow an der Weihnachtsfeier",
+    "description": "Jedes Kind oder kleine Gruppen zeigen etwas: Film, Vorspiel, Sport, Musik, Geschicklichkeit, Gedicht, Gebackenes für die Jury oder ein Witz. Anmeldung vorab per Umfrage, unter allen Teilnehmern wird ein Preis verlost. 2019 kombiniert mit einer Tour durch Schwäbisch Gmünd und einer Kinderstunde.",
+    "material": null,
+    "tags": [
+      "drinnen",
+      "feier",
+      "kreativ"
+    ],
+    "done": [
+      "2019-12"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2019-11-30",
+    "chat_message_id": -999839648
+  },
+  {
+    "title": "Ausflug zur Kugelbahn in Stetten",
+    "description": "Kleiner Ausflug zur Kugelbahn nach Stetten, 17:30 bis 19:30.",
+    "material": null,
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2019-05"
+    ],
+    "suggested_by": "Johann Kern",
+    "proposed_at": "2019-05-18",
+    "chat_message_id": -999857465
+  },
+  {
+    "title": "Tagesausflug Breitenauer See mit Tretboot",
+    "description": "Mit der kleinen Jungs- und Mädelsjungschar zum Breitenauer See bei Scheppach: Baden, Tretboot fahren, danach Zwischenstopp auf dem Kernhof und Übernachtung im Saal. 2019 geplant, wegen Regen und Gewitter durch den Schwabenpark ersetzt. Allergien vorher abfragen.",
+    "material": "Badekleidung, Handtuch, Schwimmflügel für Nichtschwimmer, Wechselkleider, Luftmatratze und Bettwäsche, eingecremt kommen, Sonnenhut, Kindersitze",
+    "tags": [
+      "draußen",
+      "wasser",
+      "ausflug"
+    ],
+    "done": [],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2019-06-13",
+    "chat_message_id": -999855630
+  },
+  {
+    "title": "Wasserschlacht mit Wasserrutsche",
+    "description": "Sommerprogramm draußen mit allen Jungscharen gemeinsam: Sport, dazu Wasserschlacht und Wasserrutsche. 2019 als Qualifikation für den Staffellauf auf Brunstad.",
+    "material": "Wechselkleidung, Handtuch, Mückenschutz",
+    "tags": [
+      "draußen",
+      "wasser",
+      "sport"
+    ],
+    "done": [
+      "2019-06"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2019-06-28",
+    "chat_message_id": -999854557
+  },
+  {
+    "title": "Tagesausflug: Wilhelma oder Kletterpark zur Wahl",
+    "description": "Die Kinder wählen vorab im Chat zwischen Wilhelma und Kletterpark Schwäbisch Gmünd, zwei Gruppen fahren parallel. Treffpunkt 10:00 am Saal, abends Übernachtung im Saal für wer will, Abholung Sonntag 9:30 oder abends ca. 21:30. Schlechtwetter-Alternative einplanen.",
+    "material": "Geeignete Kleidung, Trinkflasche, Bettzeug und Matratze für die Übernachtung",
+    "tags": [
+      "draußen",
+      "ausflug"
+    ],
+    "done": [
+      "2019-09"
+    ],
+    "suggested_by": "Lars Müller",
+    "proposed_at": "2019-08-31",
+    "chat_message_id": -999849345
+  },
+  {
+    "title": "Schlittschuhlaufen in der Eishalle Adelberg",
+    "description": "Öffentlicher Lauf in der Eishalle Adelberg, ohne Schläger und Puck. Schlittschuhe vorab organisieren, notfalls Verleih vor Ort. Danach an der Hütte abholen. Auf Fundsachen achten, 2019 gingen Schlittschuhe und Stirnband verloren.",
+    "material": "Schlittschuhe, Handschuhe, warme Kleidung",
+    "tags": [
+      "drinnen",
+      "winter",
+      "sport",
+      "ausflug"
+    ],
+    "done": [
+      "2019-11"
+    ],
+    "suggested_by": "Jens Müller",
+    "proposed_at": "2019-11-02",
+    "chat_message_id": -999843135
+  },
+  {
+    "title": "Holzauto-Bausatz basteln",
+    "description": "Holzautos aus Bausätzen zusammenleimen, zuhause noch lackieren. Kam bei den Kindern sehr gut an. 2019 nach einer Weihnachtsfeier-Probe in der Hütte.",
+    "material": "Holzauto-Bausätze, Holzleim",
+    "tags": [
+      "drinnen",
+      "kreativ"
+    ],
+    "done": [
+      "2019-11"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2019-11-09",
+    "chat_message_id": -999842289
+  },
+  {
+    "title": "Indoor-Minigolf",
+    "description": "Indoor-Minigolf als Winter-Alternative, 17:30 bis 19:30.",
+    "material": null,
+    "tags": [
+      "drinnen",
+      "ausflug",
+      "winter"
+    ],
+    "done": [
+      "2019-11"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2019-11-29",
+    "chat_message_id": -999839691
+  },
+  {
+    "title": "Online-Jungschar mit Zoom und skribbl.io",
+    "description": "Jungschar per Zoom, jedes Kind mit Laptop oder Tablet, gemeinsam Spiele wie skribbl.io. Danach Storytime für alle Jungscharkinder. Link und Passwort rechtzeitig posten und Warteraum abschalten.",
+    "material": "Laptop oder Tablet pro Kind",
+    "tags": [
+      "online"
+    ],
+    "done": [
+      "2020-04"
+    ],
+    "suggested_by": "Jörg Höfer",
+    "proposed_at": "2020-04-27",
+    "chat_message_id": -999819242
   }
 ]
