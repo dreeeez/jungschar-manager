@@ -78,14 +78,19 @@ export function halfYearWindow(today = new Date()): HalfYearWindow {
   return { number: 2, from: iso, until: `${y}-08-31`, label: `Halbjahr 2 · Mär – Aug ${y}` }
 }
 
-/** Wer am wenigsten dran war; bei Gleichstand wer am längsten nicht, dann Name. */
-function pickLowest(pool: RotationCandidate[]): RotationCandidate | null {
+/**
+ * Wer am wenigsten dran war. Bei Gleichstand entscheidet der Zufall, damit
+ * jeder Klick auf "Halbjahr einteilen" eine neue Verteilung liefert. Wer
+ * beim direkt vorherigen Termin dran war, wird dabei gemieden, solange es
+ * Alternativen gibt.
+ */
+function pickLowest(pool: RotationCandidate[], prevEventDate: string | null = null): RotationCandidate | null {
   if (pool.length === 0) return null
-  return [...pool].sort((a, b) => {
-    if (a.count !== b.count) return a.count - b.count
-    if (a.lastAssigned !== b.lastAssigned) return (a.lastAssigned ?? '').localeCompare(b.lastAssigned ?? '')
-    return a.name.localeCompare(b.name)
-  })[0]
+  const minCount = Math.min(...pool.map(h => h.count))
+  let tied = pool.filter(h => h.count === minCount)
+  const rested = tied.filter(h => h.lastAssigned !== prevEventDate)
+  if (rested.length > 0) tied = rested
+  return tied[Math.floor(Math.random() * tied.length)]
 }
 
 /**
@@ -93,13 +98,13 @@ function pickLowest(pool: RotationCandidate[]): RotationCandidate | null {
  * muss Senior sein. Erster Helfer Senior → Junior, außer ein anderer
  * Senior liegt mindestens einen Einsatz zurück (dann zwei Senioren).
  */
-function pickPartner(first: RotationCandidate, pool: RotationCandidate[]): RotationCandidate | null {
+function pickPartner(first: RotationCandidate, pool: RotationCandidate[], prevEventDate: string | null): RotationCandidate | null {
   const others = pool.filter(h => h.id !== first.id)
   const seniors = others.filter(h => h.isSenior)
   const juniors = others.filter(h => !h.isSenior)
-  if (!first.isSenior) return pickLowest(seniors)
-  const bestJ = pickLowest(juniors)
-  const bestS = pickLowest(seniors)
+  if (!first.isSenior) return pickLowest(seniors, prevEventDate)
+  const bestJ = pickLowest(juniors, prevEventDate)
+  const bestS = pickLowest(seniors, prevEventDate)
   if (!bestJ) return bestS
   if (bestS && bestS.count + 1 <= bestJ.count) return bestS
   return bestJ
@@ -150,9 +155,10 @@ export async function generateHalfYearRotation(): Promise<RotationResult> {
   const pool = (): RotationCandidate[] =>
     helpers.map(h => ({ ...h, count: counts.get(h.id) ?? 0, lastAssigned: last.get(h.id) ?? null }))
 
+  let prevEventDate: string | null = null
   for (const evt of events) {
-    const first = pickLowest(pool())
-    const partner = first ? pickPartner(first, pool()) : null
+    const first = pickLowest(pool(), prevEventDate)
+    const partner = first ? pickPartner(first, pool(), prevEventDate) : null
     if (!first || !partner) {
       result.skipped.push({ eventId: evt.id, eventDate: evt.event_date, reason: 'kein passendes Senior/Junior-Paar verfügbar' })
       continue
@@ -163,6 +169,7 @@ export async function generateHalfYearRotation(): Promise<RotationResult> {
       counts.set(h.id, (counts.get(h.id) ?? 0) + 1)
       last.set(h.id, evt.event_date)
     }
+    prevEventDate = evt.event_date
   }
   return result
 }
@@ -459,7 +466,7 @@ export interface ExecuteHalfYearOptions {
 }
 
 /** Baut aus der (manuell angepassten) Vorschau vollständige Proposals. */
-async function proposalsFromOverride(
+export async function proposalsFromOverride(
   override: NonNullable<ExecuteHalfYearOptions['override']>,
 ): Promise<{ window: HalfYearWindow; proposals: RotationProposal[] }> {
   const win = halfYearWindow()
@@ -579,4 +586,15 @@ export async function executeHalfYearRotation(opts: ExecuteHalfYearOptions): Pro
   result.messageId = posted.messageId
   result.telegram = posted.telegram
   return result
+}
+
+/**
+ * Nachrichten-Text für die (angepasste) Vorschau, ohne zu speichern oder
+ * zu senden. Die Mini-App zeigt ihn, bevor gepostet wird.
+ */
+export async function previewRotationMessage(
+  override: NonNullable<ExecuteHalfYearOptions['override']>,
+): Promise<{ text: string; window: HalfYearWindow }> {
+  const { window: win, proposals } = await proposalsFromOverride(override)
+  return { text: formatRotationMessage(proposals, win.label), window: win }
 }

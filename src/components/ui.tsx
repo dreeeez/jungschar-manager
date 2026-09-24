@@ -627,6 +627,12 @@ export const SmallIcons = {
       <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
     </svg>
   ),
+  pencilSmall: () => (
+    <svg {...smallIcon} width={12} height={12}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  ),
   trash: () => (
     <svg {...iconProps} width={16} height={16}>
       <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />

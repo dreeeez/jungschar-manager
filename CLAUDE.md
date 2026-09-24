@@ -68,8 +68,8 @@ Schedule-Logik in `services/reminders.ts:processReminders()`:
 Kein Automatismus. Button „Halbjahr einteilen“ im Kalender (`services/rotation.ts`):
 - Fenster: HJ 1 = heute bis Ende Februar (ab September), HJ 2 = heute bis Ende August (ab März). Alle Termine im Fenster.
 - Paare: immer Senior + Junior (`helpers.is_senior`). Zwei Senioren nur, wenn ein Senior mindestens einen Einsatz zurückliegt. Zwei Junioren nie, sonst wird der Termin übersprungen.
-- Fair: pro Halbjahr gleich oft, Zähler startet bei 0, Vergangenheit zählt nicht.
-- Ablauf: Vorschau → „In Sandbox-Gruppe posten“ (`/api/rotation/commit?test=1`: neu berechnen, Zuweisungen im Fenster **ersetzen**, in `TELEGRAM_TEST_CHAT_ID` posten + pinnen) → Helfer im Termin-Sheet tauschen (editiert die gepinnte Nachricht über `rotation_message_id`) → „In Helfer-Gruppe posten“ (`/api/rotation/commit`: postet den **aktuellen Stand**, keine Neuberechnung).
+- Fair: pro Halbjahr gleich oft, Zähler startet bei 0, Vergangenheit zählt nicht. Gleichstände werden zufällig aufgelöst (wer beim vorherigen Termin dran war, wird gemieden), jeder Klick auf „Halbjahr einteilen“ liefert also eine neue Verteilung.
+- Ablauf: Vorschau (Name antippen = Helfer tauschen, „Nachricht ansehen“ = `POST /api/rotation/message` rendert den Telegram-Text der aktuellen Vorschau) → „In Sandbox-Gruppe posten“ (`/api/rotation/commit?test=1`: neu berechnen, Zuweisungen im Fenster **ersetzen**, in `TELEGRAM_TEST_CHAT_ID` posten + pinnen) → Helfer im Termin-Sheet tauschen (editiert die gepinnte Nachricht über `rotation_message_id`) → „In Helfer-Gruppe posten“ (`/api/rotation/commit`: postet den **aktuellen Stand**, keine Neuberechnung).
 - Bei Termin-Ausfall rückt der Reminder-Cron die Duos weiter (`shiftRotationOnCancellation`).
 
 ## Vote-Tracking

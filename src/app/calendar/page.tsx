@@ -99,6 +99,15 @@ interface Birthday {
   age: number
 }
 
+/**
+ * Telegram-HTML (nur b/i/a) für die Vorschau: Mentions werden zu blauem
+ * Text, weil tg://-Links im Browser nichts tun. Der Text kommt vom eigenen
+ * Server bereits escaped.
+ */
+function telegramHtmlForPreview(html: string): string {
+  return html.replace(/<a href="tg:\/\/user\?id=\d+">(.*?)<\/a>/g, '<span class="text-accent">$1</span>')
+}
+
 export default function CalendarPage() {
   const { showAlert, showConfirm } = useTelegram()
   const [events, setEvents] = useState<Event[]>([])
@@ -120,6 +129,8 @@ export default function CalendarPage() {
   const [showAllUpcoming, setShowAllUpcoming] = useState(false)
   const [rotationWindow, setRotationWindow] = useState<{ label: string; from: string; until: string } | null>(null)
   const [rotationHelpers, setRotationHelpers] = useState<{ seniors: number; juniors: number }>({ seniors: 0, juniors: 0 })
+  const [rotationMessage, setRotationMessage] = useState<string | null>(null)
+  const [rotationMessageLoading, setRotationMessageLoading] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -437,6 +448,7 @@ export default function CalendarPage() {
         showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
         return
       }
+      setRotationMessage(null)
       setRotationPreview(body.proposals ?? [])
       setRotationSkipped(body.skipped ?? [])
       setRotationWindow(body.window ?? null)
@@ -447,9 +459,34 @@ export default function CalendarPage() {
     setRotationLoading(false)
   }
 
+  function rotationPayload() {
+    return { proposals: (rotationPreview ?? []).map(p => ({ eventId: p.eventId, helperIds: p.helpers.map(h => h.id) })) }
+  }
+
+  async function loadRotationMessage() {
+    setRotationMessageLoading(true)
+    try {
+      const res = await fetch('/api/rotation/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rotationPayload()),
+      })
+      const body = await res.json()
+      if (!res.ok) {
+        showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
+        return
+      }
+      setRotationMessage(body.text ?? '')
+    } catch (e: any) {
+      showAlert('Fehler: ' + e.message)
+    }
+    setRotationMessageLoading(false)
+  }
+
   function swapRotationHelper(eventId: string, index: number, helperId: string) {
     const helper = helpers.find(h => h.id === helperId)
     if (!helper) return
+    setRotationMessage(null)
     setRotationPreview(prev => prev?.map(p => {
       if (p.eventId !== eventId) return p
       const next = [...p.helpers]
@@ -464,7 +501,7 @@ export default function CalendarPage() {
       const res = await fetch('/api/rotation/commit' + (testMode ? '?test=1' : ''), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ proposals: (rotationPreview ?? []).map(p => ({ eventId: p.eventId, helperIds: p.helpers.map(h => h.id) })) }),
+        body: JSON.stringify(rotationPayload()),
       })
       const body = await res.json()
       if (!res.ok) {
@@ -478,6 +515,7 @@ export default function CalendarPage() {
         showAlert(`In der Helfer-Gruppe gepostet: ${n} Termine.`)
       }
       setRotationPreview(null)
+      setRotationMessage(null)
       await fetchData()
     } catch (e: any) {
       showAlert('Fehler: ' + e.message)
@@ -674,7 +712,7 @@ export default function CalendarPage() {
       {/* Rotation-Sheet */}
       <Sheet
         open={!!rotationPreview}
-        onClose={() => setRotationPreview(null)}
+        onClose={() => { setRotationPreview(null); setRotationMessage(null) }}
         title="Einteilungs-Vorschlag"
         locked={rotationCommitting}
       >
@@ -700,17 +738,21 @@ export default function CalendarPage() {
                       <div className="mt-1 space-y-1">
                         {p.helpers.map((h, i) => (
                           <p key={i} className="flex items-center justify-between gap-2 text-sm">
-                            <select
-                              value={h.id}
-                              onChange={e => swapRotationHelper(p.eventId, i, e.target.value)}
-                              disabled={rotationCommitting}
-                              aria-label="Helfer"
-                              className="rounded-lg bg-bg px-2 py-1 text-sm outline-none"
-                            >
-                              {helpers.map(opt => (
-                                <option key={opt.id} value={opt.id}>{opt.name}</option>
-                              ))}
-                            </select>
+                            <label className="relative inline-flex items-center gap-1.5 py-0.5">
+                              <span>{h.name}</span>
+                              <span className="text-muted"><SmallIcons.pencilSmall /></span>
+                              <select
+                                value={h.id}
+                                onChange={e => swapRotationHelper(p.eventId, i, e.target.value)}
+                                disabled={rotationCommitting}
+                                aria-label="Helfer tauschen"
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                              >
+                                {helpers.map(opt => (
+                                  <option key={opt.id} value={opt.id}>{opt.name}</option>
+                                ))}
+                              </select>
+                            </label>
                             <Badge tone={h.isSenior ? 'warn' : 'outline'}>{h.isSenior ? 'Senior' : 'Junior'}</Badge>
                           </p>
                         ))}
@@ -732,6 +774,24 @@ export default function CalendarPage() {
 
             {rotationPreview.length > 0 && (
               <div className="space-y-3">
+                {rotationMessage === null ? (
+                  <Button
+                    variant="secondary"
+                    block
+                    onClick={loadRotationMessage}
+                    disabled={rotationMessageLoading || rotationCommitting}
+                  >
+                    {rotationMessageLoading ? 'Lade …' : 'Nachricht ansehen'}
+                  </Button>
+                ) : (
+                  <div>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">So geht die Nachricht raus</p>
+                    <div
+                      className="whitespace-pre-wrap rounded-2xl rounded-tl-md bg-card px-3 py-2 shadow-sm text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: telegramHtmlForPreview(rotationMessage) }}
+                    />
+                  </div>
+                )}
                 <Button
                   variant="primary"
                   block
