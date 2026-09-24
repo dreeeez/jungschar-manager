@@ -77,8 +77,7 @@ Kein Automatismus. Button „Halbjahr einteilen“ im Kalender (`services/rotati
 Mittwoch-Stage-2 sendet Inline-Buttons `votey_<event_id>` / `voten_<event_id>`. Klick:
 1. Webhook-Handler in `services/bot-commands.ts` parst die Nachricht (✅ Dabei / ❌ Absagen Zeilen) und re-rendert sie mit dem Klicker-Namen.
 2. Persistiert den Vote in `attendance_votes` via `recordVote()` — Vote-Status lebt also doppelt: in der editierten Nachricht UND in der DB.
-3. Setzt eine Big-Mode-Reaction (`is_big: true`) auf die Mittwochs-Nachricht: 🎉 bei "dabei", 😢 bei "kann nicht".
-4. Donnerstags-Cron liest `attendance_votes` um Nicht-Voter zu finden.
+3. Donnerstags-Cron liest `attendance_votes` um Nicht-Voter zu finden.
 
 ## Database-Quirk
 
