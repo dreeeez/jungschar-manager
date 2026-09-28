@@ -14,10 +14,10 @@ import { sendTelegramMessage } from './reminders'
  *  - Kein Automatismus. Ausgelöst wird ausschließlich über den Button
  *    "Halbjahr einteilen" in der Mini-App.
  *
- * Ablauf: Vorschau → in die Sandbox-Gruppe posten (speichert die
- * Einteilung, damit Tausche in der App die Nachricht aktualisieren) →
- * wenn alles passt, in die Helfer-Gruppe posten (postet den aktuellen
- * Stand, keine Neuberechnung).
+ * Ablauf: abfragen, wer zuletzt dran war → berechnen (Vorschau, Namen
+ * tauschbar) → Chat wählen (Sandbox oder Helfer-Gruppe): speichert die
+ * Einteilung und postet sie. Die gespeicherte Einteilung lässt sich
+ * jederzeit ohne Neuberechnung erneut posten.
  */
 
 const HELPERS_PER_EVENT = 2
@@ -136,11 +136,16 @@ async function loadWindowEvents(win: HalfYearWindow) {
   return (data ?? []) as any[]
 }
 
+/** Platzhalter-Datum für "zuletzt dran" (Termin vor dem Halbjahres-Fenster). */
+const LAST_EVENT = 'last'
+
 /**
  * Frischer Vorschlag für das laufende Halbjahr. Bestehende Zuweisungen im
  * Fenster werden ignoriert (und beim Speichern ersetzt). Schreibt nichts.
+ * {lastHelperIds}: wer zuletzt Jungschar gemacht hat. Zählt als ein Einsatz
+ * und kommt beim ersten Termin nicht dran, solange es Alternativen gibt.
  */
-export async function generateHalfYearRotation(): Promise<RotationResult> {
+export async function generateHalfYearRotation(lastHelperIds: string[] = []): Promise<RotationResult> {
   const win = halfYearWindow()
   const helpers = await loadHelpers()
   const events = await loadWindowEvents(win)
@@ -156,6 +161,12 @@ export async function generateHalfYearRotation(): Promise<RotationResult> {
     helpers.map(h => ({ ...h, count: counts.get(h.id) ?? 0, lastAssigned: last.get(h.id) ?? null }))
 
   let prevEventDate: string | null = null
+  for (const id of lastHelperIds) {
+    if (!helpers.some(h => h.id === id)) continue
+    counts.set(id, 1)
+    last.set(id, LAST_EVENT)
+    prevEventDate = LAST_EVENT
+  }
   for (const evt of events) {
     const first = pickLowest(pool(), prevEventDate)
     const partner = first ? pickPartner(first, pool(), prevEventDate) : null
@@ -459,9 +470,9 @@ export function formatRotationMessage(proposals: RotationProposal[], title?: str
 
 export interface ExecuteHalfYearOptions {
   chatId: string
-  /** true = Sandbox-Gruppe: neu berechnen, speichern, posten. false = Helfer-Gruppe: aktuellen Stand posten. */
+  /** true = Sandbox-Gruppe, false = Helfer-Gruppe. */
   isTest: boolean
-  /** Sandbox: in der Vorschau manuell angepasste Einteilung statt Neuberechnung. */
+  /** Einteilung aus der Vorschau: wird gespeichert und gepostet. Ohne = gespeicherten Stand posten. */
   override?: { eventId: string; helperIds: string[] }[]
 }
 
@@ -529,31 +540,24 @@ async function postAndPin(chatId: string, text: string, eventIds: string[]): Pro
 }
 
 /**
- * Sandbox: Halbjahr neu berechnen, Zuweisungen im Fenster ersetzen, in die
- * Sandbox-Gruppe posten und pinnen. Tausche in der App editieren danach
- * diese Nachricht.
- * Live: den aktuellen Stand der Zuweisungen in die Helfer-Gruppe posten und
- * pinnen. Keine Neuberechnung, damit Korrekturen aus der Sandbox-Phase
- * erhalten bleiben. Gibt es noch keine Zuweisungen, wird einmal berechnet.
+ * Mit {override}: die Einteilung aus der Vorschau speichern (Zuweisungen der
+ * enthaltenen Termine ersetzen), posten und pinnen.
+ * Ohne: den gespeicherten Stand posten und pinnen, keine Neuberechnung.
+ * Chat je nach {isTest} Sandbox oder Helfer-Gruppe. Tausche in der App
+ * editieren danach die gepinnte Nachricht.
  */
 export async function executeHalfYearRotation(opts: ExecuteHalfYearOptions): Promise<ExecuteHalfYearResult> {
   const db = getSupabase()
   let replaced = 0
   let inserted = 0
   let proposals: RotationProposal[]
-  let skipped: RotationResult['skipped'] = []
+  const skipped: RotationResult['skipped'] = []
   let win: HalfYearWindow
 
-  const current = await currentHalfYearAssignments()
-  const needsFresh = opts.isTest || current.proposals.length === 0
-
-  if (needsFresh) {
-    const plan = opts.isTest && opts.override
-      ? { ...(await proposalsFromOverride(opts.override)), skipped: [] }
-      : await generateHalfYearRotation()
+  if (opts.override) {
+    const plan = await proposalsFromOverride(opts.override)
     win = plan.window
     proposals = plan.proposals
-    skipped = plan.skipped
     const eventIds = proposals.map(p => p.eventId)
     if (eventIds.length > 0) {
       const { data: old } = await db.from('assignments').select('id').in('event_id', eventIds)
@@ -565,6 +569,7 @@ export async function executeHalfYearRotation(opts: ExecuteHalfYearOptions): Pro
       inserted = rows.length
     }
   } else {
+    const current = await currentHalfYearAssignments()
     win = current.window
     proposals = current.proposals
   }
@@ -583,6 +588,9 @@ export async function executeHalfYearRotation(opts: ExecuteHalfYearOptions): Pro
 
   const text = formatRotationMessage(proposals, win.label)
   const posted = await postAndPin(opts.chatId, text, proposals.map(p => p.eventId))
+  if (!posted.messageId) {
+    throw new Error(`Telegram hat die Nachricht abgelehnt: ${posted.telegram?.description ?? 'unbekannt'}`)
+  }
   result.messageId = posted.messageId
   result.telegram = posted.telegram
   return result

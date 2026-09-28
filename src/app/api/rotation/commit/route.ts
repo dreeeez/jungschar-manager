@@ -5,12 +5,11 @@ import { requireOperator } from '@/services/api-guard'
 export const dynamic = 'force-dynamic'
 
 /**
- * Halbjahres-Einteilung posten.
- *   ?test=1 → Sandbox-Gruppe (TELEGRAM_TEST_CHAT_ID): neu berechnen,
- *             Zuweisungen im Halbjahr ersetzen, posten, pinnen. Body
- *             { proposals: [{ eventId, helperIds }] } übernimmt die in der
- *             Vorschau angepasste Einteilung statt neu zu berechnen.
- *   sonst   → Helfer-Gruppe (TELEGRAM_CHAT_ID): aktuellen Stand posten, pinnen.
+ * Halbjahres-Einteilung posten und pinnen.
+ *   ?test=1 → Sandbox-Gruppe (TELEGRAM_TEST_CHAT_ID), sonst Helfer-Gruppe.
+ *   Body { proposals: [{ eventId, helperIds }] } → diese Einteilung speichern
+ *   (ersetzt die Zuweisungen der Termine) und posten. Ohne Body → den
+ *   gespeicherten Stand posten, keine Neuberechnung.
  */
 export async function POST(req: NextRequest) {
   const denied = requireOperator(req)

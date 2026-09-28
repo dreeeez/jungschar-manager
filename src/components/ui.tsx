@@ -366,20 +366,30 @@ export function Star({ filled }: { filled: boolean }) {
 }
 
 /** Kompakte Datumskachel: Wochentag über Tag, farbig. */
-export function DateTile({ date, tone = 'accent' }: { date: string; tone?: 'accent' | 'muted' }) {
+export function DateTile({
+  date,
+  tone = 'accent',
+  weekday = true,
+}: {
+  date: string
+  tone?: 'accent' | 'muted'
+  /** false, wenn der Wochentag daneben schon steht (Kalender-Liste). */
+  weekday?: boolean
+}) {
   const d = new Date(date + 'T12:00:00')
-  const weekday = d.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '')
+  const wd = d.toLocaleDateString('de-DE', { weekday: 'short' }).replace('.', '')
   const month = d.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '')
   return (
     <div
       className={cx(
-        'flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl leading-none',
+        'flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl leading-none',
+        weekday ? 'gap-1' : 'gap-1.5',
         tone === 'accent' ? 'bg-accent-soft text-accent' : 'bg-bg text-muted',
       )}
     >
-      <span className="text-[10px] font-medium uppercase">{weekday}</span>
-      <span className="mt-0.5 text-lg font-semibold">{d.getDate()}</span>
-      <span className="text-[10px] uppercase opacity-70">{month}</span>
+      {weekday && <span className="text-[10px] font-semibold uppercase tracking-wide">{wd}</span>}
+      <span className={cx('font-semibold', weekday ? 'text-lg' : 'text-xl')}>{d.getDate()}</span>
+      <span className="text-[10px] uppercase tracking-wide opacity-70">{month}</span>
     </div>
   )
 }
