@@ -345,20 +345,8 @@ function pickStage1Template(): (c: Stage1Ctx) => string {
   return STAGE1_TEMPLATES[Math.floor(Math.random() * STAGE1_TEMPLATES.length)]
 }
 
-// Top-Header für Stage 1 — rotiert unabhängig vom Theme.
-// Bewusst etwas länger gehalten, sonst wirken kurze Titel im "+++ X +++"
-// Wrap visuell unausgewogen.
-const STAGE1_TOP_HEADERS = [
-  'JUNGSCHAR NEWS',
-  'JUNGSCHAR INTEL',
-  'HEADS-UP — NÄCHSTE WOCHE',
-  'NÄCHSTE WOCHE JUNGSCHAR',
-  '📣 ANKÜNDIGUNG',
-]
-
-function pickStage1TopHeader(): string {
-  return STAGE1_TOP_HEADERS[Math.floor(Math.random() * STAGE1_TOP_HEADERS.length)]
-}
+// Top-Header für Stage 1: bewusst kurz, längere Header brechen am Handy um.
+const STAGE1_TOP_HEADER = 'HEADS-UP'
 
 function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: Birthday[]): ReminderMessage {
   const ctx: Stage1Ctx = {
@@ -371,7 +359,7 @@ function generateStage1Message(event: any, weather: WeatherForecast | null, birt
     birthdayLine: formatBirthdayLine(birthdays),
   }
   return {
-    message: `+++ ${pickStage1TopHeader()} +++\n\n${pickStage1Template()(ctx)}`,
+    message: `+++ ${STAGE1_TOP_HEADER} +++\n\n${pickStage1Template()(ctx)}`,
   }
 }
 

@@ -50,7 +50,7 @@ Vier zeitlich gestaffelte Reminder-Pings, alle vom täglichen Vercel-Cron `0 8 *
 
 | Wann | Endpoint | Stage | Inhalt |
 |---|---|---|---|
-| Sonntag 5–8 Tage vor Event (Fr- und Sa-Termine) | `/api/cron/reminder` (Stage 1) | `stage1_sunday` | Heads-up — 7 rotierende Themes (Spy, Glaskugel, Wettervorhersage, Spotify Wrapped, Stadion, Festival, Mission Control) + rotierender `+++ NEWS / JUNGSCHAR INTEL / HEADS-UP / NÄCHSTE WOCHE / 📣 ANKÜNDIGUNG +++` Top-Header |
+| Sonntag 5–8 Tage vor Event (Fr- und Sa-Termine) | `/api/cron/reminder` (Stage 1) | `stage1_sunday` | Heads-up — 7 rotierende Themes (Spy, Glaskugel, Wettervorhersage, Spotify Wrapped, Stadion, Festival, Mission Control) + fester Top-Header `+++ HEADS-UP +++` (kurz, sonst bricht er am Handy um) |
 | Mittwoch 2–4 Tage vor Event (Fr- und Sa-Termine) | `/api/cron/reminder` (Stage 2) | `stage2_wednesday` | `+++ 🔥 Countdown: N Tage 🔥 +++` mit Vote-Buttons (votey/votec/voten), kompakter Checkliste |
 | Donnerstag 18:00 lokal | `/api/cron/poll-reminder` | (separates Cron) | Tagged Helfer ohne Vote-Eintrag, replyt zur Mittwochs-Nachricht. 20 rotierende `+++ … +++` Templates |
 | Tag des Events 20:00 lokal | `/api/cron/review-ping` (Crons 18:00 + 19:00 UTC, sendet nur wenn Berlin ≥ 20 Uhr) | `review_pings` | DM an jede ID der Zugangsliste: Sterne-Buttons → Drinnen/Draußen → Freitext. Ergebnis wird `ideas`-Eintrag (`source='bot'`, Rating, Tag, Wetter). Sobald einer fertig ist, werden die DMs der anderen bearbeitet („X hat bereits bewertet“). Logik in `services/review-ping.ts`, Test: `?test=1&date=YYYY-MM-DD[&user=<id>]` |
