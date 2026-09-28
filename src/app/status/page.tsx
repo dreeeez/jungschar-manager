@@ -62,7 +62,7 @@ function fmtDateTime(iso: string): string {
 function stageLabel(t: string): string {
   if (t === 'stage1_sunday') return 'So'
   if (t === 'stage2_wednesday') return 'Mi'
-  if (t === 'stage3_saturday') return 'Sa'
+  if (t === 'stage3_saturday') return 'Tag'
   return t
 }
 

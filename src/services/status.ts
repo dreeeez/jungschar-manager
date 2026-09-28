@@ -19,7 +19,7 @@ const PING_LABELS: Record<PingType, string> = {
   stage2_wednesday: 'Countdown (Mittwoch)',
   poll_thursday: 'Nicht-Voter-Ping (Donnerstag)',
   review_evening: 'Bewertungs-Ping per DM (20:00)',
-  stage3_saturday: 'Aufwacher (Samstag)',
+  stage3_saturday: 'Aufwacher (Termin-Tag)',
 }
 
 /** Cron-Uhrzeiten aus vercel.json (UTC). */
