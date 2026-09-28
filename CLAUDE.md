@@ -51,14 +51,14 @@ Vier zeitlich gestaffelte Reminder-Pings, alle vom täglichen Vercel-Cron `0 8 *
 | Wann | Endpoint | Stage | Inhalt |
 |---|---|---|---|
 | Sonntag 5–8 Tage vor Event (Fr- und Sa-Termine) | `/api/cron/reminder` (Stage 1) | `stage1_sunday` | Heads-up — 7 rotierende Themes (Spy, Glaskugel, Wettervorhersage, Spotify Wrapped, Stadion, Festival, Mission Control) + rotierender `+++ NEWS / JUNGSCHAR INTEL / HEADS-UP / NÄCHSTE WOCHE / 📣 ANKÜNDIGUNG +++` Top-Header |
-| Mittwoch 3–4 Tage vor Event | `/api/cron/reminder` (Stage 2) | `stage2_wednesday` | `+++ 🔥 Countdown: N Tage 🔥 +++` mit Vote-Buttons (votey/voten), kompakter Checkliste |
+| Mittwoch 2–4 Tage vor Event (Fr- und Sa-Termine) | `/api/cron/reminder` (Stage 2) | `stage2_wednesday` | `+++ 🔥 Countdown: N Tage 🔥 +++` mit Vote-Buttons (votey/votec/voten), kompakter Checkliste |
 | Donnerstag 18:00 lokal | `/api/cron/poll-reminder` | (separates Cron) | Tagged Helfer ohne Vote-Eintrag, replyt zur Mittwochs-Nachricht. 20 rotierende `+++ … +++` Templates |
 | Tag des Events 20:00 lokal | `/api/cron/review-ping` (Crons 18:00 + 19:00 UTC, sendet nur wenn Berlin ≥ 20 Uhr) | `review_pings` | DM an jede ID der Zugangsliste: Sterne-Buttons → Drinnen/Draußen → Freitext. Ergebnis wird `ideas`-Eintrag (`source='bot'`, Rating, Tag, Wetter). Sobald einer fertig ist, werden die DMs der anderen bearbeitet („X hat bereits bewertet“). Logik in `services/review-ping.ts`, Test: `?test=1&date=YYYY-MM-DD[&user=<id>]` |
 | Samstag morgen (Tag des Events) | `/api/cron/reminder` (Stage 3) | `stage3_saturday` | Aufwacher mit 6 rotierenden Themes + 18 rotierenden Bibelversen + festem `Ihr schafft das! Viel Spaß und Gottes Segen` Closing. Top-Header rotiert zwischen `+++ HEUTE / JUNGSCHAR-DAY / GAME ON / SHOWTIME / T-0 / DER TAG +++` |
 
 Schedule-Logik in `services/reminders.ts:processReminders()`:
 - Stage 1: `dayOfWeek === 0 && daysUntil ∈ [5,8]` (5 = Freitag, 6 = Samstag)
-- Stage 2: `dayOfWeek === 3 && daysUntil ∈ [3,4]`
+- Stage 2: `dayOfWeek === 3 && daysUntil ∈ [2,4]` (2 = Freitag, 3 = Samstag)
 - Stage 3: `daysUntil === 0` (event day, weekday-unabhängig)
 
 `services/status.ts` spiegelt die Fenster (Bot Health). Warnungen u. a., wenn das Sonntags-Heads-up eines der nächsten 5 Termine fehlt (Sonntag vorbei oder kein Sonntag im Fenster) oder die Einteilung des nächsten Termins nur in der Sandbox gepostet ist.
@@ -77,9 +77,9 @@ Kein Automatismus. Button „Halbjahr einteilen“ im Kalender (`services/rotati
 
 ## Vote-Tracking
 
-Mittwoch-Stage-2 sendet Inline-Buttons `votey_<event_id>` / `voten_<event_id>`. Klick:
-1. Webhook-Handler in `services/bot-commands.ts` parst die Nachricht (✅ Dabei / ❌ Absagen Zeilen) und re-rendert sie mit dem Klicker-Namen.
-2. Persistiert den Vote in `attendance_votes` via `recordVote()` — Vote-Status lebt also doppelt: in der editierten Nachricht UND in der DB.
+Mittwoch-Stage-2 sendet Inline-Buttons `votey_<event_id>` (Bin dabei) / `votec_<event_id>` (Dabei mit Auto) / `voten_<event_id>` (Kann nicht). Klick:
+1. Webhook-Handler in `services/bot-commands.ts` parst die Nachricht (✅ Dabei / 🚗 Mit Auto / ❌ Absagen Zeilen) und re-rendert sie mit dem Klicker-Namen. Nachrichten ohne 🚗-Zeile (vor der Änderung gesendet) bleiben unverändert.
+2. Persistiert den Vote in `attendance_votes` via `recordVote()` („mit Auto“ = `attending=true`, das Auto steht nur in der Nachricht) — Vote-Status lebt also doppelt: in der editierten Nachricht UND in der DB.
 3. Donnerstags-Cron liest `attendance_votes` um Nicht-Voter zu finden.
 
 ## Database-Quirk

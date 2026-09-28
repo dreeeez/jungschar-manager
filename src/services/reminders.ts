@@ -376,7 +376,7 @@ function generateStage1Message(event: any, weather: WeatherForecast | null, birt
 }
 
 /**
- * STUFE 2 — Mittwoch (3-4 Tage vorher)
+ * STUFE 2 — Mittwoch (2-4 Tage vorher)
  * Status-Check mit Checkliste, Poll und Idee-Button
  */
 function generateStage2Message(
@@ -400,13 +400,15 @@ function generateStage2Message(
       `☐ Eltern-Chat\n` +
       `\n📊 <b>Wer ist dabei?</b>\n` +
       `✅ Dabei: —\n` +
+      `🚗 Mit Auto: —\n` +
       `❌ Absagen: —`,
     replyMarkup: {
       inline_keyboard: [
         [
           { text: '✅ Bin dabei!', callback_data: `votey_${event.id}` },
-          { text: '❌ Kann nicht', callback_data: `voten_${event.id}` },
+          { text: '🚗 Dabei mit Auto', callback_data: `votec_${event.id}` },
         ],
+        [{ text: '❌ Kann nicht', callback_data: `voten_${event.id}` }],
       ],
     },
   }
@@ -562,8 +564,8 @@ export async function processReminders(chatId: string, testStage?: number) {
       }
     }
 
-    // Stufe 2: Mittwoch, 3-4 Tage vorher
-    if (testStage === 2 || (!isTest && dayOfWeek === 3 && daysUntil >= 3 && daysUntil <= 4)) {
+    // Stufe 2: Mittwoch, 2-4 Tage vorher (2 = Freitags-, 3 = Samstags-Termin)
+    if (testStage === 2 || (!isTest && dayOfWeek === 3 && daysUntil >= 2 && daysUntil <= 4)) {
       reminderType = STAGE_WEDNESDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         const [weather, birthdays] = await Promise.all([

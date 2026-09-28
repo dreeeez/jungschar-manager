@@ -577,8 +577,12 @@ export function setupBotCommands(bot: Bot) {
 
       switch (action) {
         case 'votey':
+        case 'votec':
         case 'voten': {
-          const isYes = action === 'votey'
+          // votec = dabei mit Auto: zählt in der DB als Zusage, das Auto
+          // steht nur in der Nachricht.
+          const isYes = action !== 'voten'
+          const withCar = action === 'votec'
           const msg = ctx.callbackQuery.message
           const text = msg?.text || ''
           const entities = (msg as any)?.entities || []
@@ -596,16 +600,18 @@ export function setupBotCommands(bot: Bot) {
 
           // Parse current votes from plain text
           const dabeiMatch = text.match(/✅ Dabei(?:\s*\(\d+\))?: (.+)/)
+          const autoMatch = text.match(/🚗 Mit Auto(?:\s*\(\d+\))?: (.+)/)
           const absagenMatch = text.match(/❌ Absagen(?:\s*\(\d+\))?: (.+)/)
+          const names = (m: RegExpMatchArray | null) => !m?.[1] || m[1] === '—' ? [] : m[1].split(', ')
 
-          let dabei = !dabeiMatch?.[1] || dabeiMatch[1] === '—' ? [] : dabeiMatch[1].split(', ')
-          let absagen = !absagenMatch?.[1] || absagenMatch[1] === '—' ? [] : absagenMatch[1].split(', ')
+          // Remove user from all lists (handles vote change)
+          const dabei = names(dabeiMatch).filter(n => n !== userName)
+          const auto = names(autoMatch).filter(n => n !== userName)
+          const absagen = names(absagenMatch).filter(n => n !== userName)
 
-          // Remove user from both lists (handles vote change)
-          dabei = dabei.filter(n => n !== userName)
-          absagen = absagen.filter(n => n !== userName)
-
-          if (isYes) {
+          if (withCar) {
+            auto.push(userName)
+          } else if (isYes) {
             dabei.push(userName)
           } else {
             absagen.push(userName)
@@ -616,6 +622,9 @@ export function setupBotCommands(bot: Bot) {
           const dabeiLine = dabei.length > 0
             ? `✅ Dabei (${dabei.length}): ${dabei.map(esc).join(', ')}`
             : '✅ Dabei: —'
+          const autoLine = auto.length > 0
+            ? `🚗 Mit Auto (${auto.length}): ${auto.map(esc).join(', ')}`
+            : '🚗 Mit Auto: —'
           const absagenLine = absagen.length > 0
             ? `❌ Absagen (${absagen.length}): ${absagen.map(esc).join(', ')}`
             : '❌ Absagen: —'
@@ -623,6 +632,7 @@ export function setupBotCommands(bot: Bot) {
           // Rebuild HTML and replace vote lines
           const html = rebuildHtml(text, entities)
             .replace(/✅ Dabei(?:\s*\(\d+\))?: .+/, dabeiLine)
+            .replace(/🚗 Mit Auto(?:\s*\(\d+\))?: .+/, autoLine)
             .replace(/❌ Absagen(?:\s*\(\d+\))?: .+/, absagenLine)
 
           try {
@@ -635,7 +645,7 @@ export function setupBotCommands(bot: Bot) {
           }
 
           await ctx.answerCallbackQuery({
-            text: isYes ? '✅ Du bist dabei!' : '❌ Notiert!',
+            text: withCar ? '🚗 Du bist dabei, mit Auto!' : isYes ? '✅ Du bist dabei!' : '❌ Notiert!',
           })
           break
         }

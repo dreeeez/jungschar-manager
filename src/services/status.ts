@@ -50,7 +50,7 @@ function isoDay(d: Date): string {
  *
  * Der Reminder-Cron läuft täglich 08:00 UTC; an jedem Lauf gilt
  *   Stage 1: Sonntag  und 5 <= daysUntil <= 8
- *   Stage 2: Mittwoch und 3 <= daysUntil <= 4
+ *   Stage 2: Mittwoch und 2 <= daysUntil <= 4
  *   Stage 3: daysUntil === 0
  * Der Poll-Cron läuft Donnerstag 16:00 UTC und antwortet auf den zuletzt
  * gesendeten Mittwochs-Reminder eines noch bevorstehenden Events.
@@ -81,7 +81,7 @@ function predictPings(eventDate: string, sent: Set<string>, now: Date): NextPing
       if (future) out.push({ type: 'stage1_sunday', at: at.toISOString(), eventDate, label: PING_LABELS.stage1_sunday })
       pending.delete('stage1_sunday')
     }
-    if (pending.has('stage2_wednesday') && dow === 3 && daysUntil >= 3 && daysUntil <= 4) {
+    if (pending.has('stage2_wednesday') && dow === 3 && daysUntil >= 2 && daysUntil <= 4) {
       if (future) {
         out.push({ type: 'stage2_wednesday', at: at.toISOString(), eventDate, label: PING_LABELS.stage2_wednesday })
         stage2Day = day
