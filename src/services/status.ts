@@ -27,6 +27,10 @@ const REMINDER_CRON_HOUR_UTC = 8
 const POLL_CRON_HOUR_UTC = 16
 const POLL_CRON_WEEKDAY = 4 // Donnerstag
 
+/** Stage-1-Fenster aus reminders.ts: Sonntag, 5–8 Tage vor dem Termin. */
+const STAGE1_MIN_DAYS = 5
+const STAGE1_MAX_DAYS = 8
+
 /** Wie viele Termine processReminders() pro Lauf betrachtet (getUpcomingEvents(5)). */
 const REMINDER_EVENT_WINDOW = 5
 
@@ -45,7 +49,7 @@ function isoDay(d: Date): string {
  * berechnet für ein Event die noch ausstehenden Cron-Pings.
  *
  * Der Reminder-Cron läuft täglich 08:00 UTC; an jedem Lauf gilt
- *   Stage 1: Sonntag  und 6 <= daysUntil <= 8
+ *   Stage 1: Sonntag  und 5 <= daysUntil <= 8
  *   Stage 2: Mittwoch und 3 <= daysUntil <= 4
  *   Stage 3: daysUntil === 0
  * Der Poll-Cron läuft Donnerstag 16:00 UTC und antwortet auf den zuletzt
@@ -73,7 +77,7 @@ function predictPings(eventDate: string, sent: Set<string>, now: Date): NextPing
     const daysUntil = totalDays - i
     const future = at.getTime() > now.getTime()
 
-    if (pending.has('stage1_sunday') && dow === 0 && daysUntil >= 6 && daysUntil <= 8) {
+    if (pending.has('stage1_sunday') && dow === 0 && daysUntil >= STAGE1_MIN_DAYS && daysUntil <= STAGE1_MAX_DAYS) {
       if (future) out.push({ type: 'stage1_sunday', at: at.toISOString(), eventDate, label: PING_LABELS.stage1_sunday })
       pending.delete('stage1_sunday')
     }
@@ -113,6 +117,23 @@ function predictPings(eventDate: string, sent: Set<string>, now: Date): NextPing
   }
 
   return out
+}
+
+/**
+ * Sonntags-Heads-up (mit Einteilung) fehlt: noch nicht im reminder_log und
+ * entweder ist der Sonntag schon vorbei (Cron lief, eine Stunde Puffer) oder
+ * es gibt für diesen Wochentag gar keinen Sonntag im Fenster.
+ */
+function stage1Missing(eventDate: string, sent: Set<string>, now: Date): boolean {
+  if (sent.has('stage1_sunday')) return false
+  const event = utcDate(eventDate)
+  for (let k = STAGE1_MIN_DAYS; k <= STAGE1_MAX_DAYS; k++) {
+    const day = new Date(event.getTime() - k * DAY_MS)
+    if (day.getUTCDay() !== 0) continue
+    const due = day.getTime() + (REMINDER_CRON_HOUR_UTC + 1) * 60 * 60 * 1000
+    return due < now.getTime()
+  }
+  return true
 }
 
 /** Ortszeit Europe/Berlin (volle Stunde) → UTC-Date, Sommer-/Winterzeit-sicher. */
@@ -170,7 +191,7 @@ export async function getBotStatus(): Promise<BotStatus> {
   // Alle zukünftigen Termine (für Detail-Liste UND Drift-Abgleich).
   const { data: eventsData } = await db
     .from('events')
-    .select('id, event_date, rotation_message_id')
+    .select('id, event_date, rotation_message_id, rotation_chat_id')
     .gte('event_date', todayIso)
     .order('event_date', { ascending: true })
   const events = (eventsData ?? []) as any[]
@@ -239,6 +260,16 @@ export async function getBotStatus(): Promise<BotStatus> {
     if (ev.daysUntil <= 7 && ev.duo.length === 0) {
       issues.push(`Termin am ${ev.date} in ${ev.daysUntil} Tag(en) hat noch keine Einteilung.`)
     }
+  }
+  for (const e of events.slice(0, REMINDER_EVENT_WINDOW)) {
+    if (stage1Missing(e.event_date, new Set(remByEvent.get(e.id) ?? []), now)) {
+      issues.push(`Termin am ${e.event_date}: Sonntags-Nachricht mit Einteilung ist nicht rausgegangen.`)
+    }
+  }
+  const testChat = process.env.TELEGRAM_TEST_CHAT_ID
+  const next = events[0]
+  if (testChat && next?.rotation_message_id && String(next.rotation_chat_id) === testChat) {
+    issues.push('Die Einteilung ist nur in der Sandbox-Gruppe gepostet, noch nicht in der Helfer-Gruppe.')
   }
 
   return {

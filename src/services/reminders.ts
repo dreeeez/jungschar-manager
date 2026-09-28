@@ -550,8 +550,8 @@ export async function processReminders(chatId: string, testStage?: number) {
     let reminder: ReminderMessage | null = null
     let reminderType: string | null = null
 
-    // Stufe 1: Sonntag, 6-8 Tage vorher
-    if (testStage === 1 || (!isTest && dayOfWeek === 0 && daysUntil >= 6 && daysUntil <= 8)) {
+    // Stufe 1: Sonntag, 5-8 Tage vorher (5 = Freitags-, 6 = Samstags-Termin)
+    if (testStage === 1 || (!isTest && dayOfWeek === 0 && daysUntil >= 5 && daysUntil <= 8)) {
       reminderType = STAGE_SUNDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
         const [weather, birthdays] = await Promise.all([
