@@ -292,16 +292,18 @@ function berlinWeekdayTime(iso: string): string {
 async function getFreshParentIdeas(eventDate: string): Promise<FreshIdea[]> {
   try {
     const db = getSupabase()
-    const [{ data: lastLog }, { data: prevEvent }] = await Promise.all([
-      db.from('reminder_log').select('sent_at').eq('reminder_type', STAGE_SUNDAY).order('sent_at', { ascending: false }).limit(1).maybeSingle(),
-      db.from('events').select('event_date').lt('event_date', eventDate).order('event_date', { ascending: false }).limit(1).maybeSingle(),
-    ])
-    const candidates = [
-      (lastLog as any)?.sent_at as string | undefined,
-      (prevEvent as any)?.event_date ? `${(prevEvent as any).event_date}T23:59:59+02:00` : undefined,
-    ].filter(Boolean) as string[]
-    if (candidates.length === 0) return []
-    const since = candidates.map(c => new Date(c).getTime()).reduce((a, b) => Math.max(a, b))
+    const { data: lastLog } = await db
+      .from('reminder_log').select('sent_at').eq('reminder_type', STAGE_SUNDAY)
+      .order('sent_at', { ascending: false }).limit(1).maybeSingle()
+    let sinceIso: string | undefined = (lastLog as any)?.sent_at
+    if (!sinceIso) {
+      const { data: prevEvent } = await db
+        .from('events').select('event_date').lt('event_date', eventDate)
+        .order('event_date', { ascending: false }).limit(1).maybeSingle()
+      if ((prevEvent as any)?.event_date) sinceIso = `${(prevEvent as any).event_date}T23:59:59+02:00`
+    }
+    if (!sinceIso) return []
+    const since = new Date(sinceIso).getTime()
 
     const { data } = await db
       .from('ideas')
@@ -654,9 +656,9 @@ export async function processReminders(chatId: string, testStage?: number) {
     if (reminder && reminderType) {
       const result = await sendTelegramMessage(chatId, reminder.message, reminder.replyMarkup)
       const messageId: number | undefined = result?.result?.message_id
-      // Auch im Testmodus loggen, damit der Donnerstags-Reply-Test
-      // die message_id auflesen kann (Upsert vermeidet UNIQUE-Konflikte).
-      await logReminder(event.id, reminderType, messageId)
+      // Nur Live-Sends loggen. Ein Test-Eintrag würde den echten Send
+      // desselben Termins unterdrücken und die Ideen-Liste verschieben.
+      if (!isTest && result?.ok) await logReminder(event.id, reminderType, messageId)
       results.push({
         event_id: event.id,
         event_date: event.event_date,

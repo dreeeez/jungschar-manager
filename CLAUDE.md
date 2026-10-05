@@ -67,7 +67,7 @@ Schedule-Logik in `services/reminders.ts:processReminders()`:
 
 `services/status.ts` spiegelt die Fenster (Bot Health). Warnungen u. a., wenn das Sonntags-Heads-up eines der nächsten 5 Termine fehlt (Sonntag vorbei oder kein Sonntag im Fenster) oder die Einteilung des nächsten Termins nur in der Sandbox gepostet ist.
 
-`reminder_log` mit UNIQUE(event_id, reminder_type) verhindert Duplikate. Im Test-Modus wird upserted, nicht insert-only — sonst kannst du `?test=N` nicht mehrfach feuern.
+`reminder_log` mit UNIQUE(event_id, reminder_type) verhindert Duplikate. **Testläufe (`?test=N`) loggen nicht**: ein Test-Eintrag würde den Live-Send desselben Termins unterdrücken und die Ideen-Liste („seit dem letzten Heads-up“) verschieben.
 
 ## Halbjahres-Einteilung
 
@@ -94,7 +94,7 @@ Mittwoch-Stage-2 sendet Inline-Buttons `votey_<event_id>` (Bin dabei) / `votec_<
 
 ## Database-Quirk
 
-`reminder_log.message_id` wird beim Mittwochs-Send mit der Telegram-`message_id` befüllt — der Donnerstags-Cron benutzt sie für `reply_to_message_id`. Damit `?test=2` das auch befüllt, wird im Testmodus ebenfalls geloggt (Upsert auf event_id+reminder_type).
+`reminder_log.message_id` wird beim Live-Mittwochs-Send mit der Telegram-`message_id` befüllt — der Donnerstags-Cron benutzt sie für `reply_to_message_id`. Der Donnerstags-Test (`poll-reminder?test=1`) fällt ohne Live-Mittwoch auf den nächsten Termin zurück, ohne Antwort auf eine Nachricht.
 
 `getBirthdaysAroundEvent()` liefert Kinder mit Geburtstag ±3 Tage um das Event-Datum, Format `▶ 🎂 Name wird X (Tag. Mon.)` pro Kind. Nur Stage 1 + 2 zeigen Geburtstage, Stage 3 nicht.
 

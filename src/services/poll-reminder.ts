@@ -39,9 +39,12 @@ function pickReminderTemplate(): TemplateFn {
  * Findet den letzten Mittwochs-Reminder-Log-Eintrag für ein noch
  * bevorstehendes Event. Wir brauchen die message_id, um Donnerstag
  * darauf antworten zu können, und das Event, um Nicht-Voter zu finden.
+ * Im Test (kein Live-Mittwoch geloggt) fällt es auf den nächsten Termin
+ * zurück, ohne Antwort auf eine Nachricht.
  */
-async function getLatestWednesdayReminder() {
-  const { data } = await getSupabase()
+async function getLatestWednesdayReminder(isTest = false) {
+  const db = getSupabase()
+  const { data } = await db
     .from('reminder_log')
     .select('event_id, message_id, sent_at, event:events(id, event_date)')
     .eq('reminder_type', STAGE_WEDNESDAY)
@@ -50,12 +53,19 @@ async function getLatestWednesdayReminder() {
     .limit(1)
 
   const row = data?.[0] as any
-  if (!row || !row.event) return null
-  return {
-    eventId: row.event_id as string,
-    messageId: row.message_id as number | null,
-    eventDate: row.event.event_date as string,
+  if (row?.event) {
+    return {
+      eventId: row.event_id as string,
+      messageId: row.message_id as number | null,
+      eventDate: row.event.event_date as string,
+    }
   }
+  if (!isTest) return null
+  const { data: next } = await db
+    .from('events').select('id, event_date').gte('event_date', getTodayISO())
+    .order('event_date', { ascending: true }).limit(1).maybeSingle()
+  if (!next) return null
+  return { eventId: (next as any).id as string, messageId: null, eventDate: (next as any).event_date as string }
 }
 
 /**
@@ -102,7 +112,7 @@ function escapeHtml(s: string): string {
  * nicht im Mittwochs-Poll abgestimmt haben.
  */
 export async function processPollReminder(chatId: string, isTest = false) {
-  const wednesday = await getLatestWednesdayReminder()
+  const wednesday = await getLatestWednesdayReminder(isTest)
   if (!wednesday) {
     return { message: 'Kein offener Mittwochs-Reminder gefunden.' }
   }
