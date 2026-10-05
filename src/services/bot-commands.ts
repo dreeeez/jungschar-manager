@@ -36,6 +36,7 @@ import {
   saveParentIdea,
   sendFoodInspo,
 } from './parents-bot'
+import { BUG_PHOTO_NEEDS_TEXT, BUG_PROMPT, saveFeedback } from './feedback'
 
 /**
  * Bot-Befehle.
@@ -52,6 +53,8 @@ import {
 const pendingRegistrations = new Set<number>()
 // Wartet auf den Freitext nach /idee — Fallback, falls jemand nicht "antwortet"
 const pendingIdeas = new Set<number>()
+// Wartet auf den Text nach /bug
+const pendingBugs = new Set<number>()
 // Alben kommen als mehrere Nachrichten mit gleicher media_group_id: nur einmal antworten.
 const answeredAlbums = new Set<string>()
 
@@ -124,16 +127,35 @@ function helpFor(role: Role): string {
   if (!role.helper && !role.parent) {
     lines.push('/register CODE – als Helfer registrieren')
   }
+  if (role.helper || role.parent || role.admin) {
+    lines.push('', '/bug – Fehler oder Wunsch zum Bot melden')
+  }
   lines.push('', '/help – diese Übersicht')
   return lines.join('\n').trim()
 }
 
 /** Button, der den privaten Chat mit dem Bot öffnet und dort direkt {payload} startet. */
-function privateChatButton(ctx: Context, payload: 'idee' | 'invite' | 'inspo') {
+function privateChatButton(ctx: Context, payload: 'idee' | 'invite' | 'inspo' | 'bug') {
   const username = ctx.me.username
   return {
     inline_keyboard: [[{ text: 'Privat schreiben', url: `https://t.me/${username}?start=${payload}` }]],
   }
+}
+
+/** Rolle als Wort fürs Feedback. */
+function roleLabel(role: Role): string {
+  if (role.admin) return 'Admin'
+  if (role.helper) return 'Helfer'
+  if (role.parent) return 'Eltern'
+  return 'unbekannt'
+}
+
+/** /bug im privaten Chat: nach der Meldung fragen. */
+async function startBugFlow(ctx: Context) {
+  if (ctx.from) pendingBugs.add(ctx.from.id)
+  await ctx.reply(BUG_PROMPT, {
+    reply_markup: { force_reply: true, input_field_placeholder: 'Was ist dir aufgefallen?' },
+  })
 }
 
 /** /idee im privaten Chat: nach der Idee fragen. */
@@ -191,7 +213,7 @@ async function startInviteFlow(ctx: Context, role: Role) {
  */
 export function setupBotCommands(bot: Bot) {
   // /start – Begrüßung je Rolle. Admins bekommen den Menü-Button "Admin".
-  // Mit Deep-Link-Payload (t.me/<bot>?start=idee|invite|inspo|fotos) direkt in den Ablauf springen.
+  // Mit Deep-Link-Payload (t.me/<bot>?start=idee|invite|inspo|bug|fotos) direkt in den Ablauf springen.
   bot.command('start', async (ctx) => {
     const role = await roleOf(ctx)
     const payload = (ctx.match ?? '').trim().toLowerCase()
@@ -206,7 +228,7 @@ export function setupBotCommands(bot: Bot) {
       return
     }
 
-    if (ctx.chat.type === 'private' && ['idee', 'invite', 'einladen', 'inspo'].includes(payload)) {
+    if (ctx.chat.type === 'private' && ['idee', 'invite', 'einladen', 'inspo', 'bug'].includes(payload)) {
       if (!role.helper && !role.parent && !role.admin) {
         await ctx.reply(UNKNOWN)
         return
@@ -217,6 +239,10 @@ export function setupBotCommands(bot: Bot) {
       }
       if (payload === 'inspo') {
         await sendFoodInspo(String(ctx.chat.id))
+        return
+      }
+      if (payload === 'bug') {
+        await startBugFlow(ctx)
         return
       }
       if (role.parent || role.admin) {
@@ -379,6 +405,23 @@ export function setupBotCommands(bot: Bot) {
     await startInviteFlow(ctx, role)
   })
 
+  // /bug – Fehler, Wunsch oder Idee zu Bot und App (alle Bekannten, privat)
+  bot.command('bug', async (ctx) => {
+    const role = await roleOf(ctx)
+    if (!role.helper && !role.parent && !role.admin) {
+      await ctx.reply(UNKNOWN)
+      return
+    }
+    if (ctx.chat.type !== 'private') {
+      await ctx.reply('Schreib mir das privat, dann geht nichts unter.', {
+        reply_markup: privateChatButton(ctx, 'bug'),
+        disable_notification: true,
+      })
+      return
+    }
+    await startBugFlow(ctx)
+  })
+
   // /inspo – Essens-„Inspiration“ (Spaß): Sterneküche als Album, dann die Auflösung.
   bot.command('inspo', async (ctx) => {
     const role = await roleOf(ctx)
@@ -480,9 +523,33 @@ export function setupBotCommands(bot: Bot) {
     if (ctx.chat.type !== 'private' || !ctx.from) return
     const role = await roleOf(ctx)
 
+    const repliedTo = ctx.message.reply_to_message?.text
+
+    // Screenshot zu /bug: Bildunterschrift = Meldung.
+    if (ctx.message.photo && (pendingBugs.has(ctx.from.id) || repliedTo === BUG_PROMPT || repliedTo === BUG_PHOTO_NEEDS_TEXT)) {
+      const groupKey = ctx.message.media_group_id ?? `single_${ctx.message.message_id}`
+      if (answeredAlbums.has(groupKey)) return
+      answeredAlbums.add(groupKey)
+      const caption = (ctx.message.caption ?? '').trim()
+      if (!caption) {
+        await ctx.reply(BUG_PHOTO_NEEDS_TEXT, { reply_markup: { force_reply: true } })
+        return
+      }
+      pendingBugs.delete(ctx.from.id)
+      const name = role.parent?.name ?? role.helper?.name ?? ctx.from.first_name ?? 'Unbekannt'
+      const best = ctx.message.photo[ctx.message.photo.length - 1]
+      try {
+        await saveFeedback(caption, { name, telegramUserId: ctx.from.id, role: roleLabel(role) }, best.file_id)
+        await ctx.reply('Danke, ist notiert! Wir schauen es uns an.')
+      } catch (e) {
+        console.error('saveFeedback (photo) failed:', e)
+        await ctx.reply('Speichern hat nicht geklappt. Magst du es später noch einmal versuchen?')
+      }
+      return
+    }
+
     // Bild zu einer Idee (/idee läuft gerade): Bildunterschrift = Idee.
     // Bei Alben zählt nur das erste Bild, ein Bild pro Idee.
-    const repliedTo = ctx.message.reply_to_message?.text
     if (ctx.message.photo && (pendingIdeas.has(ctx.from.id) || repliedTo === IDEA_PROMPT || repliedTo === IDEA_PHOTO_NEEDS_TEXT)) {
       const groupKey = ctx.message.media_group_id ?? `single_${ctx.message.message_id}`
       if (answeredAlbums.has(groupKey)) return
@@ -574,6 +641,21 @@ export function setupBotCommands(bot: Bot) {
     if (!telegramUserId || ctx.chat?.type !== 'private') return
 
     const repliedTo = ctx.message.reply_to_message?.text
+
+    // Antwort auf /bug
+    if (repliedTo === BUG_PROMPT || repliedTo === BUG_PHOTO_NEEDS_TEXT || pendingBugs.has(telegramUserId)) {
+      pendingBugs.delete(telegramUserId)
+      const role = await roleOf(ctx)
+      const name = role.parent?.name ?? role.helper?.name ?? ctx.from?.first_name ?? 'Unbekannt'
+      try {
+        await saveFeedback(text, { name, telegramUserId, role: roleLabel(role) })
+        await ctx.reply('Danke, ist notiert! Wir schauen es uns an.')
+      } catch (e) {
+        console.error('saveFeedback failed:', e)
+        await ctx.reply('Speichern hat nicht geklappt. Magst du es später noch einmal versuchen?')
+      }
+      return
+    }
 
     // Antwort auf /idee (per "Antworten" oder direkt danach)
     if (repliedTo === IDEA_PROMPT || repliedTo === IDEA_PHOTO_NEEDS_TEXT || pendingIdeas.has(telegramUserId)) {

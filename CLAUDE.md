@@ -29,7 +29,8 @@ src/
     ideas/          Mini-App: Aktivitäten-History
     ideen/          Mini-App: Ideenpool nur lesend, einzige Seite für Helfer
     settings/       Mini-App: Wetter-Ort, ICS-Upload
-    api/idea-photo/ Bild einer /idee aus Telegram durchreichen (Session nötig)
+    api/idea-photo/ Bild einer /idee oder eines /bug aus Telegram durchreichen (Session nötig)
+    feedback/       Mini-App: Meldungen aus /bug, abhaken (nur Admins)
   components/ui.tsx UI-Bausteine der Mini-App (Page mit Seitenfarbe, Karten, Badges, Sheet, Icons) — keine Emojis in der UI
   services/         Server-side Business-Logik
     reminders.ts          Reminder-Engine (Stage 1/2/3)
@@ -148,6 +149,7 @@ Ideenpool → Button „Ideen in Helfer-Gruppe teilen“ (nur Admins) → bis zu
 | `/bilder` | Helfer, privat | eigene noch nicht gepostete Fotos/Videos einzeln, je mit Button „Rauswerfen“ (`phx_<id>`, nur eigene) |
 | `/review` | Admin, privat | alle noch nicht geposteten Fotos/Videos einzeln, je mit Button „Rauswerfen“ (`phx_<id>`, löscht die Zeile) |
 | `/send` (alt: `/senden`) | Admin, privat | Rückfrage → Album(s) in die Elterngruppe, danach Nachricht mit `/idee` (+ `/invite`, wenn die nächste Jungschar samstags ist). `/send test` → Sandbox ohne Markierung |
+| `/bug` | Eltern + Helfer + Admins, privat | Fehler, Wunsch, Idee zu Bot/App: Text oder Screenshot mit Bildunterschrift → `feedback` (Migration 015: name, role, text, photo_file_id, done_at). Admins bekommen sofort eine DM; Mini-App → „Feedback“ (nur Admins): offene zuerst, „Erledigt“/„Wieder öffnen“, nichts wird gelöscht; Startseite zeigt „N offen“. Bild via `/api/idea-photo?kind=feedback&id=` |
 | `/chatid` | Admin | Chat-ID |
 
 **Grundsatz Eltern:** der Bot schreibt Eltern nie aktiv per DM an. Eltern schreiben dem Bot (`/idee`, `/invite`, `/inspo`, `/termine`); Gruppen-Posts in die Elterngruppe (Fotos, Geburtstagsgruß) sind davon unberührt. Bewertung (review-ping) nur Admins, Fotos nur Helfer.
@@ -232,4 +234,5 @@ ideas (event_id, title, description, material, was_used, source, rating, tags[],
 review_pings (event_id, telegram_user_id, chat_id, message_id, state, stars, place, is_test) UNIQUE(event_id, telegram_user_id)
 children (id, name, birthday, active)
 settings (key UNIQUE, value)
+feedback (telegram_user_id, name, role, text, photo_file_id, done_at)
 ```
