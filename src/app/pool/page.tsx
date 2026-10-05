@@ -2,83 +2,35 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
+import { IdeaBody } from '@/components/IdeaBody'
 import { supabase } from '@/lib/supabase'
 import { Badge, Button, Check, ChevronRight, Disclosure, Empty, Input, Label, List, Loading, Page, Row, Segmented, Textarea } from '@/components/ui'
+import {
+  CATEGORIES,
+  CATEGORY_LABEL,
+  PLACE_OPTIONS,
+  POOL_SELECT,
+  SORT_OPTIONS,
+  filterIdeas,
+  loadSort,
+  originLabel,
+  saveSort,
+  shortOrigin,
+  type Place,
+  type PoolIdea,
+  type Sort,
+} from '@/lib/pool'
 
 /*
  * Ideenpool: Aktivitäten, die noch keinem Termin zugeordnet sind.
  * Gespeichert in `ideas` mit event_id NULL und was_used=false. Der Grundstock
  * stammt aus dem Elternchat-Export (source='elterngruppe'), neue Ideen kommen
- * über das Formular dazu (source='manual').
+ * über das Formular dazu (source='manual'). Helfer sehen dieselbe Liste
+ * nur lesend unter /ideen; Gemeinsames liegt in lib/pool.ts.
  */
-
-interface PoolIdea {
-  id: string
-  title: string
-  description: string | null
-  material: string | null
-  source: string
-  tags: string[] | null
-  suggested_by: string | null
-  created_at: string
-}
-
-type Place = 'drinnen' | 'draußen'
-const PLACE_OPTIONS: { value: Place; label: string }[] = [
-  { value: 'drinnen', label: 'Drinnen' },
-  { value: 'draußen', label: 'Draußen' },
-]
-
-/** Kategorien als Tags neben drinnen/draußen. Reihenfolge = Anzeige. */
-const CATEGORIES: { value: string; label: string }[] = [
-  { value: 'ausflug', label: 'Ausflug' },
-  { value: 'sport', label: 'Sport' },
-  { value: 'wasser', label: 'Wasser' },
-  { value: 'wald', label: 'Wald' },
-  { value: 'kreativ', label: 'Kreativ' },
-  { value: 'essen', label: 'Essen' },
-  { value: 'winter', label: 'Winter' },
-  { value: 'herbst', label: 'Herbst' },
-  { value: 'feier', label: 'Feier' },
-  { value: 'online', label: 'Online' },
-  { value: 'aktion', label: 'Aktion' },
-]
-const CATEGORY_LABEL = new Map(CATEGORIES.map((c) => [c.value, c.label]))
-
-type Sort = 'newest' | 'oldest' | 'title'
-const SORT_OPTIONS: { value: Sort; label: string }[] = [
-  { value: 'newest', label: 'Neueste zuerst' },
-  { value: 'oldest', label: 'Älteste zuerst' },
-  { value: 'title', label: 'A bis Z' },
-]
-const SORT_KEY = 'pool.sort'
-
-function loadSort(): Sort {
-  try {
-    const v = localStorage.getItem(SORT_KEY)
-    if (v === 'newest' || v === 'oldest' || v === 'title') return v
-  } catch {}
-  return 'newest'
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' })
-}
 
 function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(' ')
-}
-
-/** Kurzform für die Zeile: „Felix Schniepp, Nov. 2021". */
-function shortOrigin(idea: PoolIdea): string {
-  const month = new Date(idea.created_at).toLocaleDateString('de-DE', { month: 'short', year: 'numeric' })
-  return idea.suggested_by ? `${idea.suggested_by}, ${month}` : month
-}
-
-/** Herkunftszeile: „Felix Schniepp · 25. Nov. 2021 · Elternchat". */
-function originLabel(idea: PoolIdea): string {
-  const parts = [idea.suggested_by, formatDate(idea.created_at), idea.source === 'elterngruppe' ? 'Elternchat' : 'Mini-App']
-  return parts.filter(Boolean).join(' · ')
 }
 
 export default function PoolPage() {
@@ -146,13 +98,13 @@ export default function PoolPage() {
 
   function changeSort(next: Sort) {
     setSort(next)
-    try { localStorage.setItem(SORT_KEY, next) } catch {}
+    saveSort(next)
   }
 
   async function fetchIdeas() {
     const { data, error } = await (supabase as any)
       .from('ideas')
-      .select('id, title, description, material, source, tags, suggested_by, created_at')
+      .select(POOL_SELECT)
       .is('event_id', null)
       .eq('was_used', false)
       .order('created_at', { ascending: false })
@@ -164,22 +116,7 @@ export default function PoolPage() {
     setLoading(false)
   }
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const list = ideas.filter((idea) => {
-      const tags = idea.tags || []
-      if (place && !tags.includes(place)) return false
-      if (category && !tags.includes(category)) return false
-      if (!q) return true
-      const haystack = `${idea.title} ${idea.description ?? ''} ${idea.material ?? ''}`.toLowerCase()
-      return haystack.includes(q)
-    })
-    return list.sort((a, b) => {
-      if (sort === 'title') return a.title.localeCompare(b.title, 'de')
-      const diff = a.created_at.localeCompare(b.created_at)
-      return sort === 'newest' ? -diff : diff
-    })
-  }, [ideas, query, place, category, sort])
+  const filtered = useMemo(() => filterIdeas(ideas, query, place, category, sort), [ideas, query, place, category, sort])
 
   function resetForm() {
     setNewTitle('')
@@ -206,7 +143,7 @@ export default function PoolPage() {
         tags,
         suggested_by: helper?.name ?? user?.first_name ?? null,
       })
-      .select('id, title, description, material, source, tags, suggested_by, created_at')
+      .select(POOL_SELECT)
       .single()
     setSaving(false)
     if (error) {
@@ -369,14 +306,7 @@ export default function PoolPage() {
                 </Row>
                 {open && !selecting && (
                   <div className="space-y-3 px-4 pb-4">
-                    {idea.description && (
-                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{idea.description}</p>
-                    )}
-                    {idea.material && (
-                      <p className="text-sm text-muted">
-                        <span className="font-medium">Mitbringen:</span> {idea.material}
-                      </p>
-                    )}
+                    <IdeaBody idea={idea} />
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs text-muted">{originLabel(idea)}</span>
                       <Button variant="danger" size="sm" className="-mr-3" onClick={() => removeIdea(idea)}>

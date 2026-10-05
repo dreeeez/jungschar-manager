@@ -16,6 +16,14 @@ export function formatDate(dateStr: string): string {
 }
 
 /**
+ * Langer Wochentag, kurzer Monat — für die Reminder-Zeilen.
+ * Beispiel: "Samstag, 24. Jan."
+ */
+export function formatDateShortMonth(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'short' })
+}
+
+/**
  * Formatiert ein Datum kurz
  * Beispiel: "Sa, 24. Jan"
  */
@@ -42,6 +50,14 @@ export function formatDateLong(dateStr: string): string {
     day: 'numeric',
   }
   return date.toLocaleDateString('de-DE', options)
+}
+
+/**
+ * Elterndienst (Essen) gibt es nur an Samstags-Terminen. Freitags wird
+ * niemand eingeteilt und die Reminder erwähnen das Essen nicht.
+ */
+export function hasFoodDuty(eventDate: string): boolean {
+  return new Date(eventDate.slice(0, 10) + 'T12:00:00').getDay() === 6
 }
 
 /**

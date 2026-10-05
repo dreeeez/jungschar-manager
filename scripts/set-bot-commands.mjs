@@ -20,12 +20,14 @@ const commands = [
   { command: 'help', description: 'Befehle anzeigen' },
   { command: 'termine', description: 'Nächste Jungschar-Termine' },
   { command: 'idee', description: 'Programm-Idee vorschlagen' },
-  { command: 'einladen', description: 'Die Jungschar zu euch einladen' },
+  { command: 'invite', description: 'Die Jungschar zu euch einladen' },
+  { command: 'inspo', description: 'Essensideen für den Jungschar-Besuch' },
   { command: 'next', description: 'Termine mit Team (Helfer)' },
   { command: 'mystatus', description: 'Meine Einsätze (Helfer)' },
+  { command: 'bilder', description: 'Meine geschickten Bilder, falsche rauswerfen (Helfer)' },
   { command: 'register', description: 'Als Helfer registrieren (mit Code)' },
-  { command: 'bilder', description: 'Gesammelte Fotos ansehen (Admin)' },
-  { command: 'senden', description: 'Fotos in den Elternchat posten (Admin)' },
+  { command: 'review', description: 'Fotos und Videos prüfen (Admin)' },
+  { command: 'send', description: 'Fotos und Videos in den Elternchat posten (Admin)' },
 ]
 
 const res = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {

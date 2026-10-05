@@ -5,28 +5,36 @@ import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from '.
 import { recordVote } from './attendance'
 import { handleReviewCallback, handleReviewText } from './review-ping'
 import { ADMIN_TELEGRAM_USER_IDS, APP_URL, isAdmin } from './admins'
-import { sendTelegramMessage } from './reminders'
+import { sendTelegramMessage, wasReminderSent } from './reminders'
 import {
   eventForNewPhoto,
   eventForPosting,
-  photoCounts,
+  mediaCounts,
+  mediaLabel,
+  photoInvite,
   photoTargetChat,
-  postPhotos,
-  previewPhotos,
-  savePhoto,
+  postMedia,
+  removeMedia,
+  removeMediaGroup,
+  saveMedia,
+  sendReviewItems,
   shortDate,
+  type MediaType,
 } from './photos'
 import {
+  IDEA_PHOTO_NEEDS_TEXT,
   IDEA_PROMPT,
+  cancelInvitation,
+  cancelInviteKeyboard,
   checkRegisterCode,
   ensureParentForAdmin,
   findParentByTelegram,
   getEventDate,
   inviteConfirmKeyboard,
-  inviteDateKeyboard,
-  openInviteEvents,
+  nextInviteEvent,
   saveInvitation,
   saveParentIdea,
+  sendFoodInspo,
 } from './parents-bot'
 
 /**
@@ -96,7 +104,7 @@ async function roleOf(ctx: Context): Promise<Role> {
   return { helper, parent, admin: isAdmin(id) }
 }
 
-const NOT_HELPER = 'Dieser Befehl ist nur für Helfer. Eltern nutzen /idee, /einladen und /termine.'
+const NOT_HELPER = 'Dieser Befehl ist nur für Helfer. Eltern nutzen /idee, /invite und /termine.'
 const UNKNOWN =
   'Ich kenne dich noch nicht.\n\n' +
   'Helfer: /register CODE (den Code bekommst du von Marco oder Jens).\n' +
@@ -105,13 +113,13 @@ const UNKNOWN =
 function helpFor(role: Role): string {
   const lines: string[] = []
   if (role.helper) {
-    lines.push('<b>Helfer</b>', '/next – nächste Termine mit Team', '/status – nächste Jungschar', '/mystatus – meine Einsätze', 'Fotos von der Jungschar? Einfach hier reinschicken.')
+    lines.push('<b>Helfer</b>', '/next – nächste Termine mit Team', '/status – nächste Jungschar', '/mystatus – meine Einsätze', 'Fotos oder Videos von der Jungschar? Einfach hier reinschicken.', '/bilder – meine geschickten Bilder, falsche rauswerfen', 'Ideenpool: Button „Ideen“ unten neben dem Eingabefeld')
   }
   if (role.parent || role.helper || role.admin) {
-    lines.push('', '<b>Eltern</b>', '/termine – nächste Jungschar-Termine', '/idee – Programm-Idee vorschlagen', '/einladen – die Jungschar zu euch einladen')
+    lines.push('', '<b>Eltern</b>', '/termine – nächste Jungschar-Termine', '/idee – Programm-Idee vorschlagen', '/invite – die Jungschar zu euch einladen', '/inspo – Essensideen für den Jungschar-Besuch')
   }
   if (role.admin) {
-    lines.push('', '<b>Admin</b>', '/bilder – gesammelte Fotos ansehen', '/senden – Fotos in den Elternchat posten', '/chatid – Chat-ID anzeigen', `Mini-App: ${APP_URL}`)
+    lines.push('', '<b>Admin</b>', '/review – gesammelte Fotos und Videos prüfen, einzelne rauswerfen', '/send – alles Übrige in den Elternchat posten', '/chatid – Chat-ID anzeigen', `Mini-App: ${APP_URL}`)
   }
   if (!role.helper && !role.parent) {
     lines.push('/register CODE – als Helfer registrieren')
@@ -121,7 +129,7 @@ function helpFor(role: Role): string {
 }
 
 /** Button, der den privaten Chat mit dem Bot öffnet und dort direkt {payload} startet. */
-function privateChatButton(ctx: Context, payload: 'idee' | 'einladen') {
+function privateChatButton(ctx: Context, payload: 'idee' | 'invite' | 'inspo') {
   const username = ctx.me.username
   return {
     inline_keyboard: [[{ text: 'Privat schreiben', url: `https://t.me/${username}?start=${payload}` }]],
@@ -136,15 +144,45 @@ async function startIdeaFlow(ctx: Context) {
   })
 }
 
-/** /einladen im privaten Chat: freie Termine als Buttons. */
-async function startInviteFlow(ctx: Context) {
-  const events = await openInviteEvents()
-  if (events.length === 0) {
-    await ctx.reply('Gerade ist kein Termin frei. Danke euch!')
+/**
+ * DM an die Zugangsliste (Marco, Jens), aber nur, wenn das Sonntags-Heads-up
+ * für den Termin schon raus ist. Vorher zeigt das Heads-up die Einladung
+ * selbst; danach müssen die beiden das Team informieren.
+ */
+async function notifyAdminsAfterHeadsUp(eventId: string, line: string): Promise<void> {
+  if (!(await wasReminderSent(eventId, 'stage1_sunday'))) return
+  const event = await getEventById(eventId)
+  const team = event ? getHelperNames(event) : 'Niemand eingetragen'
+  const note = `${line}\n👥 Dran sind: ${escapeHtml(team)}\n⚠️ Das Sonntags-Heads-up ist schon raus, sag dem Team bitte Bescheid.`
+  for (const adminId of ADMIN_TELEGRAM_USER_IDS) {
+    sendTelegramMessage(String(adminId), note).catch((e) => console.error('admin invite notice failed:', e))
+  }
+}
+
+/**
+ * /invite im privaten Chat: nur die nächste Samstags-Jungschar, keine
+ * Terminauswahl. Schon vergeben → „zu spät“; selbst eingeladen → Button zum
+ * Zurückziehen; frei → Ja/Nein.
+ */
+async function startInviteFlow(ctx: Context, role: Role) {
+  const target = await nextInviteEvent()
+  if (!target) {
+    await ctx.reply('Gerade steht keine Samstags-Jungschar an. Danke euch, gerne beim nächsten Mal!')
     return
   }
-  await ctx.reply('Schön! Zu welcher Jungschar möchtet ihr uns einladen?', {
-    reply_markup: inviteDateKeyboard(events),
+  if (target.takenBy) {
+    if (role.parent && target.takenBy.parentId === role.parent.id) {
+      await ctx.reply(
+        `Ihr habt uns für ${shortDate(target.event_date)} schon eingeladen, danke! Falls es doch nicht klappt, könnt ihr die Einladung hier zurückziehen.`,
+        { reply_markup: cancelInviteKeyboard(target.id) },
+      )
+      return
+    }
+    await ctx.reply(`Zu spät, für ${shortDate(target.event_date)} war jemand anderes schneller! Gerne bei der nächsten Gelegenheit.`)
+    return
+  }
+  await ctx.reply(`Die nächste Jungschar ist am ${formatDate(target.event_date)}. Wollt ihr uns zu euch einladen?`, {
+    reply_markup: inviteConfirmKeyboard(target.id),
   })
 }
 
@@ -153,12 +191,22 @@ async function startInviteFlow(ctx: Context) {
  */
 export function setupBotCommands(bot: Bot) {
   // /start – Begrüßung je Rolle. Admins bekommen den Menü-Button "Admin".
-  // Mit Deep-Link-Payload (t.me/<bot>?start=idee|einladen) direkt in den Ablauf springen.
+  // Mit Deep-Link-Payload (t.me/<bot>?start=idee|invite|inspo|fotos) direkt in den Ablauf springen.
   bot.command('start', async (ctx) => {
     const role = await roleOf(ctx)
     const payload = (ctx.match ?? '').trim().toLowerCase()
 
-    if (ctx.chat.type === 'private' && (payload === 'idee' || payload === 'einladen')) {
+    // Button „Momente festgehalten?“ aus der Helfer-Gruppe
+    if (ctx.chat.type === 'private' && payload === 'fotos') {
+      if (!role.helper && !role.admin) {
+        await ctx.reply(role.parent ? 'Fotos sammeln nur die Helfer. Danke dir trotzdem!' : UNKNOWN)
+        return
+      }
+      await ctx.reply(await photoInvite())
+      return
+    }
+
+    if (ctx.chat.type === 'private' && ['idee', 'invite', 'einladen', 'inspo'].includes(payload)) {
       if (!role.helper && !role.parent && !role.admin) {
         await ctx.reply(UNKNOWN)
         return
@@ -167,19 +215,26 @@ export function setupBotCommands(bot: Bot) {
         await startIdeaFlow(ctx)
         return
       }
+      if (payload === 'inspo') {
+        await sendFoodInspo(String(ctx.chat.id))
+        return
+      }
       if (role.parent || role.admin) {
-        await startInviteFlow(ctx)
+        await startInviteFlow(ctx, role)
         return
       }
       await ctx.reply('Einladungen kommen von den Eltern. Als Helfer trägst du so etwas im Ideenpool ein.')
       return
     }
 
-    if (ctx.chat.type === 'private' && role.admin) {
+    // Menü-Button neben dem Eingabefeld: Admins die ganze App, Helfer nur den Ideenpool.
+    if (ctx.chat.type === 'private' && (role.admin || role.helper)) {
       await ctx.api
         .setChatMenuButton({
           chat_id: ctx.chat.id,
-          menu_button: { type: 'web_app', text: 'Admin', web_app: { url: APP_URL } },
+          menu_button: role.admin
+            ? { type: 'web_app', text: 'Admin', web_app: { url: APP_URL } }
+            : { type: 'web_app', text: 'Ideen', web_app: { url: `${APP_URL}/ideen` } },
         })
         .catch((e) => console.error('setChatMenuButton failed:', e))
     }
@@ -190,7 +245,7 @@ export function setupBotCommands(bot: Bot) {
     } else if (role.parent) {
       intro =
         `Hallo ${escapeHtml(role.parent.name)}! Schön, dass du da bist.\n\n` +
-        'Mit /idee kannst du uns eine Programm-Idee schicken, mit /einladen die Jungschar zu euch nach Hause einladen.'
+        'Mit /idee kannst du uns eine Programm-Idee schicken, mit /invite die Jungschar zu euch nach Hause einladen.'
     } else {
       intro = 'Willkommen beim Jungschar-Bot!\n\n' + UNKNOWN
     }
@@ -307,8 +362,8 @@ export function setupBotCommands(bot: Bot) {
     await startIdeaFlow(ctx)
   })
 
-  // /einladen – „Kommt zu uns“ (Eltern und Admins, privat)
-  bot.command('einladen', async (ctx) => {
+  // /invite (alt: /einladen) – „Kommt zu uns“ (Eltern und Admins, privat)
+  bot.command(['invite', 'einladen'], async (ctx) => {
     const role = await roleOf(ctx)
     if (!role.parent && !role.admin) {
       await ctx.reply(role.helper ? 'Einladungen kommen von den Eltern. Als Helfer trägst du so etwas im Ideenpool ein.' : UNKNOWN)
@@ -316,40 +371,76 @@ export function setupBotCommands(bot: Bot) {
     }
     if (ctx.chat.type !== 'private') {
       await ctx.reply('Einladungen nehme ich privat entgegen.', {
-        reply_markup: privateChatButton(ctx, 'einladen'),
+        reply_markup: privateChatButton(ctx, 'invite'),
         disable_notification: true,
       })
       return
     }
-    await startInviteFlow(ctx)
+    await startInviteFlow(ctx, role)
   })
 
-  // /bilder – gesammelte Fotos ansehen (Admins, privat)
+  // /inspo – Essens-„Inspiration“ (Spaß): Sterneküche als Album, dann die Auflösung.
+  bot.command('inspo', async (ctx) => {
+    const role = await roleOf(ctx)
+    if (!role.helper && !role.parent && !role.admin) {
+      await ctx.reply(UNKNOWN)
+      return
+    }
+    if (ctx.chat.type !== 'private') {
+      await ctx.reply('Das zeige ich dir privat.', {
+        reply_markup: privateChatButton(ctx, 'inspo'),
+        disable_notification: true,
+      })
+      return
+    }
+    await sendFoodInspo(String(ctx.chat.id))
+  })
+
+  // /bilder – eigene, noch nicht gepostete Fotos und Videos (Helfer, privat),
+  // je mit Button zum Rauswerfen, falls etwas falsch geschickt wurde.
   bot.command('bilder', async (ctx) => {
+    const role = await roleOf(ctx)
+    if (ctx.chat.type !== 'private' || !ctx.from || (!role.helper && !role.admin)) return
+    const event = await eventForPosting()
+    if (!event) {
+      await ctx.reply('Kein Termin gefunden.')
+      return
+    }
+    const shown = await sendReviewItems(String(ctx.chat.id), event, ctx.from.id)
+    await ctx.reply(
+      shown === 0
+        ? `Von dir ist für ${shortDate(event.event_date)} nichts offen. Was schon gepostet ist, kann nur noch im Elternchat gelöscht werden.`
+        : `${shown} ${shown === 1 ? 'Medium' : 'Medien'} von dir für ${shortDate(event.event_date)}. Falsch geschickt? Einfach drunter rauswerfen.`,
+    )
+  })
+
+  // /review – gesammelte Fotos und Videos prüfen (Admins, privat). Jedes
+  // Medium kommt einzeln mit einem Button zum Rauswerfen (phx_<id>).
+  bot.command('review', async (ctx) => {
     if (!isAdmin(ctx.from?.id ?? 0) || ctx.chat.type !== 'private') return
     const event = await eventForPosting()
     if (!event) {
       await ctx.reply('Kein Termin gefunden.')
       return
     }
-    const counts = await photoCounts(event.id)
+    const counts = await mediaCounts(event.id)
     if (counts.pending === 0) {
       await ctx.reply(
         counts.total > 0
-          ? `Alle ${counts.total} Bilder für ${shortDate(event.event_date)} sind schon gepostet.`
-          : `Bis jetzt keine Bilder für ${shortDate(event.event_date)}.`,
+          ? `Alles für ${shortDate(event.event_date)} ist schon gepostet.`
+          : `Bis jetzt keine Fotos oder Videos für ${shortDate(event.event_date)}.`,
       )
       return
     }
-    const shown = await previewPhotos(String(ctx.chat.id), event)
+    await sendReviewItems(String(ctx.chat.id), event)
     await ctx.reply(
-      `${counts.pending} ${counts.pending === 1 ? 'Bild' : 'Bilder'} für ${shortDate(event.event_date)}${shown < counts.pending ? `, die ersten ${shown} als Vorschau` : ''}. /senden postet sie.`,
+      `${mediaLabel(counts)} für ${shortDate(event.event_date)}. Was nicht rein soll, direkt unter dem Bild rauswerfen. /send postet den Rest.`,
     )
   })
 
-  // /senden – Fotos in den Elternchat posten (Admins, privat, mit Rückfrage).
-  // "/senden test" postet in die Sandbox-Gruppe, ohne die Bilder als gepostet zu markieren.
-  bot.command('senden', async (ctx) => {
+  // /send (alt: /senden) – Fotos und Videos in den Elternchat posten (Admins, privat, mit Rückfrage).
+  // "/send test" postet in die Sandbox-Gruppe, ohne die Medien als gepostet zu markieren.
+  bot.command(['send', 'senden'], async (ctx) => {
     if (!isAdmin(ctx.from?.id ?? 0) || ctx.chat.type !== 'private') return
     const isTest = (ctx.match ?? '').trim().toLowerCase() === 'test'
     const target = photoTargetChat()
@@ -366,13 +457,13 @@ export function setupBotCommands(bot: Bot) {
       await ctx.reply('Kein Termin gefunden.')
       return
     }
-    const counts = await photoCounts(event.id)
+    const counts = await mediaCounts(event.id)
     if (counts.pending === 0) {
       await ctx.reply(`Für ${shortDate(event.event_date)} gibt es nichts zu posten.`)
       return
     }
     await ctx.reply(
-      `${counts.pending} Bilder für ${shortDate(event.event_date)} in ${isTest ? 'die Sandbox-Gruppe (Test, ohne Markierung)' : target.label} posten?`,
+      `${mediaLabel(counts)} für ${shortDate(event.event_date)} in ${isTest ? 'die Sandbox-Gruppe (Test, ohne Markierung)' : target.label} posten?`,
       {
         reply_markup: {
           inline_keyboard: [[
@@ -384,34 +475,78 @@ export function setupBotCommands(bot: Bot) {
     )
   })
 
-  // Fotos im privaten Chat: nur von Helfern (Admins sind Helfer). Eltern sind hier bewusst raus.
-  bot.on('message:photo', async (ctx) => {
+  // Fotos und Videos im privaten Chat: nur von Helfern (Admins sind Helfer). Eltern sind hier bewusst raus.
+  bot.on(['message:photo', 'message:video'], async (ctx) => {
     if (ctx.chat.type !== 'private' || !ctx.from) return
     const role = await roleOf(ctx)
+
+    // Bild zu einer Idee (/idee läuft gerade): Bildunterschrift = Idee.
+    // Bei Alben zählt nur das erste Bild, ein Bild pro Idee.
+    const repliedTo = ctx.message.reply_to_message?.text
+    if (ctx.message.photo && (pendingIdeas.has(ctx.from.id) || repliedTo === IDEA_PROMPT || repliedTo === IDEA_PHOTO_NEEDS_TEXT)) {
+      const groupKey = ctx.message.media_group_id ?? `single_${ctx.message.message_id}`
+      if (answeredAlbums.has(groupKey)) return
+      answeredAlbums.add(groupKey)
+      const caption = (ctx.message.caption ?? '').trim()
+      if (!caption) {
+        await ctx.reply(IDEA_PHOTO_NEEDS_TEXT, { reply_markup: { force_reply: true } })
+        return
+      }
+      pendingIdeas.delete(ctx.from.id)
+      const name = role.parent?.name ?? role.helper?.name ?? ctx.from.first_name ?? 'Unbekannt'
+      const best = ctx.message.photo[ctx.message.photo.length - 1]
+      try {
+        await saveParentIdea(caption, { name, telegramUserId: ctx.from.id }, best.file_id)
+        await ctx.reply('Danke, Idee mit Bild ist notiert! Wir schauen sie uns an und melden uns, wenn wir sie einplanen.')
+      } catch (e) {
+        console.error('saveParentIdea (photo) failed:', e)
+        await ctx.reply('Speichern hat nicht geklappt. Magst du es später noch einmal versuchen?')
+      }
+      return
+    }
+
     if (!role.helper && !role.admin) {
       await ctx.reply(role.parent ? 'Fotos sammeln nur die Helfer. Danke dir trotzdem!' : UNKNOWN)
       return
     }
     const event = await eventForNewPhoto()
     if (!event) {
-      await ctx.reply('In den letzten drei Tagen war keine Jungschar, deshalb kann ich das Bild keinem Termin zuordnen.')
+      await ctx.reply('In den letzten drei Tagen war keine Jungschar, deshalb kann ich das keinem Termin zuordnen.')
       return
     }
+    // Foto: größte Auflösung nehmen. Video: die Datei selbst.
     const sizes = ctx.message.photo
-    const best = sizes[sizes.length - 1]
+    const file = ctx.message.video ?? (sizes ? sizes[sizes.length - 1] : null)
+    if (!file) return
+    const type: MediaType = ctx.message.video ? 'video' : 'photo'
     const name = role.helper?.name ?? ctx.from.first_name
-    const result = await savePhoto(event, { fileId: best.file_id, uniqueId: best.file_unique_id }, { telegramUserId: ctx.from.id, name })
+    const album = ctx.message.media_group_id
+    const saved = await saveMedia(
+      event,
+      { fileId: file.file_id, uniqueId: file.file_unique_id, type, mediaGroupId: album },
+      { telegramUserId: ctx.from.id, name },
+    )
 
-    const groupKey = ctx.message.media_group_id ?? `single_${ctx.message.message_id}`
+    const groupKey = album ?? `single_${ctx.message.message_id}`
     if (answeredAlbums.has(groupKey)) return
     answeredAlbums.add(groupKey)
 
-    if (result === 'duplicate' && !ctx.message.media_group_id) {
-      await ctx.reply('Das Bild hatte ich schon.')
+    if (saved.result === 'duplicate' && !album) {
+      await ctx.reply('Das hatte ich schon.')
       return
     }
-    // Keine Info-DM an die Admins: die sehen den Stand über /bilder.
-    await ctx.reply(`Danke! Gespeichert für ${shortDate(event.event_date)}. Die Admins posten die Bilder gesammelt in den Elternchat.`)
+    // Keine Info-DM an die Admins: die sehen den Stand über /review.
+    // Unter der Bestätigung ein Button zum Sofort-Rauswerfen (einzeln: phu, Album: phg).
+    const what = album ? 'Album gespeichert' : 'Gespeichert'
+    const next = role.admin
+      ? '/review zeigt alles, /send postet es in den Elternchat.'
+      : 'Die Admins schauen drüber und posten es in den Elternchat. Einzelne Bilder kannst du mit /bilder rauswerfen.'
+    const undo = album
+      ? { text: '🗑 Album rauswerfen', callback_data: `phg_${album}` }
+      : saved.id ? { text: '🗑 Rauswerfen', callback_data: `phu_${saved.id}` } : null
+    await ctx.reply(`Danke! ${what} für ${shortDate(event.event_date)}. ${next}`, {
+      reply_markup: undo ? { inline_keyboard: [[undo]] } : undefined,
+    })
   })
 
   // /chatid – nur Admins
@@ -441,7 +576,7 @@ export function setupBotCommands(bot: Bot) {
     const repliedTo = ctx.message.reply_to_message?.text
 
     // Antwort auf /idee (per "Antworten" oder direkt danach)
-    if (repliedTo === IDEA_PROMPT || pendingIdeas.has(telegramUserId)) {
+    if (repliedTo === IDEA_PROMPT || repliedTo === IDEA_PHOTO_NEEDS_TEXT || pendingIdeas.has(telegramUserId)) {
       pendingIdeas.delete(telegramUserId)
       const role = await roleOf(ctx)
       const name = role.parent?.name ?? role.helper?.name ?? ctx.from?.first_name ?? 'Unbekannt'
@@ -492,7 +627,36 @@ export function setupBotCommands(bot: Bot) {
         return
       }
 
-      // /senden: Rückfrage beantwortet (phs = Elternchat, pht = Sandbox-Test, phn = Nein)
+      // /review bzw. /bilder: ein Medium rauswerfen (phx_<event_photos.id>).
+      // Admins dürfen alles, Helfer nur ihre eigenen.
+      if (action === 'phx') {
+        const result = await removeMedia(eventId, isAdmin(telegramUserId) ? undefined : telegramUserId)
+        await ctx.answerCallbackQuery({
+          text: result.removed ? `Rausgeworfen. Noch ${result.remaining} übrig.` : 'Schon weg oder bereits gepostet.',
+        })
+        try { await ctx.deleteMessage() } catch {}
+        return
+      }
+
+      // Sofort-Rauswerfen unter der Bestätigung: phu_<id> (einzeln), phg_<media_group_id> (Album).
+      // Helfer nur eigene, Admins alles. Die Bestätigung wird zum Hinweis umgeschrieben.
+      if (action === 'phu' || action === 'phg') {
+        const owner = isAdmin(telegramUserId) ? undefined : telegramUserId
+        const removed = action === 'phg'
+          ? await removeMediaGroup(eventId, owner)
+          : (await removeMedia(eventId, owner)).removed ? 1 : 0
+        await ctx.answerCallbackQuery({ text: removed > 0 ? 'Rausgeworfen.' : 'Schon weg oder bereits gepostet.' })
+        try {
+          await ctx.editMessageText(
+            removed > 0
+              ? `Rausgeworfen: ${removed} ${removed === 1 ? 'Medium ist' : 'Medien sind'} nicht mehr gespeichert.`
+              : 'Nichts mehr zu entfernen, das war schon weg oder ist bereits gepostet.',
+          )
+        } catch {}
+        return
+      }
+
+      // /send: Rückfrage beantwortet (phs = Elternchat, pht = Sandbox-Test, phn = Nein)
       if (action === 'phs' || action === 'pht' || action === 'phn') {
         if (!isAdmin(telegramUserId)) {
           await ctx.answerCallbackQuery({ text: 'Nur für Admins.' })
@@ -512,11 +676,12 @@ export function setupBotCommands(bot: Bot) {
           return
         }
         try {
-          const result = await postPhotos(chatId, { id: event.id, event_date: event.event_date }, !isTest)
+          const result = await postMedia(chatId, { id: event.id, event_date: event.event_date }, !isTest)
           await ctx.answerCallbackQuery({ text: 'Gepostet!' })
           try {
             await ctx.editMessageText(
-              `${result.posted} Bilder für ${shortDate(event.event_date)} in ${isTest ? 'der Sandbox-Gruppe gepostet (Test, Bilder bleiben offen)' : `${target.label} gepostet`}.`,
+              `${result.posted} Medien für ${shortDate(event.event_date)} in ${isTest ? 'der Sandbox-Gruppe gepostet (Test, sie bleiben offen)' : `${target.label} gepostet`}.` +
+                (result.followUp ? '' : ' Die Nachricht mit /idee und /invite ging nicht raus.'),
             )
           } catch {}
         } catch (e: any) {
@@ -526,8 +691,8 @@ export function setupBotCommands(bot: Bot) {
         return
       }
 
-      // /einladen: Termin gewählt → Rückfrage, bestätigt → eintragen + Admins per DM.
-      if (action === 'inv' || action === 'invy' || action === 'invn') {
+      // /invite: Termin gewählt → Rückfrage, bestätigt → eintragen. invx = Einladung zurückziehen.
+      if (action === 'inv' || action === 'invy' || action === 'invn' || action === 'invx') {
         let parent = await findParentByTelegram(telegramUserId, user.username)
         if (!parent && isAdmin(telegramUserId)) {
           const helper = await getHelperByTelegramId(telegramUserId)
@@ -554,8 +719,26 @@ export function setupBotCommands(bot: Bot) {
         if (action === 'invn') {
           await ctx.answerCallbackQuery()
           try {
-            await ctx.editMessageText('Alles klar, nichts eingetragen. Mit /einladen könnt ihr es jederzeit neu starten.')
+            await ctx.editMessageText('Alles klar, nichts eingetragen. Mit /invite könnt ihr es jederzeit neu starten.')
           } catch {}
+          return
+        }
+        if (action === 'invx') {
+          const cancelled = await cancelInvitation(eventId, parent.id)
+          await ctx.answerCallbackQuery({ text: cancelled.ok ? 'Zurückgezogen' : 'Nicht gefunden' })
+          try {
+            await ctx.editMessageText(
+              cancelled.ok && cancelled.eventDate
+                ? `Alles klar, eure Einladung für ${formatDate(cancelled.eventDate)} ist zurückgezogen. Der Termin ist wieder frei.`
+                : 'Diese Einladung gibt es nicht mehr.',
+            )
+          } catch {}
+          if (cancelled.ok && cancelled.eventDate) {
+            await notifyAdminsAfterHeadsUp(
+              eventId,
+              `🏠 <b>${escapeHtml(parent.name)}</b> hat die Einladung für <b>${formatDate(cancelled.eventDate)}</b> zurückgezogen.`,
+            )
+          }
           return
         }
         const result = await saveInvitation(eventId, parent)
@@ -564,10 +747,10 @@ export function setupBotCommands(bot: Bot) {
           await ctx.editMessageText(result.text)
         } catch {}
         if (result.ok && result.eventDate) {
-          const note = `🏠 <b>${escapeHtml(parent.name)}</b> lädt die Jungschar am ${formatDate(result.eventDate)} zu sich ein.`
-          for (const adminId of ADMIN_TELEGRAM_USER_IDS) {
-            sendTelegramMessage(String(adminId), note).catch((e) => console.error('admin invite notice failed:', e))
-          }
+          await notifyAdminsAfterHeadsUp(
+            eventId,
+            `🏠 <b>${escapeHtml(parent.name)}</b> lädt die Jungschar am <b>${formatDate(result.eventDate)}</b> zu sich ein.`,
+          )
         }
         return
       }

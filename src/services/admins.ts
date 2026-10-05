@@ -1,14 +1,15 @@
 import { getSupabase } from './database'
 
 /**
- * Zugangsliste (Telegram-User-IDs).
+ * Zugangsliste (Telegram-User-IDs) = Admins.
  *
- * Nur diese Personen dürfen die Mini-App benutzen — sämtliche Daten laufen
- * über den Server (services/telegram-auth.ts + /api/db), der jede Anmeldung
- * gegen diese Liste prüft. Wer hier nicht steht, bekommt 403 — auch wenn er
- * per /register in `helpers` eingetragen ist.
+ * Admins dürfen die ganze Mini-App benutzen. Registrierte Helfer (Tabelle
+ * `helpers`) bekommen eine eigene Rolle mit genau einer Seite, dem
+ * Ideenpool (/ideen), nur lesend. Sämtliche Daten laufen über den Server
+ * (services/telegram-auth.ts + /api/db), der die Rolle aus dem Session-
+ * Cookie prüft. Wer weder Admin noch Helfer ist, bekommt 403.
  *
- * Aktuell: Marco, Jens.
+ * Aktuell Admins: Marco, Jens.
  */
 
 /** Live-URL der Mini-App (Production). */
@@ -31,21 +32,22 @@ export function isAdmin(telegramUserId: number): boolean {
   return ADMIN_TELEGRAM_USER_IDS.has(telegramUserId)
 }
 
+export type AppRole = 'admin' | 'helper'
+
 export interface AllowedUser {
   helperId: string | null
   telegramUserId: number
   name: string
   isAdmin: boolean
+  role: AppRole
 }
 
 /**
- * Liefert den zugelassenen Nutzer — oder null, wenn die ID nicht auf der
- * Liste steht. Name und helperId kommen aus `helpers`, falls die Person
- * dort per /register eingetragen ist; sonst bleibt helperId null.
+ * Liefert den zugelassenen Nutzer mit Rolle — oder null. Admin: steht auf
+ * der Zugangsliste (helperId aus `helpers`, falls registriert). Helfer:
+ * steht nur in `helpers` (per /register) und sieht ausschließlich /ideen.
  */
 export async function findAllowedHelper(telegramUserId: number): Promise<AllowedUser | null> {
-  if (!isAdmin(telegramUserId)) return null
-
   const { data, error } = await getSupabase()
     .from('helpers')
     .select('id, name')
@@ -54,11 +56,14 @@ export async function findAllowedHelper(telegramUserId: number): Promise<Allowed
 
   if (error) throw error
   const row = data as { id: string; name: string } | null
+  const admin = isAdmin(telegramUserId)
+  if (!admin && !row) return null
 
   return {
     helperId: row?.id ?? null,
     telegramUserId,
     name: row?.name ?? 'Admin',
-    isAdmin: true,
+    isAdmin: admin,
+    role: admin ? 'admin' : 'helper',
   }
 }

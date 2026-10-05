@@ -6,7 +6,7 @@ import { getSupabase, getTodayISO } from './database'
 export async function getNextEvent() {
   const { data } = await getSupabase()
     .from('events')
-    .select('*, assignments(*, helper:helpers(*)), parent_duties(*, parent:parents(*))')
+    .select('*, assignments(*, helper:helpers(*)), parent_duties(*, parent:parents(*)), invitations(*, parent:parents(*))')
     .gte('event_date', getTodayISO())
     .order('event_date', { ascending: true })
     .limit(1)
@@ -20,7 +20,7 @@ export async function getNextEvent() {
 export async function getUpcomingEvents(limit = 5) {
   const { data } = await getSupabase()
     .from('events')
-    .select('*, assignments(*, helper:helpers(*)), parent_duties(*, parent:parents(*))')
+    .select('*, assignments(*, helper:helpers(*)), parent_duties(*, parent:parents(*)), invitations(*, parent:parents(*))')
     .gte('event_date', getTodayISO())
     .order('event_date', { ascending: true })
     .limit(limit)
@@ -33,7 +33,7 @@ export async function getUpcomingEvents(limit = 5) {
 export async function getEventById(eventId: string) {
   const { data } = await getSupabase()
     .from('events')
-    .select('*, assignments(*, helper:helpers(*)), parent_duties(*, parent:parents(*))')
+    .select('*, assignments(*, helper:helpers(*)), parent_duties(*, parent:parents(*)), invitations(*, parent:parents(*))')
     .eq('id', eventId)
     .single()
   return data
@@ -48,6 +48,15 @@ export async function getAllEvents() {
     .select('*, assignments(id, helper_id, helper:helpers(id, name)), parent_duties(id, parent_id, parent:parents(id, name))')
     .order('event_date', { ascending: true })
   return data || []
+}
+
+/**
+ * Elternteil, das die Jungschar zu diesem Termin eingeladen hat (/invite).
+ * Wegen UNIQUE(event_id) liefert PostgREST ein Objekt oder ein Array.
+ */
+export function getInvitingParent(event: any): { name: string; telegram_username?: string | null; telegram_user_id?: number | null } | null {
+  const inv = Array.isArray(event?.invitations) ? event.invitations[0] : event?.invitations
+  return inv?.parent?.name ? inv.parent : null
 }
 
 /**

@@ -3,12 +3,13 @@ import { requireOperator } from '@/services/api-guard'
 import { renderReminderPreview } from '@/services/reminders'
 import { renderPollReminderPreview } from '@/services/poll-reminder'
 import { renderReviewPreview } from '@/services/review-ping'
+import { renderThanksPreview } from '@/services/photos'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * Vorschau einer geplanten Bot-Nachricht, ohne zu senden.
- * ?type=stage1_sunday|stage2_wednesday|stage3_saturday|poll_thursday|review_evening
+ * ?type=stage1_sunday|stage2_wednesday|stage3_saturday|poll_thursday|review_evening|thanks_evening
  * &date=YYYY-MM-DD (Termin-Datum)
  */
 export async function GET(req: NextRequest) {
@@ -28,6 +29,10 @@ export async function GET(req: NextRequest) {
       text = await renderPollReminderPreview(date)
     } else if (type === 'review_evening') {
       text = await renderReviewPreview(date)
+    } else if (type === 'thanks_evening') {
+      const r = await renderThanksPreview(date)
+      text = r?.text ?? null
+      buttons = r?.buttons ?? []
     } else {
       const r = await renderReminderPreview(type, date)
       text = r?.text ?? null

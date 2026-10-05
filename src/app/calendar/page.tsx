@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
+import { hasFoodDuty } from '@/utils/format'
 import {
   Page,
   Section,
@@ -86,6 +87,12 @@ interface RotationProposal {
   helpers: { id: string; name: string; username: string | null; isSenior: boolean }[]
 }
 
+interface ParentProposal {
+  eventId: string
+  eventDate: string
+  parent: Parent
+}
+
 interface Child {
   id: string
   name: string
@@ -136,6 +143,11 @@ export default function CalendarPage() {
   const [rotationLastIds, setRotationLastIds] = useState<string[]>([])
   /** Chat-Auswahl: für die Vorschau (im Vorschau-Sheet) oder die gespeicherte Einteilung. */
   const [postChoice, setPostChoice] = useState<'preview' | 'current' | null>(null)
+  /** Eltern-Einteilung (Essen, nur Samstage): Vorschau, null = Sheet zu. */
+  const [parentPreview, setParentPreview] = useState<ParentProposal[] | null>(null)
+  const [parentWindowLabel, setParentWindowLabel] = useState('')
+  const [parentLoading, setParentLoading] = useState(false)
+  const [parentSaving, setParentSaving] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -581,6 +593,56 @@ export default function CalendarPage() {
     )
   }
 
+  async function loadParentPreview() {
+    setParentLoading(true)
+    try {
+      const res = await fetch('/api/rotation/parents/preview', { method: 'POST' })
+      const body = await res.json()
+      if (!res.ok) {
+        showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
+        return
+      }
+      setParentWindowLabel(body.window?.label ?? '')
+      setParentPreview(body.proposals ?? [])
+    } catch (e: any) {
+      showAlert('Fehler: ' + e.message)
+    } finally {
+      setParentLoading(false)
+    }
+  }
+
+  function swapParentProposal(eventId: string, parentId: string) {
+    const parent = parents.find(p => p.id === parentId)
+    if (!parent) return
+    setParentPreview(prev => prev?.map(p => (p.eventId === eventId ? { ...p, parent } : p)) ?? null)
+  }
+
+  async function saveParentPreview() {
+    if (!parentPreview || parentPreview.length === 0) return
+    const ok = await showConfirm('Elterndienst dieser Samstage ersetzen?')
+    if (!ok) return
+    setParentSaving(true)
+    try {
+      const res = await fetch('/api/rotation/parents/commit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposals: parentPreview.map(p => ({ eventId: p.eventId, parentId: p.parent.id })) }),
+      })
+      const body = await res.json()
+      if (!res.ok) {
+        showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
+        return
+      }
+      showAlert(`Elterndienst für ${body.saved ?? 0} Samstage gespeichert.`)
+      setParentPreview(null)
+      await fetchData()
+    } catch (e: any) {
+      showAlert('Fehler: ' + e.message)
+    } finally {
+      setParentSaving(false)
+    }
+  }
+
   async function removeInvitation(id: string) {
     if (!selectedEvent || saving) return
     const ok = await showConfirm('Einladung entfernen?')
@@ -637,7 +699,8 @@ export default function CalendarPage() {
             {(showAllUpcoming ? upcomingEvents : upcomingEvents.slice(0, 5)).map((event) => {
               const idea = ideasMap.get(event.id)
               const birthdays = getBirthdaysNearEvent(event.event_date)
-              const parentName = getParentDutyName(event)
+              // Elterndienst (Essen) gibt es nur samstags.
+              const parentName = hasFoodDuty(event.event_date) ? getParentDutyName(event) : ''
               return (
                 <Row key={event.id} onClick={() => openModal(event)}>
                   <DateTile date={event.event_date} weekday={false} />
@@ -692,6 +755,9 @@ export default function CalendarPage() {
           >
             Gespeicherte Einteilung posten
           </Button>
+          <Button variant="secondary" block onClick={loadParentPreview} disabled={parentLoading}>
+            {parentLoading && !parentPreview ? 'Berechne …' : 'Eltern einteilen (Essen, Samstage)'}
+          </Button>
         </div>
       </Section>
 
@@ -721,7 +787,10 @@ export default function CalendarPage() {
               </div>
             )}
 
-            <Section title="Helfer">
+            <Section
+              title="Helfer"
+              className={hasFoodDuty(selectedEvent.event_date) || getInvitation(selectedEvent) ? undefined : 'mb-0'}
+            >
               {helpers.length === 0 ? (
                 <Empty>Keine Helfer vorhanden.</Empty>
               ) : (
@@ -739,23 +808,26 @@ export default function CalendarPage() {
               )}
             </Section>
 
-            <Section title="Elterndienst (Essen)" className={getInvitation(selectedEvent) ? undefined : 'mb-0'}>
-              {parents.length === 0 ? (
-                <Empty>Keine Eltern vorhanden. Unter &quot;Eltern&quot; hinzufügen.</Empty>
-              ) : (
-                <List>
-                  {parents.map((parent) => (
-                    <CheckRow
-                      key={parent.id}
-                      label={parent.name}
-                      checked={getAssignedParentId(selectedEvent) === parent.id}
-                      onClick={() => toggleParentDuty(parent.id)}
-                      disabled={saving || selectedLocked}
-                    />
-                  ))}
-                </List>
-              )}
-            </Section>
+            {/* Elterndienst gibt es nur samstags, freitags wird niemand eingeteilt. */}
+            {hasFoodDuty(selectedEvent.event_date) && (
+              <Section title="Elterndienst (Essen)" className={getInvitation(selectedEvent) ? undefined : 'mb-0'}>
+                {parents.length === 0 ? (
+                  <Empty>Keine Eltern vorhanden. Unter &quot;Eltern&quot; hinzufügen.</Empty>
+                ) : (
+                  <List>
+                    {parents.map((parent) => (
+                      <CheckRow
+                        key={parent.id}
+                        label={parent.name}
+                        checked={getAssignedParentId(selectedEvent) === parent.id}
+                        onClick={() => toggleParentDuty(parent.id)}
+                        disabled={saving || selectedLocked}
+                      />
+                    ))}
+                  </List>
+                )}
+              </Section>
+            )}
 
             {getInvitation(selectedEvent) && (
               <Section title="Einladung" className="mb-0">
@@ -871,6 +943,62 @@ export default function CalendarPage() {
                   </>
                 )}
               </div>
+            )}
+          </>
+        )}
+      </Sheet>
+
+      {/* Eltern-Einteilung (Essen, nur Samstage) */}
+      <Sheet
+        open={!!parentPreview}
+        onClose={() => setParentPreview(null)}
+        title="Eltern-Einteilung"
+        locked={parentSaving}
+      >
+        {parentPreview && (
+          <>
+            <p className="mb-1 font-medium">{parentWindowLabel}</p>
+            <p className="mb-4 text-sm text-muted">
+              Essen gibt es nur an Samstagen. {parentPreview.length} Samstage · {parents.length} Eltern
+            </p>
+
+            {parents.length === 0 ? (
+              <Empty>Keine Eltern vorhanden. Unter &quot;Eltern&quot; hinzufügen.</Empty>
+            ) : parentPreview.length === 0 ? (
+              <Empty>Keine Samstags-Termine im Halbjahr.</Empty>
+            ) : (
+              <>
+                <List className="mb-5">
+                  {parentPreview.map(p => (
+                    <Row key={p.eventId}>
+                      <span className="w-24 shrink-0 text-sm font-medium">{formatDate(p.eventDate)}</span>
+                      <label className="relative inline-flex min-w-0 flex-1 items-center gap-1.5 py-0.5 text-sm">
+                        <span className="truncate">{p.parent.name}</span>
+                        <span className="text-muted"><SmallIcons.pencilSmall /></span>
+                        <select
+                          value={p.parent.id}
+                          onChange={e => swapParentProposal(p.eventId, e.target.value)}
+                          disabled={parentSaving}
+                          aria-label="Eltern tauschen"
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        >
+                          {parents.map(opt => (
+                            <option key={opt.id} value={opt.id}>{opt.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </Row>
+                  ))}
+                </List>
+                <div className="space-y-3">
+                  <Button variant="primary" block onClick={saveParentPreview} disabled={parentSaving}>
+                    {parentSaving ? 'Speichere …' : 'Speichern'}
+                  </Button>
+                  <Button variant="ghost" block onClick={loadParentPreview} disabled={parentLoading || parentSaving}>
+                    {parentLoading ? 'Berechne …' : 'Neu berechnen'}
+                  </Button>
+                </div>
+              </>
             )}
           </>
         )}

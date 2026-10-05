@@ -28,9 +28,13 @@ export interface TelegramAuthUser {
   username?: string
 }
 
+export type SessionRole = 'admin' | 'helper'
+
 export interface SessionPayload {
   /** Telegram-User-ID */
   uid: number
+  /** admin = ganze Mini-App; helper = nur /ideen, nur lesend */
+  role: SessionRole
   /** Unix-Sekunden, ab wann das Cookie ungültig ist */
   exp: number
 }
@@ -116,9 +120,10 @@ function b64url(buf: Buffer): string {
 }
 
 /** Baut ein signiertes Session-Token: <payload>.<signature> */
-export function createSessionToken(telegramUserId: number): string {
+export function createSessionToken(telegramUserId: number, role: SessionRole): string {
   const payload: SessionPayload = {
     uid: telegramUserId,
+    role,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
   }
   const body = b64url(Buffer.from(JSON.stringify(payload), 'utf8'))
@@ -145,6 +150,8 @@ export function verifySessionToken(token: string | undefined | null): SessionPay
       Buffer.from(body.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'),
     ) as SessionPayload
     if (typeof payload?.uid !== 'number' || typeof payload?.exp !== 'number') return null
+    // Alte Cookies ohne Rolle gelten nicht mehr; die App meldet sich beim Öffnen ohnehin neu an.
+    if (payload.role !== 'admin' && payload.role !== 'helper') return null
     if (payload.exp < Math.floor(Date.now() / 1000)) return null
     return payload
   } catch {

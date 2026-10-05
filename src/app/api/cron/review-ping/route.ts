@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processReviewPings } from '@/services/review-ping'
 import { ADMIN_TELEGRAM_USER_IDS } from '@/services/admins'
-import { sendPhotoNudges } from '@/services/photos'
+import { sendThanksToHelpers, type ThanksResult } from '@/services/photos'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * Abend-Bewertung: DM an die Admins am Tag der Jungschar (20:00 Ortszeit).
+ * Im selben Lauf geht die Danke-Nachricht mit dem Button „Momente
+ * festgehalten?“ in die Helfer-Gruppe (im Test: Sandbox-Gruppe, ohne Log).
  *
  * Läuft zweimal täglich (18:00 + 19:00 UTC, siehe vercel.json), sendet aber
  * nur, wenn es in Europe/Berlin schon 20 Uhr ist, und nur einmal pro Termin.
@@ -38,16 +40,21 @@ export async function GET(req: NextRequest) {
 
     const result = await processReviewPings({ force, date, testUserId })
 
-    // Foto-Erinnerung an die eingeteilten Helfer des Tages (nur live, einmal pro Termin).
-    let photoNudges: number[] = []
-    if (!isTest && result.eventId && !result.skipped) {
+    // Danke + Foto-Button in die Helfer-Gruppe (einmal pro Termin, unabhängig
+    // davon, ob der Termin schon bewertet ist).
+    let thanks: ThanksResult
+    const thanksChat = isTest ? process.env.TELEGRAM_TEST_CHAT_ID : process.env.TELEGRAM_CHAT_ID
+    if (!thanksChat) {
+      thanks = { sent: false, error: `${isTest ? 'TELEGRAM_TEST_CHAT_ID' : 'TELEGRAM_CHAT_ID'} not configured` }
+    } else {
       try {
-        photoNudges = await sendPhotoNudges(result.eventId)
-      } catch (e) {
-        console.error('photo nudges failed:', e)
+        thanks = await sendThanksToHelpers({ chatId: thanksChat, date, force, isTest })
+      } catch (e: any) {
+        console.error('thanks message failed:', e)
+        thanks = { sent: false, error: e.message ?? 'unbekannt' }
       }
     }
-    return NextResponse.json({ ...result, photoNudges })
+    return NextResponse.json({ ...result, thanks })
   } catch (error) {
     console.error('Error in review-ping cron:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

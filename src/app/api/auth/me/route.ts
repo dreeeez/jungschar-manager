@@ -17,7 +17,8 @@ export const dynamic = 'force-dynamic'
  *                      Session-Cookie setzen, Helfer zurückgeben.
  * GET                → bestehendes Cookie prüfen (Reload ohne neues initData).
  *
- * Ohne gültiges initData bzw. ohne Eintrag in `helpers`: 401.
+ * Rolle: Admin (Zugangsliste) oder Helfer (`helpers`, nur /ideen).
+ * Ohne gültiges initData: 401. Weder Admin noch Helfer: 403.
  */
 
 async function respondForTelegramUser(telegramUserId: number, setCookie: boolean) {
@@ -25,7 +26,7 @@ async function respondForTelegramUser(telegramUserId: number, setCookie: boolean
 
   if (!helper) {
     return NextResponse.json(
-      { error: 'not_registered', message: 'Kein Zugang: deine Telegram-ID steht nicht auf der Zugangsliste.' },
+      { error: 'not_registered', message: 'Kein Zugang: du bist weder Admin noch als Helfer registriert (/register CODE im Bot).' },
       { status: 403 },
     )
   }
@@ -36,11 +37,12 @@ async function respondForTelegramUser(telegramUserId: number, setCookie: boolean
       telegramUserId: helper.telegramUserId,
       name: helper.name,
       isAdmin: helper.isAdmin,
+      role: helper.role,
     },
   })
 
   if (setCookie) {
-    res.cookies.set(SESSION_COOKIE, createSessionToken(telegramUserId), sessionCookieOptions())
+    res.cookies.set(SESSION_COOKIE, createSessionToken(telegramUserId, helper.role), sessionCookieOptions())
   }
 
   return res

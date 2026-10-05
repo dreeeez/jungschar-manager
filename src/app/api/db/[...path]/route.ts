@@ -15,7 +15,10 @@ export const dynamic = 'force-dynamic'
  * `/api/db` als Basis-URL.
  */
 
-/** Nur diese Tabellen sind über den Proxy erreichbar. */
+/** Helfer-Sessions: nur lesen, nur diese Tabellen (Ideenpool). */
+const HELPER_READ_TABLES = new Set(['ideas'])
+
+/** Nur diese Tabellen sind über den Proxy erreichbar (Admin). */
 const ALLOWED_TABLES = new Set([
   'helpers',
   'events',
@@ -63,7 +66,8 @@ function serviceKey(): string {
 }
 
 async function proxy(req: NextRequest, path: string[]) {
-  if (!getSession(req)) {
+  const session = getSession(req)
+  if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -75,6 +79,10 @@ async function proxy(req: NextRequest, path: string[]) {
   const table = path[2]
   if (!ALLOWED_TABLES.has(table)) {
     return NextResponse.json({ error: `Table '${table}' not exposed` }, { status: 403 })
+  }
+  // Helfer sehen nur den Ideenpool, und den nur lesend.
+  if (session.role === 'helper' && (!HELPER_READ_TABLES.has(table) || !['GET', 'HEAD'].includes(req.method))) {
+    return NextResponse.json({ error: 'Nur lesender Zugriff auf den Ideenpool' }, { status: 403 })
   }
 
   const target = `${supabaseBase()}/${path.map(encodeURIComponent).join('/')}${req.nextUrl.search}`

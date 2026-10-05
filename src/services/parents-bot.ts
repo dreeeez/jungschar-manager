@@ -1,6 +1,8 @@
 import { getSupabase, getTodayISO } from './database'
 import { sendTelegramMessage } from './reminders'
 import { berlinNow } from './review-ping'
+import { APP_URL } from './admins'
+import { hasFoodDuty } from '@/utils/format'
 
 /**
  * Eltern im Bot: Erkennung, Registrierungs-Code, /idee, /einladen und der
@@ -84,11 +86,16 @@ export async function checkRegisterCode(input: string | undefined): Promise<'ok'
 
 export const IDEA_PROMPT =
   'Worauf hätte dein Kind richtig Lust? Ein Ausflug, ein Spiel, etwas Selbstgebautes, ein Ort, den ihr kennt?\n\n' +
-  'Schreib es einfach als Antwort auf diese Nachricht. Es muss nicht ausgereift sein, ein Stichwort reicht uns.'
+  'Schreib es einfach als Antwort auf diese Nachricht. Ein Stichwort reicht, gern auch ein Link oder ein Bild mit kurzer Beschreibung.'
+
+/** Antwort, wenn ein Bild ohne Beschreibung kommt. */
+export const IDEA_PHOTO_NEEDS_TEXT =
+  'Schönes Bild! Schreib bitte kurz in die Bildunterschrift, was die Idee ist, und schick es noch einmal.'
 
 export async function saveParentIdea(
   text: string,
   by: { name: string; telegramUserId: number },
+  photoFileId?: string,
 ): Promise<void> {
   const clean = text.trim()
   const { error } = await getSupabase().from('ideas').insert({
@@ -99,6 +106,7 @@ export async function saveParentIdea(
     source: 'elterngruppe',
     suggested_by: by.name,
     suggested_by_telegram_id: by.telegramUserId,
+    photo_file_id: photoFileId ?? null,
   } as any)
   if (error) throw error
 }
@@ -111,25 +119,52 @@ export function shortDate(iso: string): string {
   return `${wd} ${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`
 }
 
-/** Kommende Termine, an denen noch niemand eingeladen hat. */
-export async function openInviteEvents(limit = 8): Promise<{ id: string; event_date: string }[]> {
-  const { data } = await getSupabase()
-    .from('events')
-    .select('id, event_date, invitations(id)')
-    .gte('event_date', getTodayISO())
-    .order('event_date', { ascending: true })
-    .limit(30)
-  return ((data ?? []) as any[])
-    .filter(e => (e.invitations?.length ?? 0) === 0)
-    .slice(0, limit)
-    .map(e => ({ id: e.id, event_date: e.event_date }))
+export interface InviteTarget {
+  id: string
+  event_date: string
+  /** Wer schon eingeladen hat, sonst null. */
+  takenBy: { parentId: string; name: string } | null
 }
 
-export function inviteDateKeyboard(events: { id: string; event_date: string }[]) {
-  const buttons = events.map(e => ({ text: shortDate(e.event_date), callback_data: `inv_${e.id}` }))
-  const rows: typeof buttons[] = []
-  for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2))
-  return { inline_keyboard: rows }
+/**
+ * Der eine Termin, zu dem Eltern gerade einladen können: die nächste
+ * Samstags-Jungschar (freitags bekommen wir immer Essen). Keine Auswahl
+ * weiterer Termine. Eine Einladung pro Termin, wer zuerst kommt.
+ */
+export async function nextInviteEvent(): Promise<InviteTarget | null> {
+  const { data } = await getSupabase()
+    .from('events')
+    .select('id, event_date, invitations(parent_id, parent:parents(name))')
+    .gte('event_date', getTodayISO())
+    .order('event_date', { ascending: true })
+    .limit(12)
+  const next = ((data ?? []) as any[]).find(e => hasFoodDuty(e.event_date))
+  if (!next) return null
+  const inv = Array.isArray(next.invitations) ? next.invitations[0] : next.invitations
+  return {
+    id: next.id,
+    event_date: next.event_date,
+    takenBy: inv?.parent_id ? { parentId: inv.parent_id, name: inv.parent?.name ?? '' } : null,
+  }
+}
+
+export function cancelInviteKeyboard(eventId: string) {
+  return { inline_keyboard: [[{ text: 'Einladung zurückziehen', callback_data: `invx_${eventId}` }]] }
+}
+
+/** Zieht die Einladung dieses Elternteils für den Termin zurück; der Termin wird wieder frei. */
+export async function cancelInvitation(
+  eventId: string,
+  parentId: string,
+): Promise<{ ok: boolean; eventDate: string | null }> {
+  const { data } = await getSupabase()
+    .from('invitations')
+    .delete()
+    .eq('event_id', eventId)
+    .eq('parent_id', parentId)
+    .select('event:events(event_date)')
+  const row = ((data ?? []) as any[])[0]
+  return { ok: !!row, eventDate: row?.event?.event_date ?? null }
 }
 
 export function inviteConfirmKeyboard(eventId: string) {
@@ -157,17 +192,63 @@ export async function saveInvitation(
   const db = getSupabase()
   const { data: event } = await db
     .from('events')
-    .select('id, event_date, invitations(parent:parents(name))')
+    .select('id, event_date, invitations(parent:parents(name)), assignments(helper:helpers(name, telegram_username))')
     .eq('id', eventId)
     .maybeSingle()
   if (!event) return { ok: false, text: 'Diesen Termin gibt es nicht mehr.' }
   const eventDate = (event as any).event_date as string
   const taken = ((event as any).invitations ?? [])[0]?.parent?.name
-  if (taken) return { ok: false, text: `Am ${shortDate(eventDate)} hat schon ${taken} eingeladen.`, eventDate }
+  if (taken) return { ok: false, text: `Zu spät, für ${shortDate(eventDate)} war jemand anderes schneller! Gerne bei der nächsten Gelegenheit.`, eventDate }
 
   const { error } = await db.from('invitations').insert({ event_id: eventId, parent_id: parent.id } as any)
   if (error) return { ok: false, text: 'Eintragen hat nicht geklappt, bitte später noch einmal.', eventDate }
-  return { ok: true, text: `Danke! Die Jungschar kommt am ${shortDate(eventDate)} zu euch. Wir melden uns wegen der Details.`, eventDate }
+  // Ansprechpartner = eingeteiltes Team des Termins, mit @username, damit
+  // die Eltern direkt schreiben können.
+  const team = (((event as any).assignments ?? []) as any[])
+    .map(a => a.helper)
+    .filter(Boolean)
+    .map(h => (h.telegram_username ? `${h.name} (@${h.telegram_username})` : h.name))
+  const contact = team.length > 0
+    ? `Für detaillierte Infos sind eure Ansprechpartner: ${team.join(' und ')}.`
+    : 'Eure Ansprechpartner für Details melden sich, sobald die Einteilung steht.'
+  return {
+    ok: true,
+    text:
+      `Cool, dass wir eingeladen werden! 🎉 Notiert, wir haben den ${shortDate(eventDate)} auf dem Schirm.\n` +
+      `${contact}\n\n` +
+      'Keine Idee, was es zum Essen geben soll? /inspo zeigt dir, was wir sonst so von den Eltern bekommen 😉',
+    eventDate,
+  }
+}
+
+/* ---------- /inspo (Spaß) ---------- */
+
+/** Bilder liegen in public/inspo und werden von der Live-URL geladen. */
+const INSPO_IMAGES = ['essen-1.jpg', 'essen-2.jpg', 'essen-3.jpg'].map(f => `${APP_URL}/inspo/${f}`)
+
+/**
+ * /inspo: Album mit „typischen“ Essensideen (Sterneküche, Sushi …), danach
+ * die Auflösung, dass etwas völlig Einfaches reicht.
+ */
+export async function sendFoodInspo(chatId: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const media = INSPO_IMAGES.map((url, i) => ({
+    type: 'photo',
+    media: url,
+    ...(i === 0 ? { caption: 'Ein paar einfache Essensideen, die wir für gewöhnlich von den Eltern bekommen:' } : {}),
+  }))
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, media }),
+  })
+  const json = await res.json()
+  if (!json?.ok) {
+    console.error('inspo album failed:', json)
+    return false
+  }
+  await sendTelegramMessage(chatId, 'Spaß! 😄 Es reicht etwas völlig Einfaches. Danke schonmal!')
+  return true
 }
 
 /* ---------- Geburtstagsgruß ---------- */
