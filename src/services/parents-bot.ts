@@ -223,28 +223,60 @@ export async function saveInvitation(
 
 /* ---------- /inspo (Spaß) ---------- */
 
-/** Bilder liegen in public/inspo und werden von der Live-URL geladen. */
+/** Bilder liegen in public/inspo (Live-URL). */
 const INSPO_IMAGES = ['essen-1.jpg', 'essen-2.jpg', 'essen-3.jpg'].map(f => `${APP_URL}/inspo/${f}`)
+const INSPO_CAPTION = 'Ein paar einfache Essensideen, die wir für gewöhnlich von den Eltern bekommen:'
+const INSPO_FILE_IDS_KEY = 'inspo_file_ids'
+
+/**
+ * Album senden. Beim ersten Mal lädt der Server die Bilder selbst hoch
+ * (Telegram holt URLs von Vercel nicht zuverlässig: WEBPAGE_CURL_FAILED)
+ * und merkt sich die file_ids in settings; danach geht es direkt per file_id.
+ */
+async function sendInspoAlbum(chatId: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const cached = await getSetting(INSPO_FILE_IDS_KEY)
+  if (cached) {
+    const ids: string[] = JSON.parse(cached)
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        media: ids.map((id, i) => ({ type: 'photo', media: id, ...(i === 0 ? { caption: INSPO_CAPTION } : {}) })),
+      }),
+    }).then(r => r.json())
+    if (res?.ok) return true
+    console.error('inspo album (file_ids) failed, lade neu hoch:', res)
+  }
+
+  const form = new FormData()
+  form.append('chat_id', chatId)
+  form.append(
+    'media',
+    JSON.stringify(INSPO_IMAGES.map((_, i) => ({ type: 'photo', media: `attach://f${i}`, ...(i === 0 ? { caption: INSPO_CAPTION } : {}) }))),
+  )
+  for (let i = 0; i < INSPO_IMAGES.length; i++) {
+    const blob = await fetch(INSPO_IMAGES[i]).then(r => r.blob())
+    form.append(`f${i}`, blob, `essen-${i + 1}.jpg`)
+  }
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, { method: 'POST', body: form }).then(r => r.json())
+  if (!res?.ok) {
+    console.error('inspo album upload failed:', res)
+    return false
+  }
+  const ids = (res.result as any[]).map(m => m.photo?.[m.photo.length - 1]?.file_id).filter(Boolean)
+  if (ids.length === INSPO_IMAGES.length) await setSetting(INSPO_FILE_IDS_KEY, JSON.stringify(ids)).catch(() => {})
+  return true
+}
 
 /**
  * /inspo: Album mit „typischen“ Essensideen (Sterneküche, Sushi …), danach
  * die Auflösung, dass etwas völlig Einfaches reicht.
  */
 export async function sendFoodInspo(chatId: string): Promise<boolean> {
-  const token = process.env.TELEGRAM_BOT_TOKEN
-  const media = INSPO_IMAGES.map((url, i) => ({
-    type: 'photo',
-    media: url,
-    ...(i === 0 ? { caption: 'Ein paar einfache Essensideen, die wir für gewöhnlich von den Eltern bekommen:' } : {}),
-  }))
-  const res = await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, media }),
-  })
-  const json = await res.json()
-  if (!json?.ok) {
-    console.error('inspo album failed:', json)
+  if (!(await sendInspoAlbum(chatId))) {
+    await sendTelegramMessage(chatId, 'Die Bilder wollten gerade nicht. Kurz gesagt: Es reicht etwas völlig Einfaches. Danke schonmal! 😄')
     return false
   }
   await sendTelegramMessage(chatId, 'Spaß! 😄 Es reicht etwas völlig Einfaches. Danke schonmal!')
