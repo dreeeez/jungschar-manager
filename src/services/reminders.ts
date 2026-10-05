@@ -281,15 +281,16 @@ function berlinWeekdayTime(iso: string): string {
 }
 
 /**
- * Ideen, die per /idee seit dem letzten Sonntags-Heads-up (egal für welchen
- * Termin) reingekommen sind. So erscheint jede Idee genau einmal. Ohne
- * früheres Heads-up zählt alles seit dem vorigen Termin.
+ * Ideen, die per /idee seit der letzten Live-Nachricht mit Ideen-Anhang
+ * (Sonntags-Heads-up oder Mittwochs-Countdown, egal für welchen Termin)
+ * reingekommen sind. So erscheint jede Idee genau einmal. Ohne frühere
+ * Nachricht zählt alles seit dem vorigen Termin.
  */
 async function getFreshParentIdeas(eventDate: string): Promise<FreshIdea[]> {
   try {
     const db = getSupabase()
     const { data: lastLog } = await db
-      .from('reminder_log').select('sent_at').eq('reminder_type', STAGE_SUNDAY)
+      .from('reminder_log').select('sent_at').in('reminder_type', [STAGE_SUNDAY, STAGE_WEDNESDAY])
       .order('sent_at', { ascending: false }).limit(1).maybeSingle()
     let sinceIso: string | undefined = (lastLog as any)?.sent_at
     if (!sinceIso) {
@@ -329,8 +330,9 @@ function ideaLine(i: FreshIdea, max = IDEA_TEXT_MAX): string {
 }
 
 /**
- * Zweite Nachricht nach dem Sonntags-Heads-up: neue Ideen der Eltern mit
- * Link zum Ideenpool. Dahinter die Bilder der Ideen als Album.
+ * Zweite Nachricht nach dem Sonntags-Heads-up bzw. Mittwochs-Countdown:
+ * neue Ideen der Eltern mit Link zum Ideenpool. Dahinter die Bilder der
+ * Ideen als Album.
  */
 function buildIdeasMessage(ideas: FreshIdea[], poolLink: string | null): string {
   const lines = ['💡 <b>Frische Ideen von den Eltern</b>', '', ...ideas.map(i => ideaLine(i))]
@@ -631,7 +633,7 @@ export async function processReminders(chatId: string, testStage?: number) {
     const daysUntil = getDaysUntil(eventDate)
     let reminder: ReminderMessage | null = null
     let reminderType: string | null = null
-    // Stage 1: neue Eltern-Ideen folgen als eigene Nachricht nach dem Heads-up.
+    // Stage 1 + 2: neue Eltern-Ideen folgen als eigene Nachricht.
     let followUp: (() => Promise<any>) | null = null
 
     // Stufe 1: Sonntag, 5-8 Tage vorher (5 = Freitags-, 6 = Samstags-Termin)
@@ -653,11 +655,14 @@ export async function processReminders(chatId: string, testStage?: number) {
     if (testStage === 2 || (!isTest && dayOfWeek === 3 && daysUntil >= 2 && daysUntil <= 4)) {
       reminderType = STAGE_WEDNESDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
-        const [weather, birthdays] = await Promise.all([
+        const [weather, birthdays, ideas, poolLink] = await Promise.all([
           fetchWeatherForEvent(event.event_date),
           getBirthdaysAroundEvent(event.event_date),
+          getFreshParentIdeas(event.event_date),
+          miniAppLink('ideen'),
         ])
         reminder = generateStage2Message(event, daysUntil, weather, birthdays)
+        if (ideas.length > 0) followUp = () => sendFreshIdeas(chatId, ideas, poolLink)
       }
     }
 
@@ -747,7 +752,11 @@ export async function renderReminderPreview(
   }
   if (type === STAGE_WEDNESDAY) {
     const r = generateStage2Message(event, getDaysUntil(new Date(eventDate)), weather, birthdays)
-    return { text: r.message, replyMarkup: r.replyMarkup }
+    const ideas = await getFreshParentIdeas(eventDate)
+    const text = ideas.length === 0
+      ? r.message
+      : `${r.message}\n\n— zweite Nachricht —\n\n${buildIdeasMessage(ideas, await miniAppLink('ideen'))}`
+    return { text, replyMarkup: r.replyMarkup }
   }
   return null
 }
