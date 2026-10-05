@@ -762,8 +762,7 @@ export function setupBotCommands(bot: Bot) {
           await ctx.answerCallbackQuery({ text: 'Gepostet!' })
           try {
             await ctx.editMessageText(
-              `${result.posted} Medien für ${shortDate(event.event_date)} in ${isTest ? 'der Sandbox-Gruppe gepostet (Test, sie bleiben offen)' : `${target.label} gepostet`}.` +
-                (result.followUp ? '' : ' Die Nachricht mit /idee und /invite ging nicht raus.'),
+              `${result.posted} Medien für ${shortDate(event.event_date)} in ${isTest ? 'der Sandbox-Gruppe gepostet (Test, sie bleiben offen)' : `${target.label} gepostet`}.`,
             )
           } catch {}
         } catch (e: any) {

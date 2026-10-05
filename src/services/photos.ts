@@ -16,8 +16,8 @@ import { botUsername } from './bot-info'
  * (bis drei Tage danach).
  *
  * Admins prüfen mit /review (einzelne Medien rauswerfen) und posten mit
- * /send alles Übrige als Album in die Elterngruppe. Danach folgt eine zweite
- * Nachricht mit den Hinweisen auf /idee und /invite.
+ * /send alles Übrige als Album in die Elterngruppe. Die Bildunterschrift
+ * trägt den kurzen Text und die Hinweise auf /idee und /invite.
  */
 
 const PHOTO_WINDOW_DAYS = 3
@@ -297,10 +297,10 @@ async function nextEventAfter(afterDate: string): Promise<PhotoEvent | null> {
 }
 
 /**
- * Zweite Nachricht nach dem Album: Hinweis auf /idee, und auf /invite nur,
- * wenn die nächste Jungschar an einem Samstag ist (freitags versorgen wir uns
- * selbst, da gibt es keine Einladung). Die Befehle sind Direktlinks in den
- * privaten Chat (t.me/<bot>?start=…), damit niemand in der Gruppe tippen muss.
+ * Hinweise unter dem Album: /idee, und /invite nur, wenn die nächste
+ * Jungschar an einem Samstag ist (freitags versorgen wir uns selbst, da gibt
+ * es keine Einladung). Die Befehle sind Direktlinks in den privaten Chat
+ * (t.me/<bot>?start=…), damit niemand in der Gruppe tippen muss.
  */
 export async function parentsFollowUp(eventDate: string): Promise<string> {
   const [username, next] = await Promise.all([botUsername(), nextEventAfter(eventDate)])
@@ -314,23 +314,25 @@ export async function parentsFollowUp(eventDate: string): Promise<string> {
 }
 
 /**
- * /send: alle ungeposteten Medien als Album(s) posten, danach die Nachricht
- * mit /idee und /invite. Mit mark=true (Elterngruppe) werden die Medien als
- * gepostet markiert; mark=false (Sandbox-Test) lässt sie offen, damit der
- * echte Post später noch geht.
+ * /send: alle ungeposteten Medien als Album(s) posten. Die Bildunterschrift
+ * des ersten Albums trägt den kurzen Text plus die Hinweise auf /idee und
+ * /invite (eine Nachricht, keine zweite Blase). Mit mark=true (Elterngruppe)
+ * werden die Medien als gepostet markiert; mark=false (Sandbox-Test) lässt
+ * sie offen, damit der echte Post später noch geht.
  */
 export async function postMedia(
   chatId: string,
   event: PhotoEvent,
   mark = true,
-): Promise<{ posted: number; albums: number; followUp: boolean }> {
+): Promise<{ posted: number; albums: number }> {
   const db = getSupabase()
   const rows = await pendingMedia(event.id)
-  if (rows.length === 0) return { posted: 0, albums: 0, followUp: false }
+  if (rows.length === 0) return { posted: 0, albums: 0 }
 
   let albums = 0
   const postedIds: string[] = []
-  const caption = albumCaption(event.event_date)
+  // Telegram erlaubt 1024 Zeichen Caption; Text + Hinweise liegen weit darunter.
+  const caption = `${albumCaption(event.event_date)}\n\n${await parentsFollowUp(event.event_date)}`
   for (let i = 0; i < rows.length; i += ALBUM_MAX) {
     const batch = rows.slice(i, i + ALBUM_MAX)
     const first = i === 0 ? caption : undefined
@@ -345,14 +347,7 @@ export async function postMedia(
   if (mark) {
     await db.from('event_photos').update({ posted_at: new Date().toISOString() } as any).in('id', postedIds)
   }
-
-  const follow = await tg('sendMessage', {
-    chat_id: chatId,
-    text: await parentsFollowUp(event.event_date),
-    parse_mode: 'HTML',
-    link_preview_options: { is_disabled: true },
-  })
-  return { posted: postedIds.length, albums, followUp: !!follow?.ok }
+  return { posted: postedIds.length, albums }
 }
 
 /* ---------- Danke-Nachricht in der Helfer-Gruppe ---------- */
