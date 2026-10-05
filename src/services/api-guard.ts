@@ -5,7 +5,8 @@ import { SESSION_COOKIE, verifySessionToken, type SessionPayload } from './teleg
  * Zugangsprüfung für die API-Routen.
  *
  * Zwei zulässige Aufrufer:
- *  - die Mini-App, per Session-Cookie (aus /api/auth/me)
+ *  - die Mini-App mit Admin-Session (Cookie aus /api/auth/me); Helfer-
+ *    Sessions dürfen nur den Ideenpool lesen (siehe /api/db), keine Aktionen
  *  - Vercel-Cron bzw. manuelle Tests, per `Authorization: Bearer $CRON_SECRET`
  *
  * Alles andere bekommt 401.
@@ -27,6 +28,6 @@ export function hasCronSecret(req: NextRequest): boolean {
  */
 export function requireOperator(req: NextRequest): NextResponse | null {
   if (hasCronSecret(req)) return null
-  if (getSession(req)) return null
+  if (getSession(req)?.role === 'admin') return null
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 }

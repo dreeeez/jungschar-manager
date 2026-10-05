@@ -4,7 +4,7 @@ import { fetchJungscharDatesFromIcs } from './ical-sync'
 
 const STAGES = ['stage1_sunday', 'stage2_wednesday', 'stage3_saturday']
 
-export type PingType = 'stage1_sunday' | 'stage2_wednesday' | 'poll_thursday' | 'stage3_saturday' | 'review_evening'
+export type PingType = 'stage1_sunday' | 'stage2_wednesday' | 'poll_thursday' | 'stage3_saturday' | 'review_evening' | 'thanks_evening'
 
 export interface NextPing {
   type: PingType
@@ -19,6 +19,7 @@ const PING_LABELS: Record<PingType, string> = {
   stage2_wednesday: 'Countdown (Mittwoch)',
   poll_thursday: 'Nicht-Voter-Ping (Donnerstag)',
   review_evening: 'Bewertungs-Ping per DM (20:00)',
+  thanks_evening: 'Danke + Foto-Button in der Helfer-Gruppe (20:00)',
   stage3_saturday: 'Aufwacher (Termin-Tag)',
 }
 
@@ -110,10 +111,11 @@ function predictPings(eventDate: string, sent: Set<string>, now: Date): NextPing
     }
   }
 
-  // Abend-Bewertung: 20:00 Ortszeit am Tag des Termins.
+  // Abend-Bewertung und Danke-Nachricht: 20:00 Ortszeit am Tag des Termins.
   const review = berlinLocalToUtc(eventDate, 20)
   if (review.getTime() > now.getTime()) {
     out.push({ type: 'review_evening', at: review.toISOString(), eventDate, label: PING_LABELS.review_evening })
+    out.push({ type: 'thanks_evening', at: review.toISOString(), eventDate, label: PING_LABELS.thanks_evening })
   }
 
   return out

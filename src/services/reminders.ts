@@ -1,9 +1,10 @@
-import { formatDate, getDaysUntil, getDayOfWeek } from '@/utils/format'
-import { getUpcomingEvents, getHelperTags, getEventById } from './events'
-import { getParentDutyDisplay } from './parents'
+import { formatDate, formatDateShortMonth, getDaysUntil, getDayOfWeek, hasFoodDuty } from '@/utils/format'
+import { getUpcomingEvents, getHelperTags, getEventById, getInvitingParent } from './events'
+import { parentMention } from './parents'
 import { getSupabase } from './database'
 import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './weather'
 import { fetchJungscharDatesFromIcs, insertNewFutureDates } from './ical-sync'
+import { miniAppLink } from './bot-info'
 
 interface ReminderMessage {
   message: string
@@ -31,6 +32,8 @@ export async function sendTelegramMessage(
     chat_id: chatId,
     text,
     parse_mode: 'HTML',
+    // Links (z. B. zum Ideenpool) sollen keine Vorschau-Karte anhängen.
+    link_preview_options: { is_disabled: true },
   }
 
   if (replyMarkup) {
@@ -74,7 +77,7 @@ export async function sendTelegramPoll(
 /**
  * Prüft ob eine Erinnerung bereits gesendet wurde
  */
-async function wasReminderSent(eventId: string, reminderType: string): Promise<boolean> {
+export async function wasReminderSent(eventId: string, reminderType: string): Promise<boolean> {
   const { data } = await getSupabase()
     .from('reminder_log')
     .select('id')
@@ -191,7 +194,7 @@ async function getBirthdaysAroundEvent(eventDate: string): Promise<Birthday[]> {
         const bdayThisYear = new Date(event.getFullYear(), bday.getMonth(), bday.getDate())
         return {
           name: child.name,
-          dayMonth: bdayThisYear.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }),
+          dayMonth: bdayThisYear.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' }),
           age,
         }
       })
@@ -200,14 +203,9 @@ async function getBirthdaysAroundEvent(eventDate: string): Promise<Birthday[]> {
   }
 }
 
-/**
- * Geburtstags-Block: ein Header + eine Zeile pro Kind mit
- * Kind-Emoji, Name, Datum und Alter.
- */
-function formatBirthdayLine(birthdays: Birthday[]): string {
-  if (birthdays.length === 0) return ''
-  const lines = birthdays.map((b) => `🧒 ${b.name} — ${b.dayMonth} (wird ${b.age})`).join('\n')
-  return `🎂 <b>Geburtstag diese Woche:</b>\n${lines}\n`
+/** Eine Pfeil-Zeile pro Kind: „▶ 🎂 Name wird 8 (26. Sept.)“. */
+function formatBirthdayLines(birthdays: Birthday[]): string[] {
+  return birthdays.map((b) => `▶ 🎂 ${b.name} wird ${b.age} (${b.dayMonth})`)
 }
 
 /**
@@ -264,80 +262,156 @@ async function fetchWeatherForEvent(eventDate: string): Promise<WeatherForecast 
  * Event-Ankündigung mit Team und Elterndienst
  */
 type Stage1Ctx = {
-  date: string
-  emoji: string
-  desc: string
-  temp: string
+  /** „Samstag, 31. Okt. · 🌤️ 14–16°C“ */
+  dateLine: string
   team: string
-  parent: string
-  birthdayLine: string
+  /** „▶ 🏠 Einladung …“ / „▶ 🍽️ Essen …“, nur samstags, sonst null. */
+  foodLine: string | null
+  birthdayLines: string[]
+  /** Neue Ideen per /idee seit dem letzten Heads-up, als ▶-Zeilen. */
+  ideaLines: string[]
+  /** Deep-Link zur Helfer-Ansicht des Ideenpools (null, wenn Bot-Username unbekannt). */
+  poolLink: string | null
+}
+
+type FreshIdea = { by: string; text: string; at: string; hasPhoto: boolean }
+
+/** „Mo 12:30“ in Europe/Berlin. */
+function berlinWeekdayTime(iso: string): string {
+  const d = new Date(iso)
+  const wd = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', weekday: 'short' }).format(d).replace('.', '')
+  const hm = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d)
+  return `${wd} ${hm}`
+}
+
+/**
+ * Ideen, die per /idee seit dem letzten Sonntags-Heads-up (egal für welchen
+ * Termin) reingekommen sind. So erscheint jede Idee genau einmal. Ohne
+ * früheres Heads-up zählt alles seit dem vorigen Termin.
+ */
+async function getFreshParentIdeas(eventDate: string): Promise<FreshIdea[]> {
+  try {
+    const db = getSupabase()
+    const [{ data: lastLog }, { data: prevEvent }] = await Promise.all([
+      db.from('reminder_log').select('sent_at').eq('reminder_type', STAGE_SUNDAY).order('sent_at', { ascending: false }).limit(1).maybeSingle(),
+      db.from('events').select('event_date').lt('event_date', eventDate).order('event_date', { ascending: false }).limit(1).maybeSingle(),
+    ])
+    const candidates = [
+      (lastLog as any)?.sent_at as string | undefined,
+      (prevEvent as any)?.event_date ? `${(prevEvent as any).event_date}T23:59:59+02:00` : undefined,
+    ].filter(Boolean) as string[]
+    if (candidates.length === 0) return []
+    const since = candidates.map(c => new Date(c).getTime()).reduce((a, b) => Math.max(a, b))
+
+    const { data } = await db
+      .from('ideas')
+      .select('description, title, suggested_by, created_at, photo_file_id')
+      .eq('source', 'elterngruppe')
+      .gt('created_at', new Date(since).toISOString())
+      .order('created_at', { ascending: true })
+    return ((data ?? []) as any[]).map(i => ({
+      by: i.suggested_by || 'Unbekannt',
+      text: (i.description || i.title || '').trim(),
+      at: i.created_at,
+      hasPhoto: !!i.photo_file_id,
+    }))
+  } catch {
+    return []
+  }
+}
+
+const IDEA_TEXT_MAX = 140
+
+function formatIdeaLines(ideas: FreshIdea[]): string[] {
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return ideas.map(i => {
+    const text = i.text.length > IDEA_TEXT_MAX ? i.text.slice(0, IDEA_TEXT_MAX - 1) + '…' : i.text
+    return `▶ <b>${esc(i.by)}</b> (${berlinWeekdayTime(i.at)}): ${esc(text.replace(/\s+/g, ' '))}${i.hasPhoto ? ' 📷' : ''}`
+  })
+}
+
+// Samstag ohne Einladung und ohne eingeteilte Eltern: wir sind selbst dran.
+const SELF_CATERING_LINES = [
+  '🍽️ Essen: diesmal von uns selbst. Werdet kreativ oder freimütig 😉',
+  '🍽️ Essen: keine Einladung, also sind wir dran. Kreativ oder freimütig 😉',
+  '🍽️ Essen: Samstag ohne Einladung, wir organisieren selbst. Wer wird kreativ? 😄',
+  '🍽️ Essen: noch niemand hat uns eingeladen. Also: selbst kochen oder freimütig fragen 😉',
+]
+
+/**
+ * Essen im Sonntags-Heads-up. Freitags bekommen wir immer Essen, deshalb
+ * keine Zeile. Samstags: Einladung per /invite → „🏠 Einladung: …“, sonst
+ * eingeteilte Eltern (Mini-App) → „🍽️ Essen: Familie X“, sonst müssen wir
+ * selbst ran.
+ */
+function formatFoodLine(event: any): string | null {
+  if (!hasFoodDuty(event.event_date)) return null
+  const inviting = getInvitingParent(event)
+  if (inviting) return `🏠 Einladung: ${parentMention(inviting)} lädt uns zu sich ein`
+  const duty = event?.parent_duties?.[0]?.parent
+  if (duty) return `🍽️ Essen: ${parentMention(duty)}`
+  return SELF_CATERING_LINES[Math.floor(Math.random() * SELF_CATERING_LINES.length)]
+}
+
+/**
+ * Info-Block mit ▶ vor jeder Zeile: Datum + Wetter, Team (Label je Theme),
+ * Essen (nur samstags), Geburtstage. In allen Themes gleich aufgebaut, nur
+ * Header, Team-Label und Closing wechseln.
+ */
+function stage1Info(c: Stage1Ctx, teamLabel: string): string {
+  const lines = [`▶ 📅 ${c.dateLine}`, `▶ 👥 ${teamLabel}: ${c.team}`]
+  if (c.foodLine) lines.push(`▶ ${c.foodLine}`)
+  lines.push(...c.birthdayLines)
+  if (c.ideaLines.length > 0) {
+    lines.push('', '💡 <b>Frische Ideen von den Eltern:</b>', ...c.ideaLines)
+    if (c.poolLink) lines.push(`▶ <a href="${c.poolLink}">Alle Ideen im Ideenpool</a>`)
+  }
+  return lines.join('\n')
 }
 
 // Pool an themed Stage-1-Templates. Eines pro Send wird zufällig gezogen.
-// Jedes muss klar Datum, Wetter, Team, Eltern-Essen kommunizieren — nur
-// die "Verkleidung" wechselt.
+// Jedes zeigt denselben Info-Block (stage1Info) — nur die "Verkleidung" wechselt.
 const STAGE1_TEMPLATES: Array<(c: Stage1Ctx) => string> = [
   // 1. Spy / Mission Impossible
   (c) =>
     `🗺️ <b>Eure Mission, falls ihr sie annehmt:</b>\n\n` +
-    `${c.date} · ${c.emoji} ${c.temp}\n` +
-    `👥 Agenten: ${c.team}\n` +
-    `🍽️ Verpflegung: ${c.parent}\n` +
-    `${c.birthdayLine}` +
+    `${stage1Info(c, 'Agenten')}\n` +
     `\nDiese Nachricht zerstört sich nicht selbst — fangt schon mal an zu planen 🙌`,
 
   // 2. Wahrsager / Glaskugel
   (c) =>
     `🔮 <b>Die Glaskugel hat gesprochen:</b>\n\n` +
-    `${c.date} · ${c.emoji} ${c.temp}\n` +
-    `👥 Auserwählte: ${c.team}\n` +
-    `🍽️ Am Herd: ${c.parent}\n` +
-    `${c.birthdayLine}` +
+    `${stage1Info(c, 'Auserwählte')}\n` +
     `\nSchicksal akzeptiert — fangt an zu planen 🚀`,
 
   // 3. Wettervorhersage parodiert
   (c) =>
-    `📡 <b>Vorhersage für ${c.date}:</b>\n\n` +
-    `${c.emoji} ${c.desc}, ${c.temp}\n` +
-    `👥 mit hoher Wahrscheinlichkeit ${c.team}\n` +
-    `🍽️ und einer kräftigen Brise ${c.parent}\n` +
-    `${c.birthdayLine}` +
+    `📡 <b>Die Vorhersage für nächste Woche:</b>\n\n` +
+    `${stage1Info(c, 'Mit hoher Wahrscheinlichkeit')}\n` +
     `\nAussichten: ihr seid dran. Planen anfangen 🌦️`,
 
   // 4. Spotify Wrapped
   (c) =>
     `🎵 <b>Jungschar Wrapped — eure nächste Schicht:</b>\n\n` +
-    `${c.date} · ${c.emoji} ${c.temp}\n` +
-    `👥 Top-Acts: ${c.team}\n` +
-    `🍽️ Featured: ${c.parent}\n` +
-    `${c.birthdayLine}` +
+    `${stage1Info(c, 'Top-Acts')}\n` +
     `\nPress play in einer Woche ▶️`,
 
   // 5. Stadion-Ansage
   (c) =>
     `📣 <b>Achtung Achtung — die nächste Aufstellung:</b>\n\n` +
-    `${c.date} · ${c.emoji} ${c.temp}\n` +
-    `👥 Mannschaft: ${c.team}\n` +
-    `🍽️ Catering: ${c.parent}\n` +
-    `${c.birthdayLine}` +
+    `${stage1Info(c, 'Mannschaft')}\n` +
     `\nAufwärmen darf beginnen 🏃`,
 
   // 6. Festival-Plakat
   (c) =>
-    `🎤 <b>Festival-Lineup für ${c.date}:</b>\n\n` +
-    `${c.emoji} Wetterprognose: ${c.temp}, ${c.desc}\n` +
-    `👥 Headliner: ${c.team}\n` +
-    `🍽️ Foodtruck: ${c.parent}\n` +
-    `${c.birthdayLine}` +
+    `🎤 <b>Festival-Lineup für nächste Woche:</b>\n\n` +
+    `${stage1Info(c, 'Headliner')}\n` +
     `\nSoundcheck in einer Woche 🎸`,
 
   // 7. Mission Control / Space
   (c) =>
     `🚀 <b>Mission Briefing — T-minus 7 Tage:</b>\n\n` +
-    `${c.date} · ${c.emoji} ${c.temp}\n` +
-    `👥 Astronauten: ${c.team}\n` +
-    `🍽️ Bord-Verpflegung: ${c.parent}\n` +
-    `${c.birthdayLine}` +
+    `${stage1Info(c, 'Astronauten')}\n` +
     `\nAlle Systeme bereit machen 🛰️`,
 ]
 
@@ -348,15 +422,14 @@ function pickStage1Template(): (c: Stage1Ctx) => string {
 // Top-Header für Stage 1: bewusst kurz, längere Header brechen am Handy um.
 const STAGE1_TOP_HEADER = 'HEADS-UP'
 
-function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: Birthday[]): ReminderMessage {
+function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: Birthday[], ideas: FreshIdea[], poolLink: string | null): ReminderMessage {
   const ctx: Stage1Ctx = {
-    date: formatDate(event.event_date),
-    emoji: weatherEmoji(weather),
-    desc: weather?.weather_description ?? 'Wetter unbekannt',
-    temp: weather ? weatherTempStr(weather) : '?°C',
+    dateLine: `${formatDateShortMonth(event.event_date)} · ${weatherEmoji(weather)} ${weather ? weatherTempStr(weather) : '?°C'}`,
     team: getHelperTags(event),
-    parent: getParentDutyDisplay(event),
-    birthdayLine: formatBirthdayLine(birthdays),
+    foodLine: formatFoodLine(event),
+    birthdayLines: formatBirthdayLines(birthdays),
+    ideaLines: formatIdeaLines(ideas),
+    poolLink,
   }
   return {
     message: `+++ ${STAGE1_TOP_HEADER} +++\n\n${pickStage1Template()(ctx)}`,
@@ -373,15 +446,18 @@ function generateStage2Message(
   weather: WeatherForecast | null,
   birthdays: Birthday[]
 ): ReminderMessage {
-  const teamTags = getHelperTags(event)
   const dayWord = daysUntil === 1 ? 'Tag' : 'Tage'
+  const weatherLine = formatWeatherStandalone(weather)
+  const info = [
+    ...(weatherLine ? [`▶ ${weatherLine}`] : []),
+    `▶ 👥 Team: ${getHelperTags(event)}`,
+    ...formatBirthdayLines(birthdays),
+  ]
 
   return {
-    message: `+++ 🔥 <b>Countdown: ${daysUntil} ${dayWord}</b> 🔥 +++\n` +
-      `${formatWeatherStandalone(weather)}\n` +
-      `Team: ${teamTags}\n` +
-      `${formatBirthdayLine(birthdays)}` +
-      `\n📋 <b>Checkliste</b> — Eltern (Essen) heute!\n` +
+    message: `+++ 🔥 <b>Countdown: ${daysUntil} ${dayWord}</b> 🔥 +++\n\n` +
+      `${info.join('\n')}\n` +
+      `\n📋 <b>Checkliste</b>\n` +
       `☐ Programm\n` +
       `☐ Material\n` +
       `☐ Kinderstunde\n` +
@@ -544,11 +620,13 @@ export async function processReminders(chatId: string, testStage?: number) {
     if (testStage === 1 || (!isTest && dayOfWeek === 0 && daysUntil >= 5 && daysUntil <= 8)) {
       reminderType = STAGE_SUNDAY
       if (isTest || !(await wasReminderSent(event.id, reminderType))) {
-        const [weather, birthdays] = await Promise.all([
+        const [weather, birthdays, ideas, poolLink] = await Promise.all([
           fetchWeatherForEvent(event.event_date),
           getBirthdaysAroundEvent(event.event_date),
+          getFreshParentIdeas(event.event_date),
+          miniAppLink('ideen'),
         ])
-        reminder = generateStage1Message(event, weather, birthdays)
+        reminder = generateStage1Message(event, weather, birthdays, ideas, poolLink)
       }
     }
 
@@ -635,7 +713,7 @@ export async function renderReminderPreview(
     getBirthdaysAroundEvent(eventDate),
   ])
   if (type === STAGE_SUNDAY) {
-    const r = generateStage1Message(event, weather, birthdays)
+    const r = generateStage1Message(event, weather, birthdays, await getFreshParentIdeas(eventDate), await miniAppLink('ideen'))
     return { text: r.message }
   }
   if (type === STAGE_WEDNESDAY) {

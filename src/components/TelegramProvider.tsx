@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 
 interface TelegramUser {
   id: number
@@ -17,7 +18,12 @@ interface Helper {
   telegramUserId: number
   name: string
   isAdmin: boolean
+  /** admin = ganze App, helper = nur /ideen (nur lesen) */
+  role: 'admin' | 'helper'
 }
+
+/** Einzige Seite für Helfer; auch Ziel des Links aus dem Heads-up (start_param=ideen). */
+const HELPER_PAGE = '/ideen'
 
 type AuthState = 'checking' | 'authorized' | 'denied'
 
@@ -41,6 +47,9 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
   const [denyReason, setDenyReason] = useState<string>('')
   const [initData, setInitData] = useState<string | null>(null)
   const [colorScheme, setColorScheme] = useState<'light' | 'dark'>('light')
+  const [startParam, setStartParam] = useState<string | null>(null)
+  const pathname = usePathname()
+  const router = useRouter()
 
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp
@@ -49,6 +58,7 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
       tg.ready()
       tg.expand()
       if (tg.initDataUnsafe?.user) setUser(tg.initDataUnsafe.user)
+      if (tg.initDataUnsafe?.start_param) setStartParam(String(tg.initDataUnsafe.start_param))
       setInitData(tg.initData)
       setColorScheme(tg.colorScheme || 'light')
       tg.onEvent('themeChanged', () => setColorScheme(tg.colorScheme || 'light'))
@@ -88,6 +98,14 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
 
     login()
   }, [])
+
+  // Helfer haben genau eine Seite. Der Deep-Link t.me/<bot>?startapp=ideen
+  // bringt auch Admins direkt dorthin.
+  useEffect(() => {
+    if (auth !== 'authorized' || !helper) return
+    const wantsIdeen = helper.role === 'helper' || startParam === 'ideen'
+    if (wantsIdeen && pathname !== HELPER_PAGE) router.replace(HELPER_PAGE)
+  }, [auth, helper, startParam, pathname, router])
 
   const close = () => {
     const tg = (window as any).Telegram?.WebApp
@@ -129,6 +147,15 @@ export function TelegramProvider({ children }: { children: ReactNode }) {
           <h1 className="mb-2 text-lg font-semibold">Kein Zugang</h1>
           <p className="text-sm text-muted">{denyReason}</p>
         </div>
+      </div>
+    )
+  }
+
+  // Helfer: bis zur Weiterleitung nichts anderes rendern.
+  if (helper?.role === 'helper' && pathname !== HELPER_PAGE) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <p className="text-sm text-muted">Öffne Ideenpool …</p>
       </div>
     )
   }
