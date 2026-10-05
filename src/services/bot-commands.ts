@@ -119,7 +119,7 @@ function helpFor(role: Role): string {
     lines.push('<b>Helfer</b>', '/next – nächste Termine mit Team', '/status – nächste Jungschar', '/mystatus – meine Einsätze', 'Fotos oder Videos von der Jungschar? Einfach hier reinschicken.', '/bilder – meine geschickten Bilder, falsche rauswerfen', 'Ideenpool: Button „Ideen“ unten neben dem Eingabefeld')
   }
   if (role.parent || role.helper || role.admin) {
-    lines.push('', '<b>Eltern</b>', '/termine – nächste Jungschar-Termine', '/idee – Programm-Idee vorschlagen', '/invite – die Jungschar zu euch einladen', '/inspo – Essensideen für den Jungschar-Besuch')
+    lines.push('', '<b>Eltern</b>', '/termine – nächste Jungschar-Termine', '/idee – Programm-Idee vorschlagen', '/invite – die Jungschar zu euch einladen')
   }
   if (role.admin) {
     lines.push('', '<b>Admin</b>', '/review – gesammelte Fotos und Videos prüfen, einzelne rauswerfen', '/send – alles Übrige in den Elternchat posten', '/chatid – Chat-ID anzeigen', `Mini-App: ${APP_URL}`)
@@ -423,6 +423,7 @@ export function setupBotCommands(bot: Bot) {
   })
 
   // /inspo – Essens-„Inspiration“ (Spaß): Sterneküche als Album, dann die Auflösung.
+  // Bewusst nicht im Befehlsmenü und nicht in /help: taucht nur in der Bestätigung nach /invite auf.
   bot.command('inspo', async (ctx) => {
     const role = await roleOf(ctx)
     if (!role.helper && !role.parent && !role.admin) {
