@@ -45,6 +45,7 @@ supabase/
   seed/ideenpool.json  Ideenpool aus dem Elternchat-Export (2020–2026)
 scripts/
   import-ideenpool.mjs  Import der Seed-Datei in `ideas` (Upsert nach Titel, --dry-run)
+  set-menu-buttons.mjs  Menü-Button für alle registrierten Helfer auf einmal setzen (Admin/Ideen)
 ```
 
 ## Reminder-System
