@@ -40,6 +40,7 @@ export default function ParentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTag, setEditTag] = useState('')
   const [editTgId, setEditTgId] = useState('')
+  const [query, setQuery] = useState('')
 
   useEffect(() => {
     fetchParents()
@@ -132,6 +133,16 @@ export default function ParentsPage() {
 
   if (loading) return <Loading />
 
+  // Suche über Name, Telegram-Name und Telegram-ID.
+  const q = query.trim().toLowerCase().replace(/^@+/, '')
+  const shown = q
+    ? parents.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.telegram_username ?? '').toLowerCase().includes(q) ||
+        String(p.telegram_user_id ?? '').includes(q),
+      )
+    : parents
+
   return (
     <Page title="Eltern" back="/" accent="parents">
       <Disclosure label="Eltern hinzufügen" open={adding} onOpenChange={setAdding}>
@@ -161,12 +172,18 @@ export default function ParentsPage() {
         </div>
       </Disclosure>
 
-      <Section title={`${parents.length} Eltern`}>
+      <div className="mb-3">
+        <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Suchen …" />
+      </div>
+
+      <Section title={q ? `${shown.length} von ${parents.length} Eltern` : `${parents.length} Eltern`}>
         {parents.length === 0 ? (
           <Empty>Noch keine Eltern vorhanden</Empty>
+        ) : shown.length === 0 ? (
+          <Empty>Niemand passt zu „{query.trim()}“</Empty>
         ) : (
           <List>
-            {parents.map((parent) => {
+            {shown.map((parent) => {
               const isEditing = editingId === parent.id
               if (isEditing) {
                 return (
