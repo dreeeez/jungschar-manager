@@ -225,7 +225,13 @@ export async function saveInvitation(
 
 /** Bilder liegen in public/inspo (Live-URL). */
 const INSPO_IMAGES = ['essen-1.jpg', 'essen-2.jpg', 'essen-3.jpg'].map(f => `${APP_URL}/inspo/${f}`)
-const INSPO_CAPTION = 'Ein paar einfache Essensideen, die wir für gewöhnlich von den Eltern bekommen:'
+/** Text unter dem Album: was auf den Bildern zu sehen ist, dann die Auflösung. */
+const INSPO_TEXT =
+  'Ein paar einfache Essensideen, die wir für gewöhnlich von den Eltern bekommen:\n' +
+  '▶ Feinster Hummer mit Zitrone, von Familie Krabbenburger\n' +
+  '▶ Sushi-Platte mit Lachs-Nigiri, von Familie Nakamura\n' +
+  '▶ Gebratene Jakobsmuschel auf Rucola und Granatapfel, von Familie Sternekoch\n\n' +
+  'Spaß! 😄 Es reicht etwas völlig Einfaches. Danke schonmal!'
 const INSPO_FILE_IDS_KEY = 'inspo_file_ids'
 
 /**
@@ -243,7 +249,7 @@ async function sendInspoAlbum(chatId: string): Promise<boolean> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        media: ids.map((id, i) => ({ type: 'photo', media: id, ...(i === 0 ? { caption: INSPO_CAPTION } : {}) })),
+        media: ids.map(id => ({ type: 'photo', media: id })),
       }),
     }).then(r => r.json())
     if (res?.ok) return true
@@ -254,7 +260,7 @@ async function sendInspoAlbum(chatId: string): Promise<boolean> {
   form.append('chat_id', chatId)
   form.append(
     'media',
-    JSON.stringify(INSPO_IMAGES.map((_, i) => ({ type: 'photo', media: `attach://f${i}`, ...(i === 0 ? { caption: INSPO_CAPTION } : {}) }))),
+    JSON.stringify(INSPO_IMAGES.map((_, i) => ({ type: 'photo', media: `attach://f${i}` }))),
   )
   for (let i = 0; i < INSPO_IMAGES.length; i++) {
     const blob = await fetch(INSPO_IMAGES[i]).then(r => r.blob())
@@ -271,16 +277,14 @@ async function sendInspoAlbum(chatId: string): Promise<boolean> {
 }
 
 /**
- * /inspo: Album mit „typischen“ Essensideen (Sterneküche, Sushi …), danach
- * die Auflösung, dass etwas völlig Einfaches reicht.
+ * /inspo: Album mit „typischen“ Essensideen (Hummer, Sushi, Sterneküche)
+ * ohne Caption, darunter als Text, was zu sehen ist, und die Auflösung,
+ * dass etwas völlig Einfaches reicht.
  */
 export async function sendFoodInspo(chatId: string): Promise<boolean> {
-  if (!(await sendInspoAlbum(chatId))) {
-    await sendTelegramMessage(chatId, 'Die Bilder wollten gerade nicht. Kurz gesagt: Es reicht etwas völlig Einfaches. Danke schonmal! 😄')
-    return false
-  }
-  await sendTelegramMessage(chatId, 'Spaß! 😄 Es reicht etwas völlig Einfaches. Danke schonmal!')
-  return true
+  const ok = await sendInspoAlbum(chatId)
+  await sendTelegramMessage(chatId, ok ? INSPO_TEXT : 'Die Bilder wollten gerade nicht. Kurz gesagt: Es reicht etwas völlig Einfaches. Danke schonmal! 😄')
+  return ok
 }
 
 /* ---------- Geburtstagsgruß ---------- */
