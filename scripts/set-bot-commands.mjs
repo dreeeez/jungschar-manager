@@ -15,20 +15,15 @@ const env = Object.fromEntries(
 const token = process.env.TELEGRAM_BOT_TOKEN ?? env.TELEGRAM_BOT_TOKEN
 if (!token) throw new Error('TELEGRAM_BOT_TOKEN fehlt')
 
-// Privater Chat: volle Liste (je nach Rolle antwortet der Bot ohnehin nur auf das Passende).
+// Privater Chat, Standard vor dem ersten /start: die Eltern-Sicht. Beim /start
+// setzt der Bot pro Chat das Menü je Rolle (bot-commands.ts: commandsFor).
 const privateCommands = [
   { command: 'start', description: 'Bot starten' },
-  { command: 'help', description: 'Befehle anzeigen' },
   { command: 'termine', description: 'Nächste Jungschar-Termine' },
   { command: 'idee', description: 'Programm-Idee vorschlagen' },
   { command: 'invite', description: 'Die Jungschar zu euch einladen' },
   { command: 'bug', description: 'Fehler oder Wunsch zum Bot melden' },
-  { command: 'next', description: 'Termine mit Team (Helfer)' },
-  { command: 'mystatus', description: 'Meine Einsätze (Helfer)' },
-  { command: 'bilder', description: 'Meine geschickten Bilder, falsche rauswerfen (Helfer)' },
-  { command: 'register', description: 'Als Helfer registrieren (mit Code)' },
-  { command: 'review', description: 'Fotos und Videos prüfen (Admin)' },
-  { command: 'send', description: 'Fotos und Videos in den Elternchat posten (Admin)' },
+  { command: 'help', description: 'Befehle anzeigen' },
 ]
 
 // Helfer-Gruppe: nur, was dort Sinn ergibt. Alles Persönliche läuft privat.

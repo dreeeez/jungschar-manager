@@ -249,7 +249,52 @@ const replyVia = (ctx: Context): Reply => (text, extra) => ctx.reply(text, extra
 /**
  * Richtet alle Bot Commands ein
  */
+/** Befehle, die in einer Gruppe erlaubt sind (werden gelöscht und per DM weitergeführt). */
+const GROUP_PRIVATE_COMMANDS = new Set(['idee', 'invite', 'einladen', 'bug', 'inspo'])
+/** Zusätzlich in der Helfer-Gruppe erlaubt. */
+const HELPER_GROUP_COMMANDS = new Set(['next', 'status'])
+
+/** Befehlsmenü im privaten Chat je Rolle (setMyCommands mit scope chat). */
+function commandsFor(role: Role): { command: string; description: string }[] {
+  const list: { command: string; description: string }[] = []
+  if (role.parent || role.helper || role.admin) {
+    list.push(
+      { command: 'termine', description: 'Nächste Jungschar-Termine' },
+      { command: 'idee', description: 'Programm-Idee vorschlagen' },
+    )
+  }
+  if (role.parent || role.admin) list.push({ command: 'invite', description: 'Die Jungschar zu euch einladen' })
+  if (role.helper) {
+    list.push(
+      { command: 'next', description: 'Termine mit Team' },
+      { command: 'mystatus', description: 'Meine Einsätze' },
+      { command: 'bilder', description: 'Meine geschickten Bilder, falsche rauswerfen' },
+    )
+  }
+  if (role.admin) {
+    list.push(
+      { command: 'review', description: 'Fotos und Videos prüfen' },
+      { command: 'send', description: 'Fotos und Videos in den Elternchat posten' },
+    )
+  }
+  if (role.parent || role.helper || role.admin) list.push({ command: 'bug', description: 'Fehler oder Wunsch zum Bot melden' })
+  if (!role.parent && !role.helper && !role.admin) list.push({ command: 'register', description: 'Als Helfer registrieren (mit Code)' })
+  list.push({ command: 'help', description: 'Befehle anzeigen' })
+  return list
+}
+
 export function setupBotCommands(bot: Bot) {
+  // Gruppen: Nur /idee, /invite, /bug, /inspo (gelöscht, dann per DM) und in der
+  // Helfer-Gruppe /next, /status. Alles andere wird still gelöscht, keine Antwort,
+  // damit in der Elterngruppe nie Bot-Dialoge auftauchen.
+  bot.on('message:entities:bot_command', async (ctx, next) => {
+    if (ctx.chat.type === 'private') return next()
+    const cmd = (ctx.message.text ?? '').trim().split(/[\s@]/)[0].slice(1).toLowerCase()
+    const isHelperGroup = String(ctx.chat.id) === process.env.TELEGRAM_CHAT_ID
+    if (GROUP_PRIVATE_COMMANDS.has(cmd) || (isHelperGroup && HELPER_GROUP_COMMANDS.has(cmd))) return next()
+    await ctx.deleteMessage().catch(() => {})
+  })
+
   // /start – Begrüßung je Rolle. Admins bekommen den Menü-Button "Admin".
   // Mit Deep-Link-Payload (t.me/<bot>?start=idee|invite|inspo|bug|fotos) direkt in den Ablauf springen.
   bot.command('start', async (ctx) => {
@@ -291,16 +336,22 @@ export function setupBotCommands(bot: Bot) {
       return
     }
 
-    // Menü-Button neben dem Eingabefeld: Admins die ganze App, Helfer nur den Ideenpool.
-    if (ctx.chat.type === 'private' && (role.admin || role.helper)) {
+    if (ctx.chat.type === 'private') {
+      // Befehlsmenü je Rolle, nur für diesen Chat.
       await ctx.api
-        .setChatMenuButton({
-          chat_id: ctx.chat.id,
-          menu_button: role.admin
-            ? { type: 'web_app', text: 'Admin', web_app: { url: APP_URL } }
-            : { type: 'web_app', text: 'Ideen', web_app: { url: `${APP_URL}/ideen` } },
-        })
-        .catch((e) => console.error('setChatMenuButton failed:', e))
+        .setMyCommands(commandsFor(role), { scope: { type: 'chat', chat_id: ctx.chat.id } })
+        .catch((e) => console.error('setMyCommands failed:', e))
+      // Menü-Button neben dem Eingabefeld: Admins die ganze App, Helfer nur den Ideenpool.
+      if (role.admin || role.helper) {
+        await ctx.api
+          .setChatMenuButton({
+            chat_id: ctx.chat.id,
+            menu_button: role.admin
+              ? { type: 'web_app', text: 'Admin', web_app: { url: APP_URL } }
+              : { type: 'web_app', text: 'Ideen', web_app: { url: `${APP_URL}/ideen` } },
+          })
+          .catch((e) => console.error('setChatMenuButton failed:', e))
+      }
     }
 
     let intro: string
