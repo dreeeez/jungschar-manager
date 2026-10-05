@@ -148,15 +148,13 @@ function privateChatButton(ctx: Context, payload: Payload) {
 type Reply = (text: string, extra?: { reply_markup?: any }) => Promise<unknown>
 
 /**
- * Befehl in einer Gruppe: Niemand soll mitbekommen, dass jemand mit dem Bot
- * spricht. Die Befehls-Nachricht wird gelöscht (dafür muss der Bot Admin der
- * Gruppe sein) und der Ablauf läuft per DM weiter. Klappt die DM nicht (die
- * Person hat den Bot nie gestartet), bleibt als Fallback die stumme Antwort
- * mit dem Button „Privat schreiben“ in der Gruppe.
+ * Befehl in einer Gruppe: Der Bot antwortet nicht in der Gruppe, sondern
+ * führt den Ablauf per DM weiter. Klappt die DM nicht (die Person hat den
+ * Bot nie gestartet), bleibt als Fallback die stumme Antwort mit dem Button
+ * „Privat schreiben“ in der Gruppe. Gelöscht wird nichts.
  */
 async function continueInPrivate(ctx: Context, payload: Payload, dm: (reply: Reply) => Promise<void>) {
   const uid = ctx.from?.id
-  await ctx.deleteMessage().catch(() => {})
   if (uid) {
     let ok = true
     const reply: Reply = async (text, extra) => {
@@ -249,10 +247,8 @@ const replyVia = (ctx: Context): Reply => (text, extra) => ctx.reply(text, extra
 /**
  * Richtet alle Bot Commands ein
  */
-/** Befehle, die in einer Gruppe erlaubt sind (werden gelöscht und per DM weitergeführt). */
+/** Befehle, auf die der Bot in fremden Gruppen (z. B. Elterngruppe) reagiert: per DM. */
 const GROUP_PRIVATE_COMMANDS = new Set(['idee', 'invite', 'einladen', 'bug', 'inspo'])
-/** Zusätzlich in der Helfer-Gruppe erlaubt. */
-const HELPER_GROUP_COMMANDS = new Set(['next', 'status'])
 
 /** Befehlsmenü im privaten Chat je Rolle (setMyCommands mit scope chat). */
 function commandsFor(role: Role): { command: string; description: string }[] {
@@ -284,15 +280,15 @@ function commandsFor(role: Role): { command: string; description: string }[] {
 }
 
 export function setupBotCommands(bot: Bot) {
-  // Gruppen: Nur /idee, /invite, /bug, /inspo (gelöscht, dann per DM) und in der
-  // Helfer-Gruppe /next, /status. Alles andere wird still gelöscht, keine Antwort,
-  // damit in der Elterngruppe nie Bot-Dialoge auftauchen.
+  // Gruppen außer der Helfer-Gruppe (z. B. Elterngruppe): Nur /idee, /invite,
+  // /bug, /inspo, und die per DM. Alles andere ignoriert der Bot dort still,
+  // damit in der Elterngruppe keine Bot-Dialoge auftauchen. In der Helfer-
+  // Gruppe funktionieren alle Befehle wie gehabt.
   bot.on('message:entities:bot_command', async (ctx, next) => {
     if (ctx.chat.type === 'private') return next()
+    if (String(ctx.chat.id) === process.env.TELEGRAM_CHAT_ID) return next()
     const cmd = (ctx.message.text ?? '').trim().split(/[\s@]/)[0].slice(1).toLowerCase()
-    const isHelperGroup = String(ctx.chat.id) === process.env.TELEGRAM_CHAT_ID
-    if (GROUP_PRIVATE_COMMANDS.has(cmd) || (isHelperGroup && HELPER_GROUP_COMMANDS.has(cmd))) return next()
-    await ctx.deleteMessage().catch(() => {})
+    if (GROUP_PRIVATE_COMMANDS.has(cmd)) return next()
   })
 
   // /start – Begrüßung je Rolle. Admins bekommen den Menü-Button "Admin".

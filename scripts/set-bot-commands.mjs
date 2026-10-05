@@ -26,10 +26,12 @@ const privateCommands = [
   { command: 'help', description: 'Befehle anzeigen' },
 ]
 
-// Helfer-Gruppe: nur, was dort Sinn ergibt. Alles Persönliche läuft privat.
+// Helfer-Gruppe: die Helfer-Befehle, wie gehabt.
 const helperGroupCommands = [
   { command: 'next', description: 'Nächste Termine mit Team' },
   { command: 'status', description: 'Nächste Jungschar' },
+  { command: 'mystatus', description: 'Meine Einsätze' },
+  { command: 'termine', description: 'Nächste Termine' },
 ]
 
 async function setCommands(commands, scope) {
