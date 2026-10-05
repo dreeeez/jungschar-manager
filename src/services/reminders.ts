@@ -4,7 +4,7 @@ import { parentMention } from './parents'
 import { getSupabase } from './database'
 import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './weather'
 import { fetchJungscharDatesFromIcs, insertNewFutureDates } from './ical-sync'
-import { miniAppLink, sendPhotoAlbum } from './bot-info'
+import { botUsername, miniAppLink, sendPhotoAlbum } from './bot-info'
 
 interface ReminderMessage {
   message: string
@@ -334,20 +334,22 @@ function ideaLine(i: FreshIdea, max = IDEA_TEXT_MAX): string {
  * neue Ideen der Eltern mit Link zum Ideenpool. Dahinter die Bilder der
  * Ideen als Album.
  */
-function buildIdeasMessage(ideas: FreshIdea[], poolLink: string | null): string {
+async function buildIdeasMessage(ideas: FreshIdea[], poolLink: string | null): Promise<string> {
   const lines = ['💡 <b>Frische Ideen von den Eltern</b>', '', ...ideas.map(i => ideaLine(i))]
-  lines.push(
-    '',
-    poolLink
-      ? `▶ <a href="${poolLink}">Alle Ideen im Ideenpool</a>`
-      : '▶ Alle Ideen: im Chat mit dem Bot unten auf <b>Ideen</b> tippen',
-  )
+  if (poolLink) {
+    lines.push('', `▶ <a href="${poolLink}">Alle Ideen im Ideenpool</a>`)
+  } else {
+    // Ohne benannte Mini-App: Link in den Bot-Chat, dort unten der Menü-Button „Ideen“.
+    const username = await botUsername()
+    const chat = username ? `<a href="https://t.me/${username}">im Chat mit dem Bot</a>` : 'im Chat mit dem Bot'
+    lines.push('', `▶ Alle Ideen: ${chat} unten auf <b>Ideen</b> tippen`)
+  }
   return lines.join('\n')
 }
 
 async function sendFreshIdeas(chatId: string, ideas: FreshIdea[], poolLink: string | null): Promise<any> {
   if (ideas.length === 0) return null
-  const res = await sendTelegramMessage(chatId, buildIdeasMessage(ideas, poolLink))
+  const res = await sendTelegramMessage(chatId, await buildIdeasMessage(ideas, poolLink))
   const withPhoto = ideas.filter(i => i.photoFileId)
   if (withPhoto.length > 0) {
     await sendPhotoAlbum(
@@ -753,14 +755,14 @@ export async function renderReminderPreview(
     const ideas = await getFreshParentIdeas(eventDate)
     if (ideas.length === 0) return { text: r.message }
     // Vorschau zeigt beide Nachrichten untereinander.
-    return { text: `${r.message}\n\n— zweite Nachricht —\n\n${buildIdeasMessage(ideas, await miniAppLink('ideen'))}` }
+    return { text: `${r.message}\n\n— zweite Nachricht —\n\n${await buildIdeasMessage(ideas, await miniAppLink('ideen'))}` }
   }
   if (type === STAGE_WEDNESDAY) {
     const r = generateStage2Message(event, getDaysUntil(new Date(eventDate)), weather, birthdays)
     const ideas = await getFreshParentIdeas(eventDate)
     const text = ideas.length === 0
       ? r.message
-      : `${r.message}\n\n— zweite Nachricht —\n\n${buildIdeasMessage(ideas, await miniAppLink('ideen'))}`
+      : `${r.message}\n\n— zweite Nachricht —\n\n${await buildIdeasMessage(ideas, await miniAppLink('ideen'))}`
     return { text, replyMarkup: r.replyMarkup }
   }
   return null
