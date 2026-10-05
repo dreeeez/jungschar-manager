@@ -1,6 +1,8 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
+import { supabase } from '@/lib/supabase'
 import { Avatar, ChevronRight, IconTile, Icons, List, PAGE_COLORS, Page, Row } from '@/components/ui'
 
 const NAV = [
@@ -11,12 +13,24 @@ const NAV = [
   { href: '/ideas', title: 'Archiv', description: 'Vergangene Termine', color: PAGE_COLORS.archive, icon: Icons.archive },
   { href: '/pool', title: 'Ideenpool', description: 'Was wir mal machen könnten', color: PAGE_COLORS.pool, icon: Icons.bulb },
   { href: '/status', title: 'Bot-Status', description: 'Health, nächste Nachricht, Pings', color: PAGE_COLORS.status, icon: Icons.activity },
+  { href: '/feedback', title: 'Feedback', description: 'Meldungen aus /bug', color: PAGE_COLORS.status, icon: Icons.bulb },
   { href: '/settings', title: 'Einstellungen', description: 'Termin-Sync, Wetter', color: PAGE_COLORS.settings, icon: Icons.settings },
 ]
 
 export default function Home() {
   const { helper, user } = useTelegram()
+  const [openFeedback, setOpenFeedback] = useState<number | null>(null)
   const name = helper?.name ?? user?.first_name ?? ''
+
+  // Zahl der offenen /bug-Meldungen in der Feedback-Zeile.
+  useEffect(() => {
+    ;(supabase as any)
+      .from('feedback')
+      .select('id', { count: 'exact', head: true })
+      .is('done_at', null)
+      .then(({ count }: any) => setOpenFeedback(typeof count === 'number' ? count : null))
+      .catch(() => {})
+  }, [])
   const firstName = user?.first_name ?? name.split(' ')[0]
   const today = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -45,7 +59,10 @@ export default function Home() {
             <IconTile color={item.color}>{item.icon()}</IconTile>
             <div className="flex-1">
               <p className="font-medium">{item.title}</p>
-              <p className="text-sm text-muted">{item.description}</p>
+              <p className="text-sm text-muted">
+                {item.href === '/feedback' && openFeedback ? `${openFeedback} offen · ` : ''}
+                {item.description}
+              </p>
             </div>
             <ChevronRight />
           </Row>

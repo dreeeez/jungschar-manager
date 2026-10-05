@@ -22,6 +22,7 @@ const commands = [
   { command: 'idee', description: 'Programm-Idee vorschlagen' },
   { command: 'invite', description: 'Die Jungschar zu euch einladen' },
   { command: 'inspo', description: 'Essensideen für den Jungschar-Besuch' },
+  { command: 'bug', description: 'Fehler oder Wunsch zum Bot melden' },
   { command: 'next', description: 'Termine mit Team (Helfer)' },
   { command: 'mystatus', description: 'Meine Einsätze (Helfer)' },
   { command: 'bilder', description: 'Meine geschickten Bilder, falsche rauswerfen (Helfer)' },
