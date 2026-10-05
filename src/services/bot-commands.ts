@@ -453,7 +453,7 @@ export function setupBotCommands(bot: Bot) {
     await ctx.reply(
       shown === 0
         ? `Von dir ist für ${shortDate(event.event_date)} nichts offen. Was schon gepostet ist, kann nur noch im Elternchat gelöscht werden.`
-        : `${shown} ${shown === 1 ? 'Medium' : 'Medien'} von dir für ${shortDate(event.event_date)}. Falsch geschickt? Einfach drunter rauswerfen.`,
+        : `${shown} ${shown === 1 ? 'Medium' : 'Medien'} von dir für ${shortDate(event.event_date)} Falsch geschickt? Einfach drunter rauswerfen.`,
     )
   })
 
@@ -471,13 +471,13 @@ export function setupBotCommands(bot: Bot) {
       await ctx.reply(
         counts.total > 0
           ? `Alles für ${shortDate(event.event_date)} ist schon gepostet.`
-          : `Bis jetzt keine Fotos oder Videos für ${shortDate(event.event_date)}.`,
+          : `Bis jetzt keine Fotos oder Videos für ${shortDate(event.event_date)}`,
       )
       return
     }
     await sendReviewItems(String(ctx.chat.id), event)
     await ctx.reply(
-      `${mediaLabel(counts)} für ${shortDate(event.event_date)}. Was nicht rein soll, direkt unter dem Bild rauswerfen. /send postet den Rest.`,
+      `${mediaLabel(counts)} für ${shortDate(event.event_date)} Was nicht rein soll, direkt unter dem Bild rauswerfen. /send postet den Rest.`,
     )
   })
 
@@ -611,7 +611,7 @@ export function setupBotCommands(bot: Bot) {
     const undo = album
       ? { text: '🗑 Album rauswerfen', callback_data: `phg_${album}` }
       : saved.id ? { text: '🗑 Rauswerfen', callback_data: `phu_${saved.id}` } : null
-    await ctx.reply(`Danke! ${what} für ${shortDate(event.event_date)}. ${next}`, {
+    await ctx.reply(`Danke! ${what} für ${shortDate(event.event_date)}\n${next}`, {
       reply_markup: undo ? { inline_keyboard: [[undo]] } : undefined,
     })
   })
