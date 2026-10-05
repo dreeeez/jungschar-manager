@@ -455,7 +455,8 @@ function generateStage2Message(
   ]
 
   return {
-    message: `+++ 🔥 <b>Countdown: ${daysUntil} ${dayWord}</b> 🔥 +++\n\n` +
+    // Nur zwei Plus: mit drei bricht der Header am Handy um.
+    message: `++ 🔥 <b>Countdown: ${daysUntil} ${dayWord}</b> 🔥 ++\n\n` +
       `${info.join('\n')}\n` +
       `\n📋 <b>Checkliste</b>\n` +
       `☐ Programm\n` +
