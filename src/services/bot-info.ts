@@ -1,3 +1,5 @@
+import { MINI_APP_SHORT_NAME } from './admins'
+
 /** Bot-Username (getMe), einmal pro Prozess geholt. null, wenn nicht erreichbar. */
 let cached: string | null = null
 
@@ -34,11 +36,12 @@ export async function sendPhotoAlbum(
 }
 
 /**
- * Link, der die Mini-App direkt öffnet (Haupt-Mini-App des Bots, bei
- * BotFather aktiviert). {startParam} landet in initData.start_param;
- * die App routet damit z. B. auf /ideen.
+ * Link, der die benannte Mini-App direkt öffnet (BotFather /newapp,
+ * MINI_APP_SHORT_NAME). {startParam} landet in initData.start_param; die App
+ * routet damit z. B. auf /ideen. null, solange keine Mini-App angelegt ist.
  */
 export async function miniAppLink(startParam: string): Promise<string | null> {
+  if (!MINI_APP_SHORT_NAME) return null
   const username = await botUsername()
-  return username ? `https://t.me/${username}?startapp=${startParam}` : null
+  return username ? `https://t.me/${username}/${MINI_APP_SHORT_NAME}?startapp=${startParam}` : null
 }

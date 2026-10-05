@@ -15,6 +15,14 @@ import { getSupabase } from './database'
 /** Live-URL der Mini-App (Production). */
 export const APP_URL = 'https://jungschar-manager-bot-mini-app.vercel.app'
 
+/**
+ * Kurzname der benannten Mini-App (BotFather /newapp), für Links aus
+ * Gruppen-Nachrichten: t.me/<bot>/<kurzname>?startapp=ideen. Leer = keine
+ * angelegt; dann steht in der Ideen-Nachricht eine Anleitung statt des Links.
+ * Die Haupt-Mini-App bleibt bewusst aus, sie zeigt allen Nutzern „OPEN“.
+ */
+export const MINI_APP_SHORT_NAME = ''
+
 export const ADMIN_TELEGRAM_USER_IDS = new Set<number>([
   5856427770, // Marco Schneider
   53866569, // Jens Müller

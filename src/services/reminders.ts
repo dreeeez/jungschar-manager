@@ -336,7 +336,12 @@ function ideaLine(i: FreshIdea, max = IDEA_TEXT_MAX): string {
  */
 function buildIdeasMessage(ideas: FreshIdea[], poolLink: string | null): string {
   const lines = ['💡 <b>Frische Ideen von den Eltern</b>', '', ...ideas.map(i => ideaLine(i))]
-  if (poolLink) lines.push('', `▶ <a href="${poolLink}">Alle Ideen im Ideenpool</a>`)
+  lines.push(
+    '',
+    poolLink
+      ? `▶ <a href="${poolLink}">Alle Ideen im Ideenpool</a>`
+      : '▶ Alle Ideen: im Chat mit dem Bot unten auf <b>Ideen</b> tippen',
+  )
   return lines.join('\n')
 }
 
