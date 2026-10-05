@@ -134,12 +134,47 @@ function helpFor(role: Role): string {
   return lines.join('\n').trim()
 }
 
+type Payload = 'idee' | 'invite' | 'inspo' | 'bug'
+
 /** Button, der den privaten Chat mit dem Bot öffnet und dort direkt {payload} startet. */
-function privateChatButton(ctx: Context, payload: 'idee' | 'invite' | 'inspo' | 'bug') {
+function privateChatButton(ctx: Context, payload: Payload) {
   const username = ctx.me.username
   return {
     inline_keyboard: [[{ text: 'Privat schreiben', url: `https://t.me/${username}?start=${payload}` }]],
   }
+}
+
+/** Antwort-Funktion: im privaten Chat ctx.reply, aus der Gruppe heraus eine DM. */
+type Reply = (text: string, extra?: { reply_markup?: any }) => Promise<unknown>
+
+/**
+ * Befehl in einer Gruppe: Niemand soll mitbekommen, dass jemand mit dem Bot
+ * spricht. Die Befehls-Nachricht wird gelöscht (dafür muss der Bot Admin der
+ * Gruppe sein) und der Ablauf läuft per DM weiter. Klappt die DM nicht (die
+ * Person hat den Bot nie gestartet), bleibt als Fallback die stumme Antwort
+ * mit dem Button „Privat schreiben“ in der Gruppe.
+ */
+async function continueInPrivate(ctx: Context, payload: Payload, dm: (reply: Reply) => Promise<void>) {
+  const uid = ctx.from?.id
+  await ctx.deleteMessage().catch(() => {})
+  if (uid) {
+    let ok = true
+    const reply: Reply = async (text, extra) => {
+      const res = await sendTelegramMessage(String(uid), text, extra?.reply_markup)
+      if (!res?.ok) ok = false
+      return res
+    }
+    try {
+      await dm(reply)
+      if (ok) return
+    } catch (e) {
+      console.error('DM aus Gruppe fehlgeschlagen:', e)
+    }
+  }
+  await ctx.reply('Schreib mir das bitte privat, dann bleibt es zwischen uns.', {
+    reply_markup: privateChatButton(ctx, payload),
+    disable_notification: true,
+  })
 }
 
 /** Rolle als Wort fürs Feedback. */
@@ -150,18 +185,18 @@ function roleLabel(role: Role): string {
   return 'unbekannt'
 }
 
-/** /bug im privaten Chat: nach der Meldung fragen. */
-async function startBugFlow(ctx: Context) {
-  if (ctx.from) pendingBugs.add(ctx.from.id)
-  await ctx.reply(BUG_PROMPT, {
+/** /bug: nach der Meldung fragen (privat oder per DM). */
+async function startBugFlow(uid: number, reply: Reply) {
+  pendingBugs.add(uid)
+  await reply(BUG_PROMPT, {
     reply_markup: { force_reply: true, input_field_placeholder: 'Was ist dir aufgefallen?' },
   })
 }
 
-/** /idee im privaten Chat: nach der Idee fragen. */
-async function startIdeaFlow(ctx: Context) {
-  if (ctx.from) pendingIdeas.add(ctx.from.id)
-  await ctx.reply(IDEA_PROMPT, {
+/** /idee: nach der Idee fragen (privat oder per DM). */
+async function startIdeaFlow(uid: number, reply: Reply) {
+  pendingIdeas.add(uid)
+  await reply(IDEA_PROMPT, {
     reply_markup: { force_reply: true, input_field_placeholder: 'Worauf hat dein Kind Lust?' },
   })
 }
@@ -186,27 +221,30 @@ async function notifyAdminsAfterHeadsUp(eventId: string, line: string): Promise<
  * Terminauswahl. Schon vergeben → „zu spät“; selbst eingeladen → Button zum
  * Zurückziehen; frei → Ja/Nein.
  */
-async function startInviteFlow(ctx: Context, role: Role) {
+async function startInviteFlow(reply: Reply, role: Role) {
   const target = await nextInviteEvent()
   if (!target) {
-    await ctx.reply('Gerade steht keine Samstags-Jungschar an. Danke euch, gerne beim nächsten Mal!')
+    await reply('Gerade steht keine Samstags-Jungschar an. Danke euch, gerne beim nächsten Mal!')
     return
   }
   if (target.takenBy) {
     if (role.parent && target.takenBy.parentId === role.parent.id) {
-      await ctx.reply(
+      await reply(
         `Ihr habt uns für ${shortDate(target.event_date)} schon eingeladen, danke! Falls es doch nicht klappt, könnt ihr die Einladung hier zurückziehen.`,
         { reply_markup: cancelInviteKeyboard(target.id) },
       )
       return
     }
-    await ctx.reply(`Zu spät, für ${shortDate(target.event_date)} war jemand anderes schneller! Gerne bei der nächsten Gelegenheit.`)
+    await reply(`Zu spät, für ${shortDate(target.event_date)} war jemand anderes schneller! Gerne bei der nächsten Gelegenheit.`)
     return
   }
-  await ctx.reply(`Die nächste Jungschar ist am ${formatDate(target.event_date)}. Wollt ihr uns zu euch einladen?`, {
+  await reply(`Die nächste Jungschar ist am ${formatDate(target.event_date)}. Wollt ihr uns zu euch einladen?`, {
     reply_markup: inviteConfirmKeyboard(target.id),
   })
 }
+
+/** ctx.reply als Reply-Funktion (privater Chat). */
+const replyVia = (ctx: Context): Reply => (text, extra) => ctx.reply(text, extra)
 
 /**
  * Richtet alle Bot Commands ein
@@ -234,7 +272,7 @@ export function setupBotCommands(bot: Bot) {
         return
       }
       if (payload === 'idee') {
-        await startIdeaFlow(ctx)
+        await startIdeaFlow(ctx.from!.id, replyVia(ctx))
         return
       }
       if (payload === 'inspo') {
@@ -242,11 +280,11 @@ export function setupBotCommands(bot: Bot) {
         return
       }
       if (payload === 'bug') {
-        await startBugFlow(ctx)
+        await startBugFlow(ctx.from!.id, replyVia(ctx))
         return
       }
       if (role.parent || role.admin) {
-        await startInviteFlow(ctx, role)
+        await startInviteFlow(replyVia(ctx), role)
         return
       }
       await ctx.reply('Einladungen kommen von den Eltern. Als Helfer trägst du so etwas im Ideenpool ein.')
@@ -372,69 +410,72 @@ export function setupBotCommands(bot: Bot) {
 
   // /idee – Programm-Idee (Eltern und Helfer, privat)
   bot.command('idee', async (ctx) => {
+    if (!ctx.from) return
+    const uid = ctx.from.id
     const role = await roleOf(ctx)
-    if (!role.helper && !role.parent) {
+    const known = !!(role.helper || role.parent)
+    if (ctx.chat.type !== 'private') {
+      await continueInPrivate(ctx, 'idee', (reply) => (known ? startIdeaFlow(uid, reply) : reply(UNKNOWN).then(() => {})))
+      return
+    }
+    if (!known) {
       await ctx.reply(UNKNOWN)
       return
     }
-    if (ctx.chat.type !== 'private') {
-      // Stumm: keine Push-Benachrichtigung für die Gruppe.
-      await ctx.reply('Ideen nehme ich privat entgegen, dann bleibt es zwischen uns.', {
-        reply_markup: privateChatButton(ctx, 'idee'),
-        disable_notification: true,
-      })
-      return
-    }
-    await startIdeaFlow(ctx)
+    await startIdeaFlow(uid, replyVia(ctx))
   })
 
   // /invite (alt: /einladen) – „Kommt zu uns“ (Eltern und Admins, privat)
   bot.command(['invite', 'einladen'], async (ctx) => {
+    if (!ctx.from) return
     const role = await roleOf(ctx)
-    if (!role.parent && !role.admin) {
-      await ctx.reply(role.helper ? 'Einladungen kommen von den Eltern. Als Helfer trägst du so etwas im Ideenpool ein.' : UNKNOWN)
-      return
-    }
+    const denied = !role.parent && !role.admin
+      ? role.helper ? 'Einladungen kommen von den Eltern. Als Helfer trägst du so etwas im Ideenpool ein.' : UNKNOWN
+      : null
     if (ctx.chat.type !== 'private') {
-      await ctx.reply('Einladungen nehme ich privat entgegen.', {
-        reply_markup: privateChatButton(ctx, 'invite'),
-        disable_notification: true,
-      })
+      await continueInPrivate(ctx, 'invite', (reply) => (denied ? reply(denied).then(() => {}) : startInviteFlow(reply, role)))
       return
     }
-    await startInviteFlow(ctx, role)
+    if (denied) {
+      await ctx.reply(denied)
+      return
+    }
+    await startInviteFlow(replyVia(ctx), role)
   })
 
   // /bug – Fehler, Wunsch oder Idee zu Bot und App (alle Bekannten, privat)
   bot.command('bug', async (ctx) => {
+    if (!ctx.from) return
+    const uid = ctx.from.id
     const role = await roleOf(ctx)
-    if (!role.helper && !role.parent && !role.admin) {
+    const known = !!(role.helper || role.parent || role.admin)
+    if (ctx.chat.type !== 'private') {
+      await continueInPrivate(ctx, 'bug', (reply) => (known ? startBugFlow(uid, reply) : reply(UNKNOWN).then(() => {})))
+      return
+    }
+    if (!known) {
       await ctx.reply(UNKNOWN)
       return
     }
-    if (ctx.chat.type !== 'private') {
-      await ctx.reply('Schreib mir das privat, dann geht nichts unter.', {
-        reply_markup: privateChatButton(ctx, 'bug'),
-        disable_notification: true,
-      })
-      return
-    }
-    await startBugFlow(ctx)
+    await startBugFlow(uid, replyVia(ctx))
   })
 
   // /inspo – Essens-„Inspiration“ (Spaß): Sterneküche als Album, dann die Auflösung.
   // Bewusst nicht im Befehlsmenü und nicht in /help: taucht nur in der Bestätigung nach /invite auf.
   bot.command('inspo', async (ctx) => {
+    if (!ctx.from) return
+    const uid = ctx.from.id
     const role = await roleOf(ctx)
-    if (!role.helper && !role.parent && !role.admin) {
-      await ctx.reply(UNKNOWN)
+    const known = !!(role.helper || role.parent || role.admin)
+    if (ctx.chat.type !== 'private') {
+      await continueInPrivate(ctx, 'inspo', async (reply) => {
+        if (!known) { await reply(UNKNOWN); return }
+        if (!(await sendFoodInspo(String(uid)))) throw new Error('inspo DM failed')
+      })
       return
     }
-    if (ctx.chat.type !== 'private') {
-      await ctx.reply('Das zeige ich dir privat.', {
-        reply_markup: privateChatButton(ctx, 'inspo'),
-        disable_notification: true,
-      })
+    if (!known) {
+      await ctx.reply(UNKNOWN)
       return
     }
     await sendFoodInspo(String(ctx.chat.id))
