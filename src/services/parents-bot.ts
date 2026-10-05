@@ -225,13 +225,14 @@ export async function saveInvitation(
 
 /** Bilder liegen in public/inspo (Live-URL). */
 const INSPO_IMAGES = ['essen-1.jpg', 'essen-2.jpg', 'essen-3.jpg'].map(f => `${APP_URL}/inspo/${f}`)
-/** Text über dem Album: was zu sehen ist, dann die Auflösung. show_caption_above_media muss bei allen Medien des Albums stehen. */
+/** Text über dem Album (show_caption_above_media muss bei allen Medien des Albums stehen). */
 const INSPO_TEXT =
   'Ein paar einfache Essensideen, die wir für gewöhnlich von den Eltern bekommen:\n' +
   '▶ Feinster Hummer mit Zitrone\n' +
   '▶ Sushi-Platte mit Lachs-Nigiri\n' +
-  '▶ Gebratene Jakobsmuschel auf Rucola und Granatapfel\n\n' +
-  'Spaß! 😄 Es reicht etwas völlig Einfaches. Danke schonmal!'
+  '▶ Gebratene Jakobsmuschel auf Rucola und Granatapfel'
+/** Die Auflösung kommt als eigene Nachricht danach, sonst geht der Witz unter. */
+const INSPO_PUNCHLINE = 'Spaß! 😄 Es reicht etwas völlig Einfaches. Danke schonmal!'
 const INSPO_FILE_IDS_KEY = 'inspo_file_ids'
 
 /**
@@ -277,13 +278,12 @@ async function sendInspoAlbum(chatId: string): Promise<boolean> {
 }
 
 /**
- * /inspo: eine Nachricht. Text oben (was zu sehen ist, dann die Auflösung,
- * dass etwas völlig Einfaches reicht), darunter das Album mit Hummer, Sushi
- * und Sterneküche.
+ * /inspo: Text oben, darunter das Album mit Hummer, Sushi und Sterneküche,
+ * dann als eigene Nachricht die Auflösung, dass etwas völlig Einfaches reicht.
  */
 export async function sendFoodInspo(chatId: string): Promise<boolean> {
   const ok = await sendInspoAlbum(chatId)
-  if (!ok) await sendTelegramMessage(chatId, 'Die Bilder wollten gerade nicht. Kurz gesagt: Es reicht etwas völlig Einfaches. Danke schonmal! 😄')
+  await sendTelegramMessage(chatId, ok ? INSPO_PUNCHLINE : 'Die Bilder wollten gerade nicht. Kurz gesagt: Es reicht etwas völlig Einfaches. Danke schonmal! 😄')
   return ok
 }
 
