@@ -228,9 +228,9 @@ const INSPO_IMAGES = ['essen-1.jpg', 'essen-2.jpg', 'essen-3.jpg'].map(f => `${A
 /** Text über dem Album: was zu sehen ist, dann die Auflösung. show_caption_above_media muss bei allen Medien des Albums stehen. */
 const INSPO_TEXT =
   'Ein paar einfache Essensideen, die wir für gewöhnlich von den Eltern bekommen:\n' +
-  '▶ Feinster Hummer mit Zitrone, von Familie Krabbenburger\n' +
-  '▶ Sushi-Platte mit Lachs-Nigiri, von Familie Nakamura\n' +
-  '▶ Gebratene Jakobsmuschel auf Rucola und Granatapfel, von Familie Sternekoch\n\n' +
+  '▶ Feinster Hummer mit Zitrone\n' +
+  '▶ Sushi-Platte mit Lachs-Nigiri\n' +
+  '▶ Gebratene Jakobsmuschel auf Rucola und Granatapfel\n\n' +
   'Spaß! 😄 Es reicht etwas völlig Einfaches. Danke schonmal!'
 const INSPO_FILE_IDS_KEY = 'inspo_file_ids'
 
