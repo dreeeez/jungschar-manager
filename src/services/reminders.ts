@@ -4,7 +4,7 @@ import { parentMention } from './parents'
 import { getSupabase } from './database'
 import { getWeatherForecast, getLocationFromSettings, WeatherForecast } from './weather'
 import { fetchJungscharDatesFromIcs, insertNewFutureDates } from './ical-sync'
-import { miniAppLink } from './bot-info'
+import { miniAppLink, sendPhotoAlbum } from './bot-info'
 
 interface ReminderMessage {
   message: string
@@ -268,13 +268,9 @@ type Stage1Ctx = {
   /** „▶ 🏠 Einladung …“ / „▶ 🍽️ Essen …“, nur samstags, sonst null. */
   foodLine: string | null
   birthdayLines: string[]
-  /** Neue Ideen per /idee seit dem letzten Heads-up, als ▶-Zeilen. */
-  ideaLines: string[]
-  /** Deep-Link zur Helfer-Ansicht des Ideenpools (null, wenn Bot-Username unbekannt). */
-  poolLink: string | null
 }
 
-type FreshIdea = { by: string; text: string; at: string; hasPhoto: boolean }
+type FreshIdea = { by: string; text: string; at: string; photoFileId: string | null }
 
 /** „Mo 12:30“ in Europe/Berlin. */
 function berlinWeekdayTime(iso: string): string {
@@ -315,21 +311,44 @@ async function getFreshParentIdeas(eventDate: string): Promise<FreshIdea[]> {
       by: i.suggested_by || 'Unbekannt',
       text: (i.description || i.title || '').trim(),
       at: i.created_at,
-      hasPhoto: !!i.photo_file_id,
+      photoFileId: (i.photo_file_id as string | null) ?? null,
     }))
   } catch {
     return []
   }
 }
 
-const IDEA_TEXT_MAX = 140
+const IDEA_TEXT_MAX = 300
 
-function formatIdeaLines(ideas: FreshIdea[]): string[] {
-  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  return ideas.map(i => {
-    const text = i.text.length > IDEA_TEXT_MAX ? i.text.slice(0, IDEA_TEXT_MAX - 1) + '…' : i.text
-    return `▶ <b>${esc(i.by)}</b> (${berlinWeekdayTime(i.at)}): ${esc(text.replace(/\s+/g, ' '))}${i.hasPhoto ? ' 📷' : ''}`
-  })
+const escHtml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+function ideaLine(i: FreshIdea, max = IDEA_TEXT_MAX): string {
+  const flat = i.text.replace(/\s+/g, ' ')
+  const text = flat.length > max ? flat.slice(0, max - 1) + '…' : flat
+  return `▶ <b>${escHtml(i.by)}</b> (${berlinWeekdayTime(i.at)}): ${escHtml(text)}${i.photoFileId ? ' 📷' : ''}`
+}
+
+/**
+ * Zweite Nachricht nach dem Sonntags-Heads-up: neue Ideen der Eltern mit
+ * Link zum Ideenpool. Dahinter die Bilder der Ideen als Album.
+ */
+function buildIdeasMessage(ideas: FreshIdea[], poolLink: string | null): string {
+  const lines = ['💡 <b>Frische Ideen von den Eltern</b>', '', ...ideas.map(i => ideaLine(i))]
+  if (poolLink) lines.push('', `▶ <a href="${poolLink}">Alle Ideen im Ideenpool</a>`)
+  return lines.join('\n')
+}
+
+async function sendFreshIdeas(chatId: string, ideas: FreshIdea[], poolLink: string | null): Promise<any> {
+  if (ideas.length === 0) return null
+  const res = await sendTelegramMessage(chatId, buildIdeasMessage(ideas, poolLink))
+  const withPhoto = ideas.filter(i => i.photoFileId)
+  if (withPhoto.length > 0) {
+    await sendPhotoAlbum(
+      chatId,
+      withPhoto.map(i => ({ fileId: i.photoFileId!, caption: `💡 <b>${escHtml(i.by)}</b>: ${escHtml(i.text.slice(0, 900))}` })),
+    ).catch(e => console.error('idea album failed:', e))
+  }
+  return res
 }
 
 // Samstag ohne Einladung und ohne eingeteilte Eltern: wir sind selbst dran.
@@ -364,10 +383,6 @@ function stage1Info(c: Stage1Ctx, teamLabel: string): string {
   const lines = [`▶ 📅 ${c.dateLine}`, `▶ 👥 ${teamLabel}: ${c.team}`]
   if (c.foodLine) lines.push(`▶ ${c.foodLine}`)
   lines.push(...c.birthdayLines)
-  if (c.ideaLines.length > 0) {
-    lines.push('', '💡 <b>Frische Ideen von den Eltern:</b>', ...c.ideaLines)
-    if (c.poolLink) lines.push(`▶ <a href="${c.poolLink}">Alle Ideen im Ideenpool</a>`)
-  }
   return lines.join('\n')
 }
 
@@ -424,14 +439,12 @@ function pickStage1Template(): (c: Stage1Ctx) => string {
 // Top-Header für Stage 1: bewusst kurz, längere Header brechen am Handy um.
 const STAGE1_TOP_HEADER = 'HEADS-UP'
 
-function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: Birthday[], ideas: FreshIdea[], poolLink: string | null): ReminderMessage {
+function generateStage1Message(event: any, weather: WeatherForecast | null, birthdays: Birthday[]): ReminderMessage {
   const ctx: Stage1Ctx = {
     dateLine: `${formatDateShortMonth(event.event_date)} · ${weatherEmoji(weather)} ${weather ? weatherTempStr(weather) : '?°C'}`,
     team: getHelperTags(event),
     foodLine: formatFoodLine(event),
     birthdayLines: formatBirthdayLines(birthdays),
-    ideaLines: formatIdeaLines(ideas),
-    poolLink,
   }
   return {
     message: `+++ ${STAGE1_TOP_HEADER} +++\n\n${pickStage1Template()(ctx)}`,
@@ -618,6 +631,8 @@ export async function processReminders(chatId: string, testStage?: number) {
     const daysUntil = getDaysUntil(eventDate)
     let reminder: ReminderMessage | null = null
     let reminderType: string | null = null
+    // Stage 1: neue Eltern-Ideen folgen als eigene Nachricht nach dem Heads-up.
+    let followUp: (() => Promise<any>) | null = null
 
     // Stufe 1: Sonntag, 5-8 Tage vorher (5 = Freitags-, 6 = Samstags-Termin)
     if (testStage === 1 || (!isTest && dayOfWeek === 0 && daysUntil >= 5 && daysUntil <= 8)) {
@@ -629,7 +644,8 @@ export async function processReminders(chatId: string, testStage?: number) {
           getFreshParentIdeas(event.event_date),
           miniAppLink('ideen'),
         ])
-        reminder = generateStage1Message(event, weather, birthdays, ideas, poolLink)
+        reminder = generateStage1Message(event, weather, birthdays)
+        if (ideas.length > 0) followUp = () => sendFreshIdeas(chatId, ideas, poolLink)
       }
     }
 
@@ -659,7 +675,14 @@ export async function processReminders(chatId: string, testStage?: number) {
       // Nur Live-Sends loggen. Ein Test-Eintrag würde den echten Send
       // desselben Termins unterdrücken und die Ideen-Liste verschieben.
       if (!isTest && result?.ok) await logReminder(event.id, reminderType, messageId)
+      // Ideen-Nachricht erst nach dem Log: das Fenster „seit letztem Heads-up“
+      // schließt damit genau hier, auch wenn das Album scheitert.
+      let ideasResult: any = null
+      if (result?.ok && followUp) {
+        ideasResult = await followUp().catch(e => ({ ok: false, description: String(e) }))
+      }
       results.push({
+        ideas: ideasResult,
         event_id: event.id,
         event_date: event.event_date,
         daysUntil,
@@ -716,8 +739,11 @@ export async function renderReminderPreview(
     getBirthdaysAroundEvent(eventDate),
   ])
   if (type === STAGE_SUNDAY) {
-    const r = generateStage1Message(event, weather, birthdays, await getFreshParentIdeas(eventDate), await miniAppLink('ideen'))
-    return { text: r.message }
+    const r = generateStage1Message(event, weather, birthdays)
+    const ideas = await getFreshParentIdeas(eventDate)
+    if (ideas.length === 0) return { text: r.message }
+    // Vorschau zeigt beide Nachrichten untereinander.
+    return { text: `${r.message}\n\n— zweite Nachricht —\n\n${buildIdeasMessage(ideas, await miniAppLink('ideen'))}` }
   }
   if (type === STAGE_WEDNESDAY) {
     const r = generateStage2Message(event, getDaysUntil(new Date(eventDate)), weather, birthdays)
