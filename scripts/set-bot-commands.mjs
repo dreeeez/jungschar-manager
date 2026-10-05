@@ -15,7 +15,8 @@ const env = Object.fromEntries(
 const token = process.env.TELEGRAM_BOT_TOKEN ?? env.TELEGRAM_BOT_TOKEN
 if (!token) throw new Error('TELEGRAM_BOT_TOKEN fehlt')
 
-const commands = [
+// Privater Chat: volle Liste (je nach Rolle antwortet der Bot ohnehin nur auf das Passende).
+const privateCommands = [
   { command: 'start', description: 'Bot starten' },
   { command: 'help', description: 'Befehle anzeigen' },
   { command: 'termine', description: 'Nächste Jungschar-Termine' },
@@ -30,9 +31,26 @@ const commands = [
   { command: 'send', description: 'Fotos und Videos in den Elternchat posten (Admin)' },
 ]
 
-const res = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ commands }),
-})
-console.log(await res.json())
+// Helfer-Gruppe: nur, was dort Sinn ergibt. Alles Persönliche läuft privat.
+const helperGroupCommands = [
+  { command: 'next', description: 'Nächste Termine mit Team' },
+  { command: 'status', description: 'Nächste Jungschar' },
+]
+
+async function setCommands(commands, scope) {
+  const res = await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ commands, scope }),
+  })
+  console.log(scope.type, (await res.json()).ok ? 'ok' : 'FEHLER')
+}
+
+await setCommands(privateCommands, { type: 'all_private_chats' })
+// Gruppen (Elterngruppe und alle anderen): kein Menü. Befehle in Gruppen sind
+// unerwünscht, weil jeder mitliest; die Info-Nachricht nutzt Links in den privaten Chat.
+await setCommands([], { type: 'all_group_chats' })
+await setCommands([], { type: 'all_chat_administrators' })
+await setCommands([], { type: 'default' })
+const helperChat = process.env.TELEGRAM_CHAT_ID ?? env.TELEGRAM_CHAT_ID
+if (helperChat) await setCommands(helperGroupCommands, { type: 'chat', chat_id: helperChat })
