@@ -251,28 +251,29 @@ const CAPTION_TEMPLATES: Array<(w: string) => string> = [
   (w) => `📸 <b>Frisch aus der Jungschar ${w}</b>\nDas Programm stand, das Wetter hat mitgespielt, die Kinder sowieso 🙌`,
 ]
 
+// Mit ▶ wie die Info-Zeilen in der Helfer-Gruppe.
 const IDEA_LINES: Array<(cmd: string) => string> = [
-  (c) => `💡 Ihr habt eine tolle Idee für die nächste Jungschar? Lasst es uns wissen: ${c}`,
-  (c) => `💡 Euer Kind hat zu Hause von einer Idee geschwärmt? Her damit: ${c}`,
-  (c) => `💡 Ausflug, Spiel, Bastelei, egal was: Ideen für die nächste Jungschar nehmen wir gerne: ${c}`,
-  (c) => `💡 Was würde euer Kind am liebsten machen? Ein Stichwort reicht uns: ${c}`,
-  (c) => `💡 Wir sammeln Ideen fürs nächste Mal. Jede zählt, auch die verrückten: ${c}`,
-  (c) => `💡 Ihr wisst, worauf die Kinder Lust haben? Verratet es uns: ${c}`,
+  (c) => `▶ 💡 Ihr habt eine tolle Idee für die nächste Jungschar? Lasst es uns wissen: ${c}`,
+  (c) => `▶ 💡 Euer Kind hat zu Hause von einer Idee geschwärmt? Her damit: ${c}`,
+  (c) => `▶ 💡 Ausflug, Spiel, Bastelei, egal was: Ideen für die nächste Jungschar nehmen wir gerne: ${c}`,
+  (c) => `▶ 💡 Was würde euer Kind am liebsten machen? Ein Stichwort reicht uns: ${c}`,
+  (c) => `▶ 💡 Wir sammeln Ideen fürs nächste Mal. Jede zählt, auch die verrückten: ${c}`,
+  (c) => `▶ 💡 Ihr wisst, worauf die Kinder Lust haben? Verratet es uns: ${c}`,
 ]
 
 const INVITE_LINES: Array<(cmd: string) => string> = [
-  (c) => `🏠 Ihr wollt uns das nächste Mal einladen und etwas zu essen machen? Oder einfach mal so? Sehr gerne, immer cool: ${c}`,
-  (c) => `🏠 Nächstes Mal ist Samstag, da haben wir Hunger 😄 Wer uns einladen möchte: ${c}`,
-  (c) => `🏠 Lust, die ganze Bande einmal bei euch zu haben? Mit Essen oder ohne, wir kommen gerne: ${c}`,
-  (c) => `🏠 Am Samstag sind wir wieder unterwegs. Wer uns zu sich einladen will: ${c}`,
-  (c) => `🏠 Ihr habt einen Garten, eine Feuerstelle oder einfach Lust auf Besuch? Ladet uns ein: ${c}`,
-  (c) => `🏠 Samstag heißt bei uns: irgendwo zu Gast sein wäre großartig. Einladung geht hier: ${c}`,
-  (c) => `🏠 Am Samstag zu ruhig im Wohnzimmer? Wir bringen gerne zwölf Kinder vorbei, dann ist Stimmung: ${c}`,
-  (c) => `🏠 Euer Haus ist euch am Samstag zu ordentlich? Das kriegen wir hin. Einladen hier: ${c}`,
-  (c) => `🏠 Wer am Samstag zu viel Kuchen und zu wenig Kinder zu Hause hat, meldet sich hier: ${c}`,
-  (c) => `🏠 Garten zu leise, Rasen zu grün, Keks-Vorrat zu groß? Wir helfen am Samstag gerne aus: ${c}`,
-  (c) => `🏠 Samstag auf der Couch wird langweilig? Jungschar nach Hause bestellen geht hier: ${c}`,
-  (c) => `🏠 Ihr habt am Samstag Lust auf Lärm, Lachen und leere Teller? Dann ladet uns ein: ${c}`,
+  (c) => `▶ 🏠 Ihr wollt uns das nächste Mal einladen und etwas zu essen machen? Oder einfach mal so? Sehr gerne, immer cool: ${c}`,
+  (c) => `▶ 🏠 Nächstes Mal ist Samstag, da haben wir Hunger 😄 Wer uns einladen möchte: ${c}`,
+  (c) => `▶ 🏠 Lust, die ganze Bande einmal bei euch zu haben? Mit Essen oder ohne, wir kommen gerne: ${c}`,
+  (c) => `▶ 🏠 Am Samstag sind wir wieder unterwegs. Wer uns zu sich einladen will: ${c}`,
+  (c) => `▶ 🏠 Ihr habt einen Garten, eine Feuerstelle oder einfach Lust auf Besuch? Ladet uns ein: ${c}`,
+  (c) => `▶ 🏠 Samstag heißt bei uns: irgendwo zu Gast sein wäre großartig. Einladung geht hier: ${c}`,
+  (c) => `▶ 🏠 Am Samstag zu ruhig im Wohnzimmer? Wir bringen gerne zwölf Kinder vorbei, dann ist Stimmung: ${c}`,
+  (c) => `▶ 🏠 Euer Haus ist euch am Samstag zu ordentlich? Das kriegen wir hin. Einladen hier: ${c}`,
+  (c) => `▶ 🏠 Wer am Samstag zu viel Kuchen und zu wenig Kinder zu Hause hat, meldet sich hier: ${c}`,
+  (c) => `▶ 🏠 Garten zu leise, Rasen zu grün, Keks-Vorrat zu groß? Wir helfen am Samstag gerne aus: ${c}`,
+  (c) => `▶ 🏠 Samstag auf der Couch wird langweilig? Jungschar nach Hause bestellen geht hier: ${c}`,
+  (c) => `▶ 🏠 Ihr habt am Samstag Lust auf Lärm, Lachen und leere Teller? Dann ladet uns ein: ${c}`,
 ]
 
 /** Kurzer Text über dem Album in der Elterngruppe, rotierend. */
