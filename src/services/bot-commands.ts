@@ -248,7 +248,7 @@ const replyVia = (ctx: Context): Reply => (text, extra) => ctx.reply(text, extra
  * Richtet alle Bot Commands ein
  */
 /** Befehle, auf die der Bot in fremden Gruppen (z. B. Elterngruppe) reagiert: per DM. */
-const GROUP_PRIVATE_COMMANDS = new Set(['idee', 'invite', 'einladen', 'bug', 'inspo'])
+const GROUP_PRIVATE_COMMANDS = new Set(['idee', 'invite', 'einladen', 'bug'])
 
 /** Befehlsmenü im privaten Chat je Rolle (setMyCommands mit scope chat). */
 function commandsFor(role: Role): { command: string; description: string }[] {
@@ -281,7 +281,7 @@ function commandsFor(role: Role): { command: string; description: string }[] {
 
 export function setupBotCommands(bot: Bot) {
   // Gruppen außer der Helfer-Gruppe (z. B. Elterngruppe): Nur /idee, /invite,
-  // /bug, /inspo, und die per DM. Alles andere ignoriert der Bot dort still,
+  // /bug, und die per DM. Alles andere ignoriert der Bot dort still,
   // damit in der Elterngruppe keine Bot-Dialoge auftauchen. In der Helfer-
   // Gruppe funktionieren alle Befehle wie gehabt.
   bot.on('message:entities:bot_command', async (ctx, next) => {
@@ -508,19 +508,11 @@ export function setupBotCommands(bot: Bot) {
   })
 
   // /inspo – Essens-„Inspiration“ (Spaß): Sterneküche als Album, dann die Auflösung.
-  // Bewusst nicht im Befehlsmenü und nicht in /help: taucht nur in der Bestätigung nach /invite auf.
+  // Nur privat, nicht im Befehlsmenü, nicht in /help: taucht nur in der Bestätigung nach /invite auf.
   bot.command('inspo', async (ctx) => {
-    if (!ctx.from) return
-    const uid = ctx.from.id
+    if (!ctx.from || ctx.chat.type !== 'private') return
     const role = await roleOf(ctx)
     const known = !!(role.helper || role.parent || role.admin)
-    if (ctx.chat.type !== 'private') {
-      await continueInPrivate(ctx, 'inspo', async (reply) => {
-        if (!known) { await reply(UNKNOWN); return }
-        if (!(await sendFoodInspo(String(uid)))) throw new Error('inspo DM failed')
-      })
-      return
-    }
     if (!known) {
       await ctx.reply(UNKNOWN)
       return
