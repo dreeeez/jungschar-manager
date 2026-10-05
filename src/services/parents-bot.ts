@@ -202,12 +202,12 @@ export async function saveInvitation(
 
   const { error } = await db.from('invitations').insert({ event_id: eventId, parent_id: parent.id } as any)
   if (error) return { ok: false, text: 'Eintragen hat nicht geklappt, bitte später noch einmal.', eventDate }
-  // Ansprechpartner = eingeteiltes Team des Termins, mit @username, damit
-  // die Eltern direkt schreiben können.
+  // Ansprechpartner = eingeteiltes Team des Termins, nur als @username,
+  // damit die Eltern direkt antippen können; ohne Username bleibt der Name.
   const team = (((event as any).assignments ?? []) as any[])
     .map(a => a.helper)
     .filter(Boolean)
-    .map(h => (h.telegram_username ? `${h.name} (@${h.telegram_username})` : h.name))
+    .map(h => (h.telegram_username ? `@${h.telegram_username}` : h.name))
   const contact = team.length > 0
     ? `Für detaillierte Infos sind eure Ansprechpartner: ${team.join(' und ')}.`
     : 'Eure Ansprechpartner für Details melden sich, sobald die Einteilung steht.'
