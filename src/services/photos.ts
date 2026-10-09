@@ -26,16 +26,17 @@ const ALBUM_MAX = 10
 const THANKS_LOG_TYPE = 'thanks_photos'
 
 /**
- * VORLÄUFIG (Stand 2026-09-10): /send postet in die Sandbox-Gruppe statt in
- * die Elterngruppe, weil der Bot dort noch nicht drin ist. Sobald der Bot in
- * der Elterngruppe ist: auf false setzen. Siehe CLAUDE.md „Offene Punkte“.
+ * Notschalter: true lenkt /send in die Sandbox-Gruppe statt in die
+ * Elterngruppe (z. B. wenn der Bot die Gruppe verlassen musste). Seit
+ * 2026-10-09 ist der Bot in der Elterngruppe, daher false. /send test geht
+ * unabhängig davon immer in die Sandbox.
  */
-export const PHOTOS_GO_TO_SANDBOX = true
+export const PHOTOS_GO_TO_SANDBOX = false
 
 /** Ziel-Chat für /send: Sandbox solange PHOTOS_GO_TO_SANDBOX, sonst Elterngruppe. */
 export function photoTargetChat(): { chatId: string | undefined; label: string; sandbox: boolean } {
   if (PHOTOS_GO_TO_SANDBOX) {
-    return { chatId: process.env.TELEGRAM_TEST_CHAT_ID, label: 'die Sandbox-Gruppe (vorläufig statt Elternchat)', sandbox: true }
+    return { chatId: process.env.TELEGRAM_TEST_CHAT_ID, label: 'die Sandbox-Gruppe (Notschalter statt Elternchat)', sandbox: true }
   }
   return { chatId: process.env.TELEGRAM_ELTERN_CHAT_ID, label: 'den Elternchat', sandbox: false }
 }

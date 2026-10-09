@@ -132,7 +132,7 @@ Ideenpool → Button „Ideen in Helfer-Gruppe teilen“ (nur Admins) → bis zu
 
 ## Offene Punkte
 
-- **Fotos gehen vorläufig in die Sandbox.** `PHOTOS_GO_TO_SANDBOX = true` in `services/photos.ts` lenkt `/send` in `TELEGRAM_TEST_CHAT_ID`, weil der Bot die Elterngruppe „Elternjet“ verlassen hat. Sobald der Bot wieder in der Elterngruppe ist (prüfen mit `node scripts/check-chats.mjs`): Konstante auf `false`, ggf. neue Chat-ID in `TELEGRAM_ELTERN_CHAT_ID`, falls Telegram die Gruppe zur Supergruppe gemacht hat. Der Geburtstagsgruß zielt weiterhin direkt auf `TELEGRAM_ELTERN_CHAT_ID` und läuft bis dahin ins Leere.
+- **Elterngruppe angebunden (seit 2026-10-09):** `TELEGRAM_ELTERN_CHAT_ID` zeigt auf die Supergruppe „Eltern Jungschar kleine Jungs“, der Bot ist dort Admin, `PHOTOS_GO_TO_SANDBOX = false`. Muss der Bot die Gruppe mal verlassen: Konstante auf `true` (Notschalter), prüfen mit `node scripts/check-chats.mjs`. Preview-Umgebung bei Vercel hat die Variable noch nicht (nicht nötig, Preview postet nie).
 
 ## Bot-Befehle und Rollen
 
