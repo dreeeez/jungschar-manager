@@ -742,6 +742,9 @@ export default function CalendarPage() {
   const gaps = pinnedUntil
     ? upcomingEvents.filter(e => e.event_date <= pinnedUntil && !pinnedIds.has(e.id))
     : []
+  /** Status-Badges in "Kommende Termine": Entwurf = nächster Block, noch nicht gepostet. */
+  const draftIds = new Set((nextBlock ?? []).filter(p => !p.posted).map(p => p.eventId))
+  const gapIds = new Set(gaps.map(e => e.id))
   /** "Henrik (S) · Hartmut" — Vorname reicht, Gruppe in Klammern. */
   const teamLine = (p: RotationProposal) =>
     p.helpers.map(h => h.name.split(' ')[0] + (h.isSenior ? ' (S)' : h.isATeam ? ' (A)' : '')).join(' · ')
@@ -774,6 +777,8 @@ export default function CalendarPage() {
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{formatDate(event.event_date)}</span>
                       {idea && <Badge tone="success">Log</Badge>}
+                      {draftIds.has(event.id) && <Badge tone="warn">Entwurf</Badge>}
+                      {gapIds.has(event.id) && <Badge tone="danger">nicht im Pin</Badge>}
                     </div>
                     <IconLine icon={<SmallIcons.users />} color={PAGE_COLORS.helpers}>
                       {getAssignedHelperNames(event)}
@@ -809,75 +814,39 @@ export default function CalendarPage() {
 
 
       <Section title="Einteilung">
-        <div className="space-y-3">
-          {currentPinned.length > 0 && (
-            <div className="card overflow-hidden">
-              <div className="flex items-center justify-between px-4 pt-3">
-                <p className="text-sm font-medium">Gepinnt in der Helfer-Gruppe</p>
-                <Button variant="ghost" size="sm" className="-mr-2" onClick={() => setPostChoice('current')}>
-                  Neu posten
-                </Button>
-              </div>
-              <div className="px-4 pb-3 pt-1">
-                {currentPinned.map(p => (
-                  <div key={p.eventId} className="flex gap-3 py-1 text-sm">
-                    <span className="w-24 shrink-0 text-muted">{formatDate(p.eventDate)}</span>
-                    <span className="min-w-0 flex-1">{teamLine(p)}</span>
-                  </div>
-                ))}
-                {gaps.map(e => (
-                  <button
-                    key={e.id}
-                    type="button"
-                    onClick={() => openModal(e)}
-                    className="flex w-full gap-3 py-1 text-left text-sm active:opacity-60"
-                  >
-                    <span className="w-24 shrink-0 text-warn">{formatDate(e.event_date)}</span>
-                    <span className="min-w-0 flex-1 text-warn">
-                      {(e.assignments?.length ?? 0) > 0 ? `${getAssignedHelperNames(e)}, nicht im Pin` : 'nicht eingeteilt, antippen'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="card overflow-hidden">
-            <div className="flex items-center justify-between px-4 pt-3">
-              <p className="text-sm font-medium">Nächster Block</p>
-              <Badge tone={blockState === 'draft' ? 'warn' : blockState === 'posted' ? 'success' : 'outline'}>
-                {blockState === 'draft' ? 'Entwurf' : blockState === 'posted' ? 'Gepostet' : 'Leer'}
-              </Badge>
-            </div>
-            <div className="px-4 pb-3 pt-1">
-              {(nextBlock ?? []).length === 0 ? (
-                <p className="py-1 text-sm text-muted">Keine weiteren Termine im Kalender.</p>
-              ) : (
-                (nextBlock ?? []).map(p => (
-                  <div key={p.eventId} className="flex gap-3 py-1 text-sm">
-                    <span className="w-24 shrink-0 text-muted">{formatDate(p.eventDate)}</span>
-                    <span className={p.helpers.length ? 'min-w-0 flex-1' : 'min-w-0 flex-1 text-muted'}>
-                      {p.helpers.length ? teamLine(p) : 'offen'}
-                    </span>
-                  </div>
-                ))
-              )}
-              {blockState === 'empty' && (nextBlock ?? []).length > 0 && (
-                <p className="pt-1 text-xs text-muted">Der Entwurf kommt automatisch nach dem vorletzten gepinnten Termin, per DM.</p>
-              )}
-              {(nextBlock ?? []).length > 0 && blockState !== 'posted' && (
-                <Button
-                  variant="primary"
-                  block
-                  className="mt-3"
-                  onClick={() => loadRotationPreview(blockState === 'draft' ? 'saved' : 'new')}
-                  disabled={rotationLoading}
-                >
-                  {rotationLoading ? 'Lade …' : blockState === 'draft' ? 'Prüfen und posten' : 'Jetzt schon ziehen'}
-                </Button>
-              )}
-            </div>
+        <div className="card px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">Nächster Block</p>
+            <Badge tone={blockState === 'draft' ? 'warn' : blockState === 'posted' ? 'success' : 'outline'}>
+              {blockState === 'draft' ? 'Entwurf' : blockState === 'posted' ? 'Gepostet' : 'Leer'}
+            </Badge>
           </div>
+          <p className="mt-1 text-sm text-muted">
+            {(nextBlock ?? []).length === 0
+              ? 'Keine weiteren Termine im Kalender.'
+              : blockState === 'draft'
+                ? `${(nextBlock ?? []).length} Termine, oben mit „Entwurf“ markiert. Prüfen, tauschen, dann posten.`
+                : blockState === 'posted'
+                  ? 'Ist gepostet und gepinnt.'
+                  : 'Der Entwurf kommt nach dem vorletzten gepinnten Termin per DM.'}
+            {gaps.length > 0 && ` ${gaps.length === 1 ? 'Ein Termin ist' : `${gaps.length} Termine sind`} nicht im Pin, oben rot markiert.`}
+          </p>
+          {(nextBlock ?? []).length > 0 && blockState !== 'posted' && (
+            <Button
+              variant="primary"
+              block
+              className="mt-3"
+              onClick={() => loadRotationPreview(blockState === 'draft' ? 'saved' : 'new')}
+              disabled={rotationLoading}
+            >
+              {rotationLoading ? 'Lade …' : blockState === 'draft' ? 'Prüfen und posten' : 'Jetzt schon ziehen'}
+            </Button>
+          )}
+          {currentPinned.length > 0 && (
+            <Button variant="ghost" size="sm" block className="mt-1" onClick={() => setPostChoice('current')}>
+              Gepinnte Einteilung neu posten
+            </Button>
+          )}
         </div>
       </Section>
 
