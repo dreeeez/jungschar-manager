@@ -141,6 +141,8 @@ export default function CalendarPage() {
   const [nextBlock, setNextBlock] = useState<RotationProposal[] | null>(null)
   /** Noch offene Termine der gepinnten Einteilung (Helfer-Gruppe). */
   const [currentPinned, setCurrentPinned] = useState<RotationProposal[]>([])
+  /** Kommende Termine, die nicht mehr im ICS-Kalender stehen. */
+  const [staleIds, setStaleIds] = useState<Set<string>>(new Set())
   /** Bilanz je Helfer (negativ = liegt zurück) für den Ersatz-Vorschlag. */
   const [balances, setBalances] = useState<Record<string, number>>({})
   const [rotationMessage, setRotationMessage] = useState<string | null>(null)
@@ -169,6 +171,7 @@ export default function CalendarPage() {
       if (res.ok) {
         setNextBlock(body.proposals ?? [])
         setCurrentPinned(body.current ?? [])
+        setStaleIds(new Set(body.stale ?? []))
         setBalances(body.balances ?? {})
       }
     } catch {}
@@ -723,6 +726,47 @@ export default function CalendarPage() {
     }
   }
 
+  /** Eine Termin-Zeile (kommende Termine und Entwurf). */
+  function renderEventRow(event: Event) {
+    const idea = ideasMap.get(event.id)
+    const birthdays = getBirthdaysNearEvent(event.event_date)
+    // Elterndienst (Essen) gibt es nur samstags.
+    const parentName = hasFoodDuty(event.event_date) ? getParentDutyName(event) : ''
+    return (
+      <Row key={event.id} onClick={() => openModal(event)}>
+        <DateTile date={event.event_date} weekday={false} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold">{formatDate(event.event_date)}</span>
+            {idea && <Badge tone="success">Log</Badge>}
+            {staleIds.has(event.id)
+              ? <Badge tone="danger">nicht mehr im Kalender</Badge>
+              : gapIds.has(event.id) && <Badge tone="danger">nicht im Pin</Badge>}
+          </div>
+          <IconLine icon={<SmallIcons.users />} color={PAGE_COLORS.helpers}>
+            {getAssignedHelperNames(event)}
+          </IconLine>
+          {parentName && (
+            <IconLine icon={<SmallIcons.food />} color={PAGE_COLORS.parents}>
+              {parentName}
+            </IconLine>
+          )}
+          {getInvitationName(event) && (
+            <IconLine icon={<SmallIcons.home />} color={PAGE_COLORS.parents}>
+              Einladung: {getInvitationName(event)}
+            </IconLine>
+          )}
+          {birthdays.map((b, i) => (
+            <IconLine key={i} icon={<SmallIcons.gift />} color={PAGE_COLORS.children}>
+              {b.name} wird {b.age} ({b.dayMonth})
+            </IconLine>
+          ))}
+        </div>
+        <ChevronRight />
+      </Row>
+    )
+  }
+
   if (loading) {
     return <Loading />
   }
@@ -742,6 +786,10 @@ export default function CalendarPage() {
   const gaps = pinnedUntil
     ? upcomingEvents.filter(e => e.event_date <= pinnedUntil && !pinnedIds.has(e.id))
     : []
+  /** Oben: alles Aktive (gepinnt, Lücken, später). Unten: der Entwurf des nächsten Blocks. */
+  const draftBlockIds = new Set((nextBlock ?? []).filter(p => !p.posted).map(p => p.eventId))
+  const activeEvents = blockState === 'draft' ? upcomingEvents.filter(e => !draftBlockIds.has(e.id)) : upcomingEvents
+  const draftEvents = blockState === 'draft' ? upcomingEvents.filter(e => draftBlockIds.has(e.id)) : []
   /** Status-Badges in "Kommende Termine": Entwurf = nächster Block, noch nicht gepostet. */
   const draftIds = new Set((nextBlock ?? []).filter(p => !p.posted).map(p => p.eventId))
   const gapIds = new Set(gaps.map(e => e.id))
@@ -760,94 +808,49 @@ export default function CalendarPage() {
 
   return (
     <Page back="/" title="Kalender" subtitle={syncSubtitle} accent="calendar">
-      <Section title="Kommende Termine">
-        {upcomingEvents.length === 0 ? (
+      <Section
+        title="Kommende Termine"
+        action={currentPinned.length > 0 ? (
+          <Button variant="ghost" size="sm" className="-mr-2" onClick={() => setPostChoice('current')}>
+            Neu posten
+          </Button>
+        ) : undefined}
+      >
+        {activeEvents.length === 0 ? (
           <Empty>Keine kommenden Termine</Empty>
         ) : (
           <List>
-            {(showAllUpcoming ? upcomingEvents : upcomingEvents.slice(0, 5)).map((event) => {
-              const idea = ideasMap.get(event.id)
-              const birthdays = getBirthdaysNearEvent(event.event_date)
-              // Elterndienst (Essen) gibt es nur samstags.
-              const parentName = hasFoodDuty(event.event_date) ? getParentDutyName(event) : ''
-              return (
-                <Row key={event.id} onClick={() => openModal(event)}>
-                  <DateTile date={event.event_date} weekday={false} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{formatDate(event.event_date)}</span>
-                      {idea && <Badge tone="success">Log</Badge>}
-                      {draftIds.has(event.id) && <Badge tone="warn">Entwurf</Badge>}
-                      {gapIds.has(event.id) && <Badge tone="danger">nicht im Pin</Badge>}
-                    </div>
-                    <IconLine icon={<SmallIcons.users />} color={PAGE_COLORS.helpers}>
-                      {getAssignedHelperNames(event)}
-                    </IconLine>
-                    {parentName && (
-                      <IconLine icon={<SmallIcons.food />} color={PAGE_COLORS.parents}>
-                        {parentName}
-                      </IconLine>
-                    )}
-                    {getInvitationName(event) && (
-                      <IconLine icon={<SmallIcons.home />} color={PAGE_COLORS.parents}>
-                        Einladung: {getInvitationName(event)}
-                      </IconLine>
-                    )}
-                    {birthdays.map((b, i) => (
-                      <IconLine key={i} icon={<SmallIcons.gift />} color={PAGE_COLORS.children}>
-                        {b.name} wird {b.age} ({b.dayMonth})
-                      </IconLine>
-                    ))}
-                  </div>
-                  <ChevronRight />
-                </Row>
-              )
-            })}
+            {(showAllUpcoming ? activeEvents : activeEvents.slice(0, 5)).map(renderEventRow)}
           </List>
         )}
-        {upcomingEvents.length > 5 && (
+        {activeEvents.length > 5 && (
           <Button variant="ghost" size="sm" className="mt-2" onClick={() => setShowAllUpcoming(v => !v)}>
-            {showAllUpcoming ? 'Weniger anzeigen' : `Alle ${upcomingEvents.length} Termine anzeigen`}
+            {showAllUpcoming ? 'Weniger anzeigen' : `Alle ${activeEvents.length} Termine anzeigen`}
           </Button>
         )}
       </Section>
 
-
-      <Section title="Einteilung">
-        <div className="card px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium">Nächster Block</p>
-            <Badge tone={blockState === 'draft' ? 'warn' : blockState === 'posted' ? 'success' : 'outline'}>
-              {blockState === 'draft' ? 'Entwurf' : blockState === 'posted' ? 'Gepostet' : 'Leer'}
-            </Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted">
+      <Section title={blockState === 'draft' ? 'Nächster Block · Entwurf' : 'Nächster Block'}>
+        {draftEvents.length === 0 ? (
+          <Empty>
             {(nextBlock ?? []).length === 0
               ? 'Keine weiteren Termine im Kalender.'
-              : blockState === 'draft'
-                ? `${(nextBlock ?? []).length} Termine, oben mit „Entwurf“ markiert. Prüfen, tauschen, dann posten.`
-                : blockState === 'posted'
-                  ? 'Ist gepostet und gepinnt.'
-                  : 'Der Entwurf kommt nach dem vorletzten gepinnten Termin per DM.'}
-            {gaps.length > 0 && ` ${gaps.length === 1 ? 'Ein Termin ist' : `${gaps.length} Termine sind`} nicht im Pin, oben rot markiert.`}
-          </p>
-          {(nextBlock ?? []).length > 0 && blockState !== 'posted' && (
-            <Button
-              variant="primary"
-              block
-              className="mt-3"
-              onClick={() => loadRotationPreview(blockState === 'draft' ? 'saved' : 'new')}
-              disabled={rotationLoading}
-            >
-              {rotationLoading ? 'Lade …' : blockState === 'draft' ? 'Prüfen und posten' : 'Jetzt schon ziehen'}
-            </Button>
-          )}
-          {currentPinned.length > 0 && (
-            <Button variant="ghost" size="sm" block className="mt-1" onClick={() => setPostChoice('current')}>
-              Gepinnte Einteilung neu posten
-            </Button>
-          )}
-        </div>
+              : 'Noch kein Entwurf. Er kommt nach dem vorletzten Termin oben per DM.'}
+          </Empty>
+        ) : (
+          <List>{draftEvents.map(renderEventRow)}</List>
+        )}
+        {(nextBlock ?? []).length > 0 && blockState !== 'posted' && (
+          <Button
+            variant="primary"
+            block
+            className="mt-3"
+            onClick={() => loadRotationPreview(blockState === 'draft' ? 'saved' : 'new')}
+            disabled={rotationLoading}
+          >
+            {rotationLoading ? 'Lade …' : blockState === 'draft' ? 'Prüfen und posten' : 'Jetzt schon ziehen'}
+          </Button>
+        )}
       </Section>
 
       <Section title="Elterndienst">
@@ -987,7 +990,7 @@ export default function CalendarPage() {
                                 ))}
                               </select>
                             </label>
-                            <Badge tone={h.isSenior ? 'warn' : h.isATeam ? 'accent' : 'outline'}>{h.isSenior ? 'Senior' : h.isATeam ? 'A-Team' : 'Junior'}</Badge>
+                            <Badge tone={h.isSenior ? 'warn' : h.isATeam ? 'violet' : 'outline'}>{h.isSenior ? 'Senior' : h.isATeam ? 'A-Team' : 'Junior'}</Badge>
                           </p>
                         ))}
                       </div>

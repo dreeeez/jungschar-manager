@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/components/TelegramProvider'
 import { supabase } from '@/lib/supabase'
-import { Badge, Button, Empty, List, Loading, Page, Row } from '@/components/ui'
+import { Badge, Button, CheckRow, ChevronRight, Empty, List, Loading, Page, Row, Sheet } from '@/components/ui'
 
 interface Helper {
   id: string
@@ -19,6 +19,9 @@ export default function HelpersPage() {
   const { showAlert, showConfirm } = useTelegram()
   const [helpers, setHelpers] = useState<Helper[]>([])
   const [loading, setLoading] = useState(true)
+  /** Helfer im Bearbeiten-Fenster (Senior, A-Team, Löschen). */
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const editing = helpers.find(h => h.id === editingId) ?? null
 
   useEffect(() => {
     fetchHelpers()
@@ -77,6 +80,7 @@ export default function HelpersPage() {
     if (error) {
       showAlert('Fehler beim Löschen: ' + error.message)
     } else {
+      setEditingId(null)
       fetchHelpers()
     }
   }
@@ -88,37 +92,50 @@ export default function HelpersPage() {
       title="Helfer"
       back="/"
       accent="helpers"
-      subtitle="Neue Helfer registrieren sich im Bot mit /register. A-Team kommt nur gemeinsam als Duo dran."
+      subtitle="Neue Helfer registrieren sich im Bot mit /register. Antippen zum Bearbeiten."
     >
       {helpers.length === 0 ? (
         <Empty>Noch keine Helfer vorhanden</Empty>
       ) : (
         <List>
           {helpers.map((helper) => (
-            <Row key={helper.id} className="items-start">
+            <Row key={helper.id} onClick={() => setEditingId(helper.id)}>
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{helper.name}</p>
                 <p className="text-sm text-muted">
                   {helper.telegram_username ? `@${helper.telegram_username}` : 'ohne Telegram-Name'}
                   {!helper.telegram_user_id && ' · nicht verknüpft'}
                 </p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {helper.is_admin && <Badge tone="accent">Admin</Badge>}
-                  <Badge tone={helper.is_senior ? 'warn' : 'outline'} onClick={() => toggleSenior(helper)}>
-                    Senior
-                  </Badge>
-                  <Badge tone={helper.is_ateam ? 'accent' : 'outline'} onClick={() => toggleATeam(helper)}>
-                    A-Team
-                  </Badge>
-                </div>
+                {(helper.is_admin || helper.is_senior || helper.is_ateam) && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {helper.is_admin && <Badge tone="accent">Admin</Badge>}
+                    {helper.is_senior && <Badge tone="warn">Senior</Badge>}
+                    {helper.is_ateam && <Badge tone="violet">A-Team</Badge>}
+                  </div>
+                )}
               </div>
-              <Button variant="danger" size="sm" onClick={() => deleteHelper(helper.id, helper.name)}>
-                Löschen
-              </Button>
+              <ChevronRight />
             </Row>
           ))}
         </List>
       )}
+
+      <Sheet open={!!editing} onClose={() => setEditingId(null)} title={editing?.name ?? 'Helfer'}>
+        {editing && (
+          <>
+            <List className="mb-2">
+              <CheckRow label="Senior" checked={editing.is_senior} onClick={() => toggleSenior(editing)} />
+              <CheckRow label="A-Team (Work and Travel)" checked={editing.is_ateam} onClick={() => toggleATeam(editing)} />
+            </List>
+            <p className="mb-5 px-1 text-xs text-muted">
+              Einteilung: immer Senior + Junior. A-Team kommt nur gemeinsam als Duo dran.
+            </p>
+            <Button variant="danger" block onClick={() => deleteHelper(editing.id, editing.name)}>
+              Helfer löschen
+            </Button>
+          </>
+        )}
+      </Sheet>
     </Page>
   )
 }

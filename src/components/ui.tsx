@@ -205,7 +205,7 @@ export function Label({ children }: { children: ReactNode }) {
   return <label className="mb-1 block text-xs text-muted">{children}</label>
 }
 
-type BadgeTone = 'neutral' | 'accent' | 'success' | 'warn' | 'danger' | 'solid' | 'outline'
+type BadgeTone = 'neutral' | 'accent' | 'success' | 'warn' | 'danger' | 'solid' | 'outline' | 'violet'
 
 /** Kleines Textabzeichen. */
 export function Badge({
@@ -225,6 +225,7 @@ export function Badge({
     danger: 'bg-danger-soft text-danger',
     solid: 'bg-accent text-accent-fg',
     outline: 'border border-line text-muted',
+    violet: 'bg-[#8b5cf6]/15 text-[#8b5cf6]',
   }
   const cls = cx('inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-md px-2 text-xs font-medium', tones[tone])
   if (onClick) {

@@ -3,6 +3,7 @@ import { processReminders } from '@/services/reminders'
 import { syncJungscharEvents } from '@/services/ical-sync'
 import { postBirthdayGreetings } from '@/services/parents-bot'
 import { processRotationBlocks } from '@/services/rotation'
+import { reconcileWithIcs } from '@/services/ics-reconcile'
 
 export async function GET(req: NextRequest) {
   // Verify cron secret to prevent unauthorized access
@@ -53,6 +54,19 @@ export async function GET(req: NextRequest) {
 
     // Einteilung in Blöcken: Entwurf nach dem vorletzten, Post nach dem letzten
     // Termin des gepinnten Blocks (nur live).
+    // Einmal pro Woche (Samstagmorgen, vor dem Sonntags-Heads-up): Kalender mit
+    // dem ICS abgleichen. Entwürfe still bereinigen, Pin-Termine nur per DM an Marco.
+    let icsReconcile = null
+    const berlinDay = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', weekday: 'short' }).format(new Date())
+    if (!isTest && berlinDay === 'Sat') {
+      try {
+        icsReconcile = await reconcileWithIcs()
+      } catch (e: any) {
+        console.error('ICS reconcile failed:', e)
+        icsReconcile = { error: e.message }
+      }
+    }
+
     let rotation = null
     if (!isTest) {
       try {
@@ -62,7 +76,7 @@ export async function GET(req: NextRequest) {
         rotation = { error: e.message }
       }
     }
-    return NextResponse.json({ ...result, icalSync, birthdays, rotation })
+    return NextResponse.json({ ...result, icalSync, birthdays, icsReconcile, rotation })
   } catch (error) {
     console.error('Error in reminder cron:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

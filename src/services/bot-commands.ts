@@ -37,6 +37,7 @@ import {
   sendFoodInspo,
 } from './parents-bot'
 import { BUG_PHOTO_NEEDS_TEXT, BUG_PROMPT, saveFeedback } from './feedback'
+import { handleIcsAction } from './ics-reconcile'
 
 /**
  * Bot-Befehle.
@@ -833,6 +834,19 @@ export function setupBotCommands(bot: Bot) {
       }
 
       // /send: Rückfrage beantwortet (phs = Elternchat, pht = Sandbox-Test, phn = Nein)
+      // Wöchentlicher ICS-Abgleich: DM-Buttons (nur Admins). Erst dieser Klick
+      // bearbeitet den Pin und schickt den Hinweis in die Helfer-Gruppe.
+      if (action === 'icsm' || action === 'icsd' || action === 'icsx') {
+        if (!isAdmin(telegramUserId)) {
+          await ctx.answerCallbackQuery({ text: 'Nur für Admins.' })
+          return
+        }
+        await ctx.answerCallbackQuery()
+        const text = await handleIcsAction(action, eventId)
+        try { await ctx.editMessageText(text, { parse_mode: 'HTML' }) } catch {}
+        return
+      }
+
       if (action === 'phs' || action === 'pht' || action === 'phn') {
         if (!isAdmin(telegramUserId)) {
           await ctx.answerCallbackQuery({ text: 'Nur für Admins.' })

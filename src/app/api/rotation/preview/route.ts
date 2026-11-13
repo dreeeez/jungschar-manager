@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { nextBlock, planNextBlock, helperBalances, currentBlockRemaining } from '@/services/rotation'
 import { requireOperator } from '@/services/api-guard'
+import { staleEventIds } from '@/services/ics-reconcile'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,9 @@ export async function POST(req: NextRequest) {
       const first = next.events[0]?.eventDate
       const balances = first ? await helperBalances(first) : {}
       const current = await currentBlockRemaining()
-      return NextResponse.json({ proposals: next.events, current, skipped: [], after: next.after, balances })
+      // Kommende Termine, die nicht mehr im ICS stehen (Badge in der App).
+      const stale = await staleEventIds().catch(() => null)
+      return NextResponse.json({ proposals: next.events, current, stale: stale ?? [], skipped: [], after: next.after, balances })
     }
     const result = await planNextBlock()
     return NextResponse.json(result)
