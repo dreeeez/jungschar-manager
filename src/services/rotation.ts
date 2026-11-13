@@ -670,7 +670,7 @@ export async function postBlock(opts: {
   if (opts.save?.length) await saveAssignments(opts.save)
   // Neuer Block: die noch offenen Termine des gepinnten Blocks kommen oben mit
   // rein, sonst verschwänden sie aus dem Pin, bevor sie stattfinden.
-  const remaining = opts.save?.length ? (await currentBlockRemaining()).map(p => p.eventId) : []
+  const remaining = opts.save?.length ? (await carryOver()).map(p => p.eventId) : []
   const ids = Array.from(new Set([...remaining, ...opts.eventIds, ...(opts.save ?? []).map(s => s.eventId)]))
   const result: PostResult = { mode: opts.isTest ? 'sandbox' : 'live', proposals: [], messageId: null }
   if (ids.length === 0) return result
@@ -694,9 +694,28 @@ export async function currentBlockRemaining(): Promise<RotationProposal[]> {
   return (block?.events ?? []).filter(e => e.eventDate >= today)
 }
 
+/**
+ * Was beim Posten eines neuen Blocks oben mit rein muss: offene Termine des
+ * gepinnten Blocks plus Termine bis zu dessen Ende, die in keinem Pin stehen,
+ * aber ein Team haben (z. B. später per ICS dazugekommen und von Hand besetzt).
+ */
+async function carryOver(): Promise<RotationProposal[]> {
+  const remaining = await currentBlockRemaining()
+  if (remaining.length === 0) return []
+  const until = remaining[remaining.length - 1].eventDate
+  const { data } = await (getSupabase() as any)
+    .from('events')
+    .select(EVENT_SELECT)
+    .gte('event_date', localIso(new Date()))
+    .lte('event_date', until)
+    .is('rotation_message_id', null)
+  const gaps = ((data ?? []) as any[]).map(toProposal).filter(p => p.helpers.length > 0)
+  return [...remaining, ...gaps].sort((a, b) => a.eventDate.localeCompare(b.eventDate))
+}
+
 /** Text der neuen Einteilungs-Nachricht: offene Termine des alten Blocks + {proposals}. */
 export async function blockMessagePreview(proposals: RotationProposal[]): Promise<string> {
-  const remaining = await currentBlockRemaining()
+  const remaining = await carryOver()
   const ids = new Set(proposals.map(p => p.eventId))
   const all = [...remaining.filter(p => !ids.has(p.eventId)), ...proposals]
     .filter(p => p.helpers.length > 0)

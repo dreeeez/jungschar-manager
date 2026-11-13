@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { nextBlock, planNextBlock, helperBalances } from '@/services/rotation'
+import { nextBlock, planNextBlock, helperBalances, currentBlockRemaining } from '@/services/rotation'
 import { requireOperator } from '@/services/api-guard'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * Nächster Block (4 Termine nach der gepinnten Einteilung).
- *   Body { saved: true } → gespeicherten Stand (Entwurf) liefern.
+ *   Body { saved: true } → gespeicherten Stand (Entwurf) liefern, dazu
+ *     current = noch offene Termine der gepinnten Einteilung.
  *   Sonst → neu ziehen per Quote (schreibt nichts).
  * Immer dabei: balances (Bilanz je Helfer) für den Ersatz-Vorschlag.
  */
@@ -20,7 +21,8 @@ export async function POST(req: NextRequest) {
       const next = await nextBlock()
       const first = next.events[0]?.eventDate
       const balances = first ? await helperBalances(first) : {}
-      return NextResponse.json({ proposals: next.events, skipped: [], after: next.after, balances })
+      const current = await currentBlockRemaining()
+      return NextResponse.json({ proposals: next.events, current, skipped: [], after: next.after, balances })
     }
     const result = await planNextBlock()
     return NextResponse.json(result)

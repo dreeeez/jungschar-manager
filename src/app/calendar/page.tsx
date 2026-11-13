@@ -139,6 +139,8 @@ export default function CalendarPage() {
   const [showAllUpcoming, setShowAllUpcoming] = useState(false)
   /** Nächster Block (4 Termine nach der gepinnten Einteilung), wie gespeichert. */
   const [nextBlock, setNextBlock] = useState<RotationProposal[] | null>(null)
+  /** Noch offene Termine der gepinnten Einteilung (Helfer-Gruppe). */
+  const [currentPinned, setCurrentPinned] = useState<RotationProposal[]>([])
   /** Bilanz je Helfer (negativ = liegt zurück) für den Ersatz-Vorschlag. */
   const [balances, setBalances] = useState<Record<string, number>>({})
   const [rotationMessage, setRotationMessage] = useState<string | null>(null)
@@ -166,6 +168,7 @@ export default function CalendarPage() {
       const body = await res.json()
       if (res.ok) {
         setNextBlock(body.proposals ?? [])
+        setCurrentPinned(body.current ?? [])
         setBalances(body.balances ?? {})
       }
     } catch {}
@@ -273,8 +276,9 @@ export default function CalendarPage() {
     }).format(date)
   }
 
+  /** Heute zählt mit (Vergleich nach Kalendertag, nicht nach Uhrzeit). */
   function isUpcoming(dateString: string) {
-    return new Date(dateString) >= new Date()
+    return !isPastEvent(dateString)
   }
 
   function isPastEvent(dateString: string) {
@@ -724,6 +728,23 @@ export default function CalendarPage() {
   }
 
   const upcomingEvents = events.filter(e => isUpcoming(e.event_date))
+  const blockState: 'empty' | 'draft' | 'posted' =
+    !nextBlock || nextBlock.length === 0 || nextBlock.every(p => p.helpers.length === 0)
+      ? 'empty'
+      : nextBlock.every(p => p.posted) ? 'posted' : 'draft'
+  /**
+   * Lücken: kommende Termine bis zum Ende der gepinnten Einteilung, die in
+   * keinem Pin stehen (z. B. später per ICS dazugekommen). Die Block-Logik
+   * plant sie nicht, deshalb hier sichtbar machen.
+   */
+  const pinnedIds = new Set(currentPinned.map(p => p.eventId))
+  const pinnedUntil = currentPinned.length ? currentPinned[currentPinned.length - 1].eventDate : null
+  const gaps = pinnedUntil
+    ? upcomingEvents.filter(e => e.event_date <= pinnedUntil && !pinnedIds.has(e.id))
+    : []
+  /** "Henrik (S) · Hartmut" — Vorname reicht, Gruppe in Klammern. */
+  const teamLine = (p: RotationProposal) =>
+    p.helpers.map(h => h.name.split(' ')[0] + (h.isSenior ? ' (S)' : h.isATeam ? ' (A)' : '')).join(' · ')
   const selectedLocked = selectedEvent ? isPastEvent(selectedEvent.event_date) : false
 
   const syncSubtitle = lastSyncAt
@@ -788,45 +809,82 @@ export default function CalendarPage() {
 
 
       <Section title="Einteilung">
-        {nextBlock && nextBlock.length > 0 && (
-          <>
-            <p className="mb-2 text-sm text-muted">
-              Nächster Block ·{' '}
-              {nextBlock.every(p => p.posted)
-                ? 'gepostet'
-                : nextBlock.some(p => p.helpers.length > 0)
-                  ? 'Entwurf, noch nicht gepostet'
-                  : 'noch leer, entsteht nach dem vorletzten Termin'}
-            </p>
-            <List className="mb-3">
-              {nextBlock.map(p => (
-                <Row key={p.eventId} onClick={() => loadRotationPreview('saved')}>
-                  <span className="w-24 shrink-0 text-sm font-medium">{formatDate(p.eventDate)}</span>
-                  <span className="min-w-0 flex-1 text-sm text-muted">
-                    {p.helpers.length ? p.helpers.map(h => h.name + (h.isSenior ? ' (S)' : h.isATeam ? ' (A)' : '')).join(' + ') : 'noch offen'}
-                  </span>
-                  <ChevronRight />
-                </Row>
-              ))}
-            </List>
-          </>
-        )}
-        <div className="space-y-2">
-          <Button variant="primary" block onClick={() => loadRotationPreview(nextBlock?.some(p => p.helpers.length > 0 && !p.posted) ? 'saved' : 'new')} disabled={rotationLoading}>
-            {rotationLoading ? 'Lade …' : nextBlock?.some(p => p.helpers.length > 0 && !p.posted) ? 'Entwurf prüfen und tauschen' : 'Nächsten Block ziehen'}
-          </Button>
-          <Button
-            variant="secondary"
-            block
-            onClick={() => setPostChoice('current')}
-            disabled={!upcomingEvents.some(e => (e.assignments?.length ?? 0) > 0)}
-          >
-            Aktuelle Einteilung neu posten (ganz unten)
-          </Button>
-          <Button variant="secondary" block onClick={loadParentPreview} disabled={parentLoading}>
-            {parentLoading && !parentPreview ? 'Berechne …' : 'Eltern einteilen (Essen, Samstage)'}
-          </Button>
+        <div className="space-y-3">
+          {currentPinned.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="flex items-center justify-between px-4 pt-3">
+                <p className="text-sm font-medium">Gepinnt in der Helfer-Gruppe</p>
+                <Button variant="ghost" size="sm" className="-mr-2" onClick={() => setPostChoice('current')}>
+                  Neu posten
+                </Button>
+              </div>
+              <div className="px-4 pb-3 pt-1">
+                {currentPinned.map(p => (
+                  <div key={p.eventId} className="flex gap-3 py-1 text-sm">
+                    <span className="w-24 shrink-0 text-muted">{formatDate(p.eventDate)}</span>
+                    <span className="min-w-0 flex-1">{teamLine(p)}</span>
+                  </div>
+                ))}
+                {gaps.map(e => (
+                  <button
+                    key={e.id}
+                    type="button"
+                    onClick={() => openModal(e)}
+                    className="flex w-full gap-3 py-1 text-left text-sm active:opacity-60"
+                  >
+                    <span className="w-24 shrink-0 text-warn">{formatDate(e.event_date)}</span>
+                    <span className="min-w-0 flex-1 text-warn">
+                      {(e.assignments?.length ?? 0) > 0 ? `${getAssignedHelperNames(e)}, nicht im Pin` : 'nicht eingeteilt, antippen'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="card overflow-hidden">
+            <div className="flex items-center justify-between px-4 pt-3">
+              <p className="text-sm font-medium">Nächster Block</p>
+              <Badge tone={blockState === 'draft' ? 'warn' : blockState === 'posted' ? 'success' : 'outline'}>
+                {blockState === 'draft' ? 'Entwurf' : blockState === 'posted' ? 'Gepostet' : 'Leer'}
+              </Badge>
+            </div>
+            <div className="px-4 pb-3 pt-1">
+              {(nextBlock ?? []).length === 0 ? (
+                <p className="py-1 text-sm text-muted">Keine weiteren Termine im Kalender.</p>
+              ) : (
+                (nextBlock ?? []).map(p => (
+                  <div key={p.eventId} className="flex gap-3 py-1 text-sm">
+                    <span className="w-24 shrink-0 text-muted">{formatDate(p.eventDate)}</span>
+                    <span className={p.helpers.length ? 'min-w-0 flex-1' : 'min-w-0 flex-1 text-muted'}>
+                      {p.helpers.length ? teamLine(p) : 'offen'}
+                    </span>
+                  </div>
+                ))
+              )}
+              {blockState === 'empty' && (nextBlock ?? []).length > 0 && (
+                <p className="pt-1 text-xs text-muted">Der Entwurf kommt automatisch nach dem vorletzten gepinnten Termin, per DM.</p>
+              )}
+              {(nextBlock ?? []).length > 0 && blockState !== 'posted' && (
+                <Button
+                  variant="primary"
+                  block
+                  className="mt-3"
+                  onClick={() => loadRotationPreview(blockState === 'draft' ? 'saved' : 'new')}
+                  disabled={rotationLoading}
+                >
+                  {rotationLoading ? 'Lade …' : blockState === 'draft' ? 'Prüfen und posten' : 'Jetzt schon ziehen'}
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
+      </Section>
+
+      <Section title="Elterndienst">
+        <Button variant="secondary" block onClick={loadParentPreview} disabled={parentLoading}>
+          {parentLoading && !parentPreview ? 'Berechne …' : 'Eltern einteilen (Samstage)'}
+        </Button>
       </Section>
 
       {/* Termin-Sheet */}
@@ -1075,12 +1133,12 @@ export default function CalendarPage() {
       </Sheet>
 
       {/* Gespeicherte Einteilung posten */}
-      <Sheet open={postChoice === 'current'} onClose={() => setPostChoice(null)} title="Einteilung posten" locked={rotationCommitting}>
+      <Sheet open={postChoice === 'current'} onClose={() => setPostChoice(null)} title="Gepinnte Einteilung neu posten" locked={rotationCommitting}>
         <List className="mb-5">
-          {upcomingEvents.filter(e => (e.assignments?.length ?? 0) > 0).map(e => (
-            <Row key={e.id}>
-              <span className="w-24 shrink-0 text-sm font-medium">{formatDate(e.event_date)}</span>
-              <span className="min-w-0 flex-1 text-sm text-muted">{getAssignedHelperNames(e)}</span>
+          {currentPinned.map(p => (
+            <Row key={p.eventId}>
+              <span className="w-24 shrink-0 text-sm font-medium">{formatDate(p.eventDate)}</span>
+              <span className="min-w-0 flex-1 text-sm text-muted">{teamLine(p)}</span>
             </Row>
           ))}
         </List>
