@@ -267,6 +267,22 @@ export async function handleReviewCallback(
 }
 
 /**
+ * Wartet bei dieser Person eine Bewertung auf den Freitext? Dann der
+ * Zeitpunkt (ms), an dem die Frage gestellt wurde (Klick auf Drinnen/Draußen).
+ */
+export async function openReviewTextAt(userId: number): Promise<number | null> {
+  const { data } = await getSupabase()
+    .from('review_pings')
+    .select('updated_at')
+    .eq('telegram_user_id', userId)
+    .eq('state', 'text')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+  const at = (data?.[0] as any)?.updated_at
+  return at ? new Date(at).getTime() : null
+}
+
+/**
  * Freitext im privaten Chat: schließt eine offene Bewertung ab.
  * @returns true, wenn die Nachricht als Bewertung verarbeitet wurde
  */

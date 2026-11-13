@@ -317,7 +317,7 @@ export async function parentsFollowUp(eventDate: string): Promise<string> {
 
 /**
  * /send: alle ungeposteten Medien als Album(s) posten. Die Bildunterschrift
- * des ersten Albums trägt den kurzen Text plus die Hinweise auf /idee und
+ * des letzten Albums (ganz unten im Chat) trägt den kurzen Text plus die Hinweise auf /idee und
  * /invite (eine Nachricht, keine zweite Blase). Mit mark=true (Elterngruppe)
  * werden die Medien als gepostet markiert; mark=false (Sandbox-Test) lässt
  * sie offen, damit der echte Post später noch geht.
@@ -337,10 +337,11 @@ export async function postMedia(
   const caption = `${albumCaption(event.event_date)}\n\n${await parentsFollowUp(event.event_date)}`
   for (let i = 0; i < rows.length; i += ALBUM_MAX) {
     const batch = rows.slice(i, i + ALBUM_MAX)
-    const first = i === 0 ? caption : undefined
+    // Text ans letzte Album, damit er im Chat ganz unten steht und nicht zwischen den Alben verschwindet.
+    const last = i + ALBUM_MAX >= rows.length ? caption : undefined
     const res = batch.length === 1
-      ? await sendOne(chatId, batch[0], first ? { caption: first, parse_mode: 'HTML' } : {})
-      : await sendAlbum(chatId, batch, first)
+      ? await sendOne(chatId, batch[0], last ? { caption: last, parse_mode: 'HTML' } : {})
+      : await sendAlbum(chatId, batch, last)
     if (!res?.ok) throw new Error(res?.description ?? 'Senden fehlgeschlagen')
     albums++
     postedIds.push(...batch.map(r => r.id))

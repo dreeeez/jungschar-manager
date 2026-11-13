@@ -28,6 +28,16 @@ const POLL_REMINDER_TEMPLATES: TemplateFn[] = [
   (m, d) => `+++ 🧭 <b>Schnitzeljagd-Hinweis #1</b> +++\n\n${m}\n\nEuer nächstes Ziel ist der Vote-Button für <b>${d}</b>. ✅ oder ❌ markieren das Schatzkästchen 💎`,
   (m, d) => `+++ 🏃 <b>Endspurt!</b> +++\n\n${m}\n\nNur noch ein Klick zur Ziellinie: ✅ oder ❌ für <b>${d}</b>. Wir feuern euch an! 🥇`,
   (m, d) => `+++ ⏰ <b>Sanftes Wecken</b> +++\n\n${m}\n\nMittwoch ist vorbei und euer Vote für <b>${d}</b> schläft noch. Tippt ihn wach mit ✅ oder ❌ ☀️`,
+  (m, d) => `+++ 🚂 <b>Letzter Aufruf!</b> +++\n\n${m}\n\nDer Zug zur Jungschar am <b>${d}</b> fährt bald ab. Ticket lösen: oben ✅ oder ❌ 🎫`,
+  (m, d) => `+++ 🍕 <b>Bestellung offen</b> +++\n\n${m}\n\nEure Bestellung für <b>${d}</b> ist noch nicht abgeschlossen. Bitte oben ✅ oder ❌ wählen, sonst gibt's automatisch Pizza Hawaii 🍍`,
+  (m, d) => `+++ 🧾 <b>Freundliche Mahnung</b> +++\n\n${m}\n\nOffener Posten: 1 Vote für <b>${d}</b>. Zahlbar sofort, oben per ✅ oder ❌. Keine Mahngebühren 😇`,
+  (m, d) => `+++ 🐌 <b>Überholt!</b> +++\n\n${m}\n\nSelbst die Schnecke hat schon abgestimmt. Holt sie ein: oben ✅ oder ❌ für <b>${d}</b> 🏁`,
+  (m, d) => `+++ 🎮 <b>Player 2 fehlt</b> +++\n\n${m}\n\nPress Start für <b>${d}</b>: oben ✅ oder ❌. Sonst Game Over für den Bot 👾`,
+  (m, d) => `+++ 🦖 <b>Ausgestorben?</b> +++\n\n${m}\n\nVon euch fehlt seit Mittwoch jede Spur. Lebenszeichen bitte oben mit ✅ oder ❌ für <b>${d}</b> 🦴`,
+  (m, d) => `+++ 📞 <b>Verpasster Anruf</b> +++\n\n${m}\n\nDie Jungschar vom <b>${d}</b> hat versucht, euch zu erreichen. Rückruf bitte oben per ✅ oder ❌ 📲`,
+  (m, d) => `+++ 🧩 <b>Ein Teil fehlt</b> +++\n\n${m}\n\nDas Puzzle für <b>${d}</b> ist fast fertig, nur euer Teil fehlt. Oben ✅ oder ❌ einsetzen 🧠`,
+  (m, d) => `+++ 🐔 <b>Gack gack!</b> +++\n\n${m}\n\nDas Huhn wartet auf euer Ei: ✅ oder ❌ für <b>${d}</b>, oben ins Nest legen 🥚`,
+  (m, d) => `+++ 🛰️ <b>Houston?</b> +++\n\n${m}\n\nKein Signal von euch für <b>${d}</b>. Funkspruch bitte oben mit ✅ oder ❌ 📡`,
   (m, d) => `+++ 🦸 <b>Mission: Jungschar ${d}</b> +++\n\n${m}\n\nDie Welt — naja, zumindest die Gemeinde — braucht euch. Mission annehmen mit ✅, ablehnen mit ❌ oben 💪`,
 ]
 

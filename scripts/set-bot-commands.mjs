@@ -22,7 +22,7 @@ const privateCommands = [
   { command: 'termine', description: 'Nächste Jungschar-Termine' },
   { command: 'idee', description: 'Programm-Idee vorschlagen' },
   { command: 'invite', description: 'Die Jungschar zu euch einladen' },
-  { command: 'bug', description: 'Fehler oder Wunsch zum Bot melden' },
+  { command: 'feedback', description: 'Fehler, Wunsch oder Idee zum Bot' },
   { command: 'help', description: 'Befehle anzeigen' },
 ]
 

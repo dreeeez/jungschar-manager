@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Badge, Button, ChevronRight, Empty, List, Loading, Page, Row } from '@/components/ui'
 
 /*
- * Feedback aus /bug: Fehler, Wünsche, Ideen zu Bot und App. Nur Admins.
+ * Feedback aus /feedback: Fehler, Wünsche, Ideen zu Bot und App. Nur Admins.
  * Offene zuerst, Erledigte bleiben grau darunter. Nichts wird gelöscht.
  */
 
@@ -94,9 +94,9 @@ export default function FeedbackPage() {
   }
 
   return (
-    <Page back="/" title="Feedback" accent="status" subtitle={`${open.length} offen · ${done.length} erledigt · aus /bug im Bot`}>
+    <Page back="/" title="Feedback" accent="status" subtitle={`${open.length} offen · ${done.length} erledigt · aus /feedback im Bot`}>
       {items.length === 0 ? (
-        <Empty>Noch kein Feedback. Alle können dem Bot mit /bug schreiben.</Empty>
+        <Empty>Noch kein Feedback. Alle können dem Bot mit /feedback schreiben.</Empty>
       ) : (
         <>
           {open.length > 0 && (

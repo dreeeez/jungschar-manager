@@ -5,7 +5,7 @@ import { getSupabase } from '@/services/database'
 export const dynamic = 'force-dynamic'
 
 /**
- * Bild zu einer Idee (/idee mit Foto) oder zu einem Feedback (/bug mit
+ * Bild zu einer Idee (/idee mit Foto) oder zu einem Feedback (/feedback mit
  * Screenshot). Der Browser kennt den Bot-Token nicht, deshalb holt der
  * Server die Datei bei Telegram und reicht sie durch.
  * ?id=<uuid>[&kind=feedback], Session nötig; Feedback nur für Admins.

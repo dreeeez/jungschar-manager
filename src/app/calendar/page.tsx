@@ -28,6 +28,7 @@ interface Helper {
   id: string
   name: string
   is_senior?: boolean
+  is_ateam?: boolean
 }
 
 interface Parent {
@@ -84,7 +85,9 @@ interface IdeaRecord {
 interface RotationProposal {
   eventId: string
   eventDate: string
-  helpers: { id: string; name: string; username: string | null; isSenior: boolean }[]
+  helpers: { id: string; name: string; username: string | null; isSenior: boolean; isATeam?: boolean }[]
+  /** Nur im gespeicherten nächsten Block: schon in der Helfer-Gruppe gepostet. */
+  posted?: boolean
 }
 
 interface ParentProposal {
@@ -134,13 +137,12 @@ export default function CalendarPage() {
   const [rotationSkipped, setRotationSkipped] = useState<{ eventDate: string; reason: string }[]>([])
   const [rotationCommitting, setRotationCommitting] = useState(false)
   const [showAllUpcoming, setShowAllUpcoming] = useState(false)
-  const [rotationWindow, setRotationWindow] = useState<{ label: string; from: string; until: string } | null>(null)
-  const [rotationHelpers, setRotationHelpers] = useState<{ seniors: number; juniors: number }>({ seniors: 0, juniors: 0 })
+  /** Nächster Block (4 Termine nach der gepinnten Einteilung), wie gespeichert. */
+  const [nextBlock, setNextBlock] = useState<RotationProposal[] | null>(null)
+  /** Bilanz je Helfer (negativ = liegt zurück) für den Ersatz-Vorschlag. */
+  const [balances, setBalances] = useState<Record<string, number>>({})
   const [rotationMessage, setRotationMessage] = useState<string | null>(null)
   const [rotationMessageLoading, setRotationMessageLoading] = useState(false)
-  /** Schritt 1 "Halbjahr einteilen": wer zuletzt dran war (null = Sheet zu). */
-  const [rotationSetup, setRotationSetup] = useState<string[] | null>(null)
-  const [rotationLastIds, setRotationLastIds] = useState<string[]>([])
   /** Chat-Auswahl: für die Vorschau (im Vorschau-Sheet) oder die gespeicherte Einteilung. */
   const [postChoice, setPostChoice] = useState<'preview' | 'current' | null>(null)
   /** Eltern-Einteilung (Essen, nur Samstage): Vorschau, null = Sheet zu. */
@@ -151,7 +153,23 @@ export default function CalendarPage() {
 
   useEffect(() => {
     fetchData()
+    loadNextBlock()
   }, [])
+
+  async function loadNextBlock() {
+    try {
+      const res = await fetch('/api/rotation/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ saved: true }),
+      })
+      const body = await res.json()
+      if (res.ok) {
+        setNextBlock(body.proposals ?? [])
+        setBalances(body.balances ?? {})
+      }
+    } catch {}
+  }
 
   async function fetchData() {
     const [eventsResult, helpersResult, parentsResult, childrenResult] = await Promise.all([
@@ -161,7 +179,7 @@ export default function CalendarPage() {
         .order('event_date', { ascending: true }),
       supabase
         .from('helpers')
-        .select('id, name, is_senior')
+        .select('id, name, is_senior, is_ateam')
         .order('name', { ascending: true }),
       (supabase as any)
         .from('parents')
@@ -456,47 +474,72 @@ export default function CalendarPage() {
     setSavingActivity(false)
   }
 
-  /** Team des letzten vergangenen Termins, als Vorauswahl für "zuletzt dran". */
-  function lastEventWithTeam(): Event | null {
-    const past = events.filter(e => isPastEvent(e.event_date) && (e.assignments?.length ?? 0) > 0)
-    return past.length ? past[past.length - 1] : null
-  }
-
-  function openRotationSetup() {
-    const last = lastEventWithTeam()
-    setRotationSetup(last ? last.assignments.map(a => a.helper_id) : [])
-  }
-
-  function toggleRotationSetup(helperId: string) {
-    setRotationSetup(prev => prev?.includes(helperId) ? prev.filter(id => id !== helperId) : [...(prev ?? []), helperId])
-  }
-
-  async function loadRotationPreview(lastHelperIds: string[]) {
+  /** Nächsten Block in der Vorschau öffnen: gespeicherter Entwurf ('saved') oder neu gezogen ('new'). */
+  async function loadRotationPreview(mode: 'saved' | 'new' = 'new') {
     setRotationLoading(true)
     try {
       const res = await fetch('/api/rotation/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lastHelperIds }),
+        body: JSON.stringify(mode === 'saved' ? { saved: true } : {}),
       })
       const body = await res.json()
       if (!res.ok) {
         showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
         return
       }
-      setRotationLastIds(lastHelperIds)
-      setRotationSetup(null)
       setPostChoice(null)
       setRotationMessage(null)
       setRotationPreview(body.proposals ?? [])
       setRotationSkipped(body.skipped ?? [])
-      setRotationWindow(body.window ?? null)
-      setRotationHelpers(body.helpers ?? { seniors: 0, juniors: 0 })
+      setBalances(body.balances ?? {})
     } catch (e: any) {
       showAlert('Fehler: ' + e.message)
     } finally {
       setRotationLoading(false)
     }
+  }
+
+  async function saveRotationDraft() {
+    setRotationCommitting(true)
+    try {
+      const res = await fetch('/api/rotation/commit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...rotationPayload(), draftOnly: true }),
+      })
+      const body = await res.json()
+      if (!res.ok) {
+        showAlert('Fehler: ' + (body.error ?? 'unbekannt'))
+        return
+      }
+      showAlert('Entwurf gespeichert. In der Gruppe ist nichts passiert.')
+      setRotationPreview(null)
+      setRotationMessage(null)
+      await Promise.all([fetchData(), loadNextBlock()])
+    } catch (e: any) {
+      showAlert('Fehler: ' + e.message)
+    } finally {
+      setRotationCommitting(false)
+    }
+  }
+
+  /**
+   * Tausch-Auswahl: erst dieselbe Gruppe (Senior/Junior), sortiert nach
+   * Bilanz. Der Erste bekommt einen Stern = Vorschlag (liegt am weitesten zurück).
+   */
+  function swapOptions(current: { id: string; isSenior: boolean; isATeam?: boolean }, taken: string[]) {
+    const group = (h: { is_senior?: boolean; is_ateam?: boolean }) => (h.is_ateam ? 'a' : h.is_senior ? 's' : 'j')
+    const mine = current.isATeam ? 'a' : current.isSenior ? 's' : 'j'
+    const same = helpers.filter(h => group(h) === mine)
+    const other = helpers.filter(h => group(h) !== mine)
+    const byBalance = (a: Helper, b: Helper) => (balances[a.id] ?? 0) - (balances[b.id] ?? 0)
+    const sorted = [...same.sort(byBalance), ...other.sort(byBalance)]
+    const best = sorted.find(h => group(h) === mine && h.id !== current.id && !taken.includes(h.id))
+    return sorted.map(h => ({
+      id: h.id,
+      label: (best?.id === h.id ? '★ ' : '') + h.name + (h.is_senior ? ' (S)' : h.is_ateam ? ' (A-Team)' : ''),
+    }))
   }
 
   function rotationPayload() {
@@ -530,7 +573,7 @@ export default function CalendarPage() {
     setRotationPreview(prev => prev?.map(p => {
       if (p.eventId !== eventId) return p
       const next = [...p.helpers]
-      next[index] = { ...next[index], id: helper.id, name: helper.name, isSenior: !!helper.is_senior }
+      next[index] = { ...next[index], id: helper.id, name: helper.name, isSenior: !!helper.is_senior, isATeam: !!helper.is_ateam }
       return { ...p, helpers: next }
     }) ?? null)
   }
@@ -559,12 +602,14 @@ export default function CalendarPage() {
       const n = body.proposals?.length ?? 0
       const where = testMode ? 'Sandbox-Gruppe' : 'Helfer-Gruppe'
       showAlert(n === 0
-        ? 'Keine Einteilung gespeichert, nichts gepostet.'
-        : `In der ${where} gepostet: ${n} Termine. Tausche in der App aktualisieren die Nachricht.`)
+        ? 'Nichts gepostet (keine Termine mit Team).'
+        : testMode
+          ? `In der Sandbox-Gruppe gepostet: ${n} Termine. Test, in der Helfer-Gruppe ist nichts passiert.`
+          : `In der ${where} gepostet und gepinnt: ${n} Termine. Tausche in der App aktualisieren die Nachricht.`)
       setPostChoice(null)
       setRotationPreview(null)
       setRotationMessage(null)
-      await fetchData()
+      await Promise.all([fetchData(), loadNextBlock()])
     } catch (e: any) {
       showAlert('Fehler: ' + e.message)
     } finally {
@@ -577,8 +622,8 @@ export default function CalendarPage() {
       <div className="space-y-3">
         <p className="text-sm text-muted">
           {source === 'preview'
-            ? 'Wohin posten? Die Einteilung wird gespeichert und ersetzt die bisherigen Zuweisungen im Halbjahr.'
-            : 'Wohin posten? Die gespeicherte Einteilung wird gepostet und gepinnt.'}
+            ? 'Wohin posten? Der Block wird gespeichert und als neue Nachricht gepostet und gepinnt, zusammen mit den noch offenen Terminen der jetzigen Einteilung.'
+            : 'Wohin posten? Die aktuelle Einteilung kommt noch einmal als neue Nachricht, ganz unten, und wird gepinnt.'}
         </p>
         <Button variant="secondary" block onClick={() => commitRotation(true, source)} disabled={rotationCommitting}>
           {rotationCommitting ? 'Sende …' : 'Sandbox-Gruppe (Test)'}
@@ -743,9 +788,32 @@ export default function CalendarPage() {
 
 
       <Section title="Einteilung">
+        {nextBlock && nextBlock.length > 0 && (
+          <>
+            <p className="mb-2 text-sm text-muted">
+              Nächster Block ·{' '}
+              {nextBlock.every(p => p.posted)
+                ? 'gepostet'
+                : nextBlock.some(p => p.helpers.length > 0)
+                  ? 'Entwurf, noch nicht gepostet'
+                  : 'noch leer, entsteht nach dem vorletzten Termin'}
+            </p>
+            <List className="mb-3">
+              {nextBlock.map(p => (
+                <Row key={p.eventId} onClick={() => loadRotationPreview('saved')}>
+                  <span className="w-24 shrink-0 text-sm font-medium">{formatDate(p.eventDate)}</span>
+                  <span className="min-w-0 flex-1 text-sm text-muted">
+                    {p.helpers.length ? p.helpers.map(h => h.name + (h.isSenior ? ' (S)' : h.isATeam ? ' (A)' : '')).join(' + ') : 'noch offen'}
+                  </span>
+                  <ChevronRight />
+                </Row>
+              ))}
+            </List>
+          </>
+        )}
         <div className="space-y-2">
-          <Button variant="primary" block onClick={openRotationSetup}>
-            Halbjahr einteilen
+          <Button variant="primary" block onClick={() => loadRotationPreview(nextBlock?.some(p => p.helpers.length > 0 && !p.posted) ? 'saved' : 'new')} disabled={rotationLoading}>
+            {rotationLoading ? 'Lade …' : nextBlock?.some(p => p.helpers.length > 0 && !p.posted) ? 'Entwurf prüfen und tauschen' : 'Nächsten Block ziehen'}
           </Button>
           <Button
             variant="secondary"
@@ -753,7 +821,7 @@ export default function CalendarPage() {
             onClick={() => setPostChoice('current')}
             disabled={!upcomingEvents.some(e => (e.assignments?.length ?? 0) > 0)}
           >
-            Gespeicherte Einteilung posten
+            Aktuelle Einteilung neu posten (ganz unten)
           </Button>
           <Button variant="secondary" block onClick={loadParentPreview} disabled={parentLoading}>
             {parentLoading && !parentPreview ? 'Berechne …' : 'Eltern einteilen (Essen, Samstage)'}
@@ -853,18 +921,17 @@ export default function CalendarPage() {
       <Sheet
         open={!!rotationPreview}
         onClose={() => { setRotationPreview(null); setRotationMessage(null); setPostChoice(null) }}
-        title="Einteilungs-Vorschlag"
+        title="Nächster Block"
         locked={rotationCommitting}
       >
         {rotationPreview && (
           <>
-            <p className="mb-1 font-medium">{rotationWindow?.label}</p>
             <p className="mb-4 text-sm text-muted">
-              {rotationPreview.length} Termine · {rotationHelpers.seniors} Senioren · {rotationHelpers.juniors} Junioren
+              {rotationPreview.length} Termine · Tippe auf einen Namen zum Tauschen, ★ = liegt am weitesten zurück.
             </p>
 
             {rotationPreview.length === 0 ? (
-              <Empty>Keine Termine im Halbjahr.</Empty>
+              <Empty>Keine weiteren Termine im Kalender.</Empty>
             ) : (
               <List className="mb-5">
                 {rotationPreview.map(p => (
@@ -888,12 +955,12 @@ export default function CalendarPage() {
                                 aria-label="Helfer tauschen"
                                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                               >
-                                {helpers.map(opt => (
-                                  <option key={opt.id} value={opt.id}>{opt.name}</option>
+                                {swapOptions(h, p.helpers.map(x => x.id)).map(opt => (
+                                  <option key={opt.id} value={opt.id}>{opt.label}</option>
                                 ))}
                               </select>
                             </label>
-                            <Badge tone={h.isSenior ? 'warn' : 'outline'}>{h.isSenior ? 'Senior' : 'Junior'}</Badge>
+                            <Badge tone={h.isSenior ? 'warn' : h.isATeam ? 'accent' : 'outline'}>{h.isSenior ? 'Senior' : h.isATeam ? 'A-Team' : 'Junior'}</Badge>
                           </p>
                         ))}
                       </div>
@@ -934,11 +1001,14 @@ export default function CalendarPage() {
                 )}
                 {postChoice === 'preview' ? renderPostTargets('preview') : (
                   <>
-                    <Button variant="primary" block onClick={() => setPostChoice('preview')}>
-                      Speichern und posten …
+                    <Button variant="primary" block onClick={saveRotationDraft} disabled={rotationCommitting}>
+                      {rotationCommitting ? 'Speichere …' : 'Als Entwurf speichern'}
                     </Button>
-                    <Button variant="ghost" block onClick={() => loadRotationPreview(rotationLastIds)} disabled={rotationLoading}>
-                      {rotationLoading ? 'Berechne …' : 'Neu berechnen'}
+                    <Button variant="secondary" block onClick={() => setPostChoice('preview')} disabled={rotationCommitting}>
+                      Speichern und jetzt posten …
+                    </Button>
+                    <Button variant="ghost" block onClick={() => loadRotationPreview('new')} disabled={rotationLoading || rotationCommitting}>
+                      {rotationLoading ? 'Berechne …' : 'Neu ziehen'}
                     </Button>
                   </>
                 )}
@@ -1000,34 +1070,6 @@ export default function CalendarPage() {
                 </div>
               </>
             )}
-          </>
-        )}
-      </Sheet>
-
-      {/* Halbjahr einteilen, Schritt 1: wer war zuletzt dran */}
-      <Sheet open={rotationSetup !== null} onClose={() => setRotationSetup(null)} title="Halbjahr einteilen" locked={rotationLoading}>
-        {rotationSetup && (
-          <>
-            <p className="mb-1 text-sm text-muted">
-              Wer hat zuletzt Jungschar gemacht? Zählt schon als ein Einsatz und kommt beim ersten Termin nicht dran.
-            </p>
-            {lastEventWithTeam() && (
-              <p className="mb-3 text-xs text-muted">Vorausgewählt: Team vom {formatDate(lastEventWithTeam()!.event_date)}</p>
-            )}
-            <List className="mb-5">
-              {helpers.map(h => (
-                <CheckRow
-                  key={h.id}
-                  label={h.name}
-                  checked={rotationSetup.includes(h.id)}
-                  onClick={() => toggleRotationSetup(h.id)}
-                  meta={<Badge tone={h.is_senior ? 'warn' : 'outline'}>{h.is_senior ? 'Senior' : 'Junior'}</Badge>}
-                />
-              ))}
-            </List>
-            <Button variant="primary" block onClick={() => loadRotationPreview(rotationSetup)} disabled={rotationLoading}>
-              {rotationLoading ? 'Berechne …' : 'Einteilung berechnen'}
-            </Button>
           </>
         )}
       </Sheet>

@@ -3,7 +3,7 @@ import { formatDate } from '@/utils/format'
 import { getHelperByTelegramId, registerHelper, getHelperAssignments } from './helpers'
 import { getNextEvent, getUpcomingEvents, getEventById, getHelperNames } from './events'
 import { recordVote } from './attendance'
-import { handleReviewCallback, handleReviewText } from './review-ping'
+import { handleReviewCallback, handleReviewText, openReviewTextAt } from './review-ping'
 import { ADMIN_TELEGRAM_USER_IDS, APP_URL, isAdmin } from './admins'
 import { sendTelegramMessage, wasReminderSent } from './reminders'
 import {
@@ -51,10 +51,11 @@ import { BUG_PHOTO_NEEDS_TEXT, BUG_PROMPT, saveFeedback } from './feedback'
 
 // Wartet auf den Namen nach erfolgreichem /register (in-memory, Cold-Start setzt zurück)
 const pendingRegistrations = new Set<number>()
-// Wartet auf den Freitext nach /idee — Fallback, falls jemand nicht "antwortet"
-const pendingIdeas = new Set<number>()
-// Wartet auf den Text nach /bug
-const pendingBugs = new Set<number>()
+// Wartet auf den Freitext nach /idee — Fallback, falls jemand nicht "antwortet".
+// Wert = Zeitpunkt der Frage, damit eine danach geöffnete Bewertung Vorrang hat.
+const pendingIdeas = new Map<number, number>()
+// Wartet auf den Text nach /feedback (Wert wie oben)
+const pendingBugs = new Map<number, number>()
 // Alben kommen als mehrere Nachrichten mit gleicher media_group_id: nur einmal antworten.
 const answeredAlbums = new Set<string>()
 
@@ -128,13 +129,13 @@ function helpFor(role: Role): string {
     lines.push('/register CODE – als Helfer registrieren')
   }
   if (role.helper || role.parent || role.admin) {
-    lines.push('', '/bug – Fehler oder Wunsch zum Bot melden')
+    lines.push('', '/feedback – Fehler, Wunsch oder Idee zum Bot')
   }
   lines.push('', '/help – diese Übersicht')
   return lines.join('\n').trim()
 }
 
-type Payload = 'idee' | 'invite' | 'inspo' | 'bug'
+type Payload = 'idee' | 'invite' | 'inspo' | 'feedback'
 
 /** Button, der den privaten Chat mit dem Bot öffnet und dort direkt {payload} startet. */
 function privateChatButton(ctx: Context, payload: Payload) {
@@ -183,9 +184,9 @@ function roleLabel(role: Role): string {
   return 'unbekannt'
 }
 
-/** /bug: nach der Meldung fragen (privat oder per DM). */
+/** /feedback: nach der Meldung fragen (privat oder per DM). */
 async function startBugFlow(uid: number, reply: Reply) {
-  pendingBugs.add(uid)
+  pendingBugs.set(uid, Date.now())
   await reply(BUG_PROMPT, {
     reply_markup: { force_reply: true, input_field_placeholder: 'Was ist dir aufgefallen?' },
   })
@@ -193,7 +194,7 @@ async function startBugFlow(uid: number, reply: Reply) {
 
 /** /idee: nach der Idee fragen (privat oder per DM). */
 async function startIdeaFlow(uid: number, reply: Reply) {
-  pendingIdeas.add(uid)
+  pendingIdeas.set(uid, Date.now())
   await reply(IDEA_PROMPT, {
     reply_markup: { force_reply: true, input_field_placeholder: 'Worauf hat dein Kind Lust?' },
   })
@@ -248,7 +249,7 @@ const replyVia = (ctx: Context): Reply => (text, extra) => ctx.reply(text, extra
  * Richtet alle Bot Commands ein
  */
 /** Befehle, auf die der Bot in fremden Gruppen (z. B. Elterngruppe) reagiert: per DM. */
-const GROUP_PRIVATE_COMMANDS = new Set(['idee', 'invite', 'einladen', 'bug'])
+const GROUP_PRIVATE_COMMANDS = new Set(['idee', 'invite', 'einladen', 'feedback', 'bug'])
 
 /** Befehlsmenü im privaten Chat je Rolle (setMyCommands mit scope chat). */
 function commandsFor(role: Role): { command: string; description: string }[] {
@@ -273,7 +274,7 @@ function commandsFor(role: Role): { command: string; description: string }[] {
       { command: 'send', description: 'Fotos und Videos in den Elternchat posten' },
     )
   }
-  if (role.parent || role.helper || role.admin) list.push({ command: 'bug', description: 'Fehler oder Wunsch zum Bot melden' })
+  if (role.parent || role.helper || role.admin) list.push({ command: 'feedback', description: 'Fehler, Wunsch oder Idee zum Bot' })
   if (!role.parent && !role.helper && !role.admin) list.push({ command: 'register', description: 'Als Helfer registrieren (mit Code)' })
   list.push({ command: 'help', description: 'Befehle anzeigen' })
   return list
@@ -281,7 +282,7 @@ function commandsFor(role: Role): { command: string; description: string }[] {
 
 export function setupBotCommands(bot: Bot) {
   // Gruppen außer der Helfer-Gruppe (z. B. Elterngruppe): Nur /idee, /invite,
-  // /bug, und die per DM. Alles andere ignoriert der Bot dort still,
+  // /feedback, und die per DM. Alles andere ignoriert der Bot dort still,
   // damit in der Elterngruppe keine Bot-Dialoge auftauchen. In der Helfer-
   // Gruppe funktionieren alle Befehle wie gehabt.
   bot.on('message:entities:bot_command', async (ctx, next) => {
@@ -307,7 +308,7 @@ export function setupBotCommands(bot: Bot) {
       return
     }
 
-    if (ctx.chat.type === 'private' && ['idee', 'invite', 'einladen', 'inspo', 'bug'].includes(payload)) {
+    if (ctx.chat.type === 'private' && ['idee', 'invite', 'einladen', 'inspo', 'feedback', 'bug'].includes(payload)) {
       if (!role.helper && !role.parent && !role.admin) {
         await ctx.reply(UNKNOWN)
         return
@@ -320,7 +321,7 @@ export function setupBotCommands(bot: Bot) {
         await sendFoodInspo(String(ctx.chat.id))
         return
       }
-      if (payload === 'bug') {
+      if (payload === 'feedback' || payload === 'bug') {
         await startBugFlow(ctx.from!.id, replyVia(ctx))
         return
       }
@@ -490,14 +491,15 @@ export function setupBotCommands(bot: Bot) {
     await startInviteFlow(replyVia(ctx), role)
   })
 
-  // /bug – Fehler, Wunsch oder Idee zu Bot und App (alle Bekannten, privat)
-  bot.command('bug', async (ctx) => {
+  // /feedback – Fehler, Wunsch oder Idee zu Bot und App (alle Bekannten, privat).
+  // /bug ist der alte Name: nicht mehr im Menü, wird aber still weiter angenommen.
+  bot.command(['feedback', 'bug'], async (ctx) => {
     if (!ctx.from) return
     const uid = ctx.from.id
     const role = await roleOf(ctx)
     const known = !!(role.helper || role.parent || role.admin)
     if (ctx.chat.type !== 'private') {
-      await continueInPrivate(ctx, 'bug', (reply) => (known ? startBugFlow(uid, reply) : reply(UNKNOWN).then(() => {})))
+      await continueInPrivate(ctx, 'feedback', (reply) => (known ? startBugFlow(uid, reply) : reply(UNKNOWN).then(() => {})))
       return
     }
     if (!known) {
@@ -606,7 +608,7 @@ export function setupBotCommands(bot: Bot) {
 
     const repliedTo = ctx.message.reply_to_message?.text
 
-    // Screenshot zu /bug: Bildunterschrift = Meldung.
+    // Screenshot zu /feedback: Bildunterschrift = Meldung.
     if (ctx.message.photo && (pendingBugs.has(ctx.from.id) || repliedTo === BUG_PROMPT || repliedTo === BUG_PHOTO_NEEDS_TEXT)) {
       const groupKey = ctx.message.media_group_id ?? `single_${ctx.message.message_id}`
       if (answeredAlbums.has(groupKey)) return
@@ -723,8 +725,14 @@ export function setupBotCommands(bot: Bot) {
 
     const repliedTo = ctx.message.reply_to_message?.text
 
-    // Antwort auf /bug
-    if (repliedTo === BUG_PROMPT || repliedTo === BUG_PHOTO_NEEDS_TEXT || pendingBugs.has(telegramUserId)) {
+    // Ohne ausdrückliches "Antworten" gewinnt die zuletzt gestellte Frage:
+    // wer nach /idee oder /feedback noch in der Abend-Bewertung auf Drinnen/Draußen
+    // tippt, meint mit dem nächsten Text die Bewertung.
+    const reviewAt = await openReviewTextAt(telegramUserId)
+    const newerThanReview = (askedAt?: number) => askedAt != null && (reviewAt == null || askedAt > reviewAt)
+
+    // Antwort auf /feedback
+    if (repliedTo === BUG_PROMPT || repliedTo === BUG_PHOTO_NEEDS_TEXT || newerThanReview(pendingBugs.get(telegramUserId))) {
       pendingBugs.delete(telegramUserId)
       const role = await roleOf(ctx)
       const name = role.parent?.name ?? role.helper?.name ?? ctx.from?.first_name ?? 'Unbekannt'
@@ -739,7 +747,7 @@ export function setupBotCommands(bot: Bot) {
     }
 
     // Antwort auf /idee (per "Antworten" oder direkt danach)
-    if (repliedTo === IDEA_PROMPT || repliedTo === IDEA_PHOTO_NEEDS_TEXT || pendingIdeas.has(telegramUserId)) {
+    if (repliedTo === IDEA_PROMPT || repliedTo === IDEA_PHOTO_NEEDS_TEXT || newerThanReview(pendingIdeas.get(telegramUserId))) {
       pendingIdeas.delete(telegramUserId)
       const role = await roleOf(ctx)
       const name = role.parent?.name ?? role.helper?.name ?? ctx.from?.first_name ?? 'Unbekannt'
@@ -760,7 +768,12 @@ export function setupBotCommands(bot: Bot) {
       (html) => ctx.reply(html, { parse_mode: 'HTML' }),
       ctx.from?.first_name || ctx.from?.username || 'Jemand',
     )
-    if (handled) return
+    if (handled) {
+      // Die ältere /idee- bzw. /feedback-Frage ist damit überholt.
+      pendingIdeas.delete(telegramUserId)
+      pendingBugs.delete(telegramUserId)
+      return
+    }
 
     if (pendingRegistrations.has(telegramUserId)) {
       pendingRegistrations.delete(telegramUserId)

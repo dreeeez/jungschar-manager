@@ -3,7 +3,7 @@ import { sendTelegramMessage } from './reminders'
 import { ADMIN_TELEGRAM_USER_IDS } from './admins'
 
 /**
- * /bug: Fehler, Wünsche und Ideen zu Bot und App. Für alle, die der Bot
+ * /feedback (alt: /bug): Fehler, Wünsche und Ideen zu Bot und App. Für alle, die der Bot
  * kennt. Landet in `feedback`, Admins bekommen sofort eine DM und sehen die
  * Liste in der Mini-App unter „Feedback“. Der Melder bekommt nur das Danke,
  * keine weitere DM (Eltern werden nie aktiv angeschrieben).
@@ -33,7 +33,7 @@ export async function saveFeedback(
 
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const note =
-    `🐞 <b>Feedback von ${esc(by.name)}</b> (${esc(by.role)})${photoFileId ? ' 📷' : ''}\n` +
+    `💬 <b>Feedback von ${esc(by.name)}</b> (${esc(by.role)})${photoFileId ? ' 📷' : ''}\n` +
     `${esc(clean.length > 600 ? clean.slice(0, 599) + '…' : clean)}\n\n` +
     'Liste und Abhaken: Mini-App → Feedback.'
   for (const adminId of ADMIN_TELEGRAM_USER_IDS) {

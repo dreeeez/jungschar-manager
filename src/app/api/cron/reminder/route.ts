@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { processReminders } from '@/services/reminders'
 import { syncJungscharEvents } from '@/services/ical-sync'
 import { postBirthdayGreetings } from '@/services/parents-bot'
+import { processRotationBlocks } from '@/services/rotation'
 
 export async function GET(req: NextRequest) {
   // Verify cron secret to prevent unauthorized access
@@ -48,10 +49,20 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Keine Auto-Rotation mehr: Einteilungen entstehen nur über den Button
-    // "Halbjahr einteilen" in der Mini-App.
     const result = await processReminders(chatId, isTest ? parseInt(testStage!) : undefined)
-    return NextResponse.json({ ...result, icalSync, birthdays })
+
+    // Einteilung in Blöcken: Entwurf nach dem vorletzten, Post nach dem letzten
+    // Termin des gepinnten Blocks (nur live).
+    let rotation = null
+    if (!isTest) {
+      try {
+        rotation = await processRotationBlocks()
+      } catch (e: any) {
+        console.error('Rotation blocks failed:', e)
+        rotation = { error: e.message }
+      }
+    }
+    return NextResponse.json({ ...result, icalSync, birthdays, rotation })
   } catch (error) {
     console.error('Error in reminder cron:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

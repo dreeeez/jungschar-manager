@@ -439,6 +439,54 @@ const STAGE1_TEMPLATES: Array<(c: Stage1Ctx) => string> = [
     `🚀 <b>Mission Briefing — T-minus 7 Tage:</b>\n\n` +
     `${stage1Info(c, 'Astronauten')}\n` +
     `\nAlle Systeme bereit machen 🛰️`,
+
+  // 8. Kochshow
+  (c) =>
+    `👨‍🍳 <b>Nächste Woche in der Show-Küche:</b>\n\n` +
+    `${stage1Info(c, 'Chefköche')}\n` +
+    `\nSchürze bügeln, Rezept ausdenken 🍳`,
+
+  // 9. Lotto-Ziehung
+  (c) =>
+    `🎱 <b>Die Ziehung der Woche:</b>\n\n` +
+    `${stage1Info(c, 'Die Glückszahlen')}\n` +
+    `\nKein Rubbellos nötig, ihr habt schon gewonnen 🍀`,
+
+  // 10. Navi
+  (c) =>
+    `🧭 <b>Route wird berechnet …</b>\n\n` +
+    `${stage1Info(c, 'Fahrer')}\n` +
+    `\nIn 7 Tagen: Sie haben Ihr Ziel erreicht 🏁`,
+
+  // 11. Paketverfolgung
+  (c) =>
+    `📦 <b>Ihre Sendung ist unterwegs:</b>\n\n` +
+    `${stage1Info(c, 'Empfänger')}\n` +
+    `\nZustellung in ca. einer Woche. Annahme verweigern zwecklos 😄`,
+
+  // 12. Superhelden
+  (c) =>
+    `🦸 <b>Das Helden-Signal leuchtet:</b>\n\n` +
+    `${stage1Info(c, 'Heldenteam')}\n` +
+    `\nUmhang bügeln, Plan schmieden 💥`,
+
+  // 13. Eilmeldung
+  (c) =>
+    `📰 <b>Eilmeldung aus der Zukunft:</b>\n\n` +
+    `${stage1Info(c, 'Im Einsatz')}\n` +
+    `\nMehr dazu in einer Woche, bleibt dran 🎙️`,
+
+  // 14. Krimi
+  (c) =>
+    `🕵️ <b>Neuer Fall eröffnet:</b>\n\n` +
+    `${stage1Info(c, 'Ermittler')}\n` +
+    `\nIndizien sammeln, Plan schmieden 🔍`,
+
+  // 15. Bahnhof
+  (c) =>
+    `🚂 <b>Nächster Halt: Jungschar</b>\n\n` +
+    `${stage1Info(c, 'Zugbegleiter')}\n` +
+    `\nAusstieg in Fahrtrichtung, in einer Woche 🎫`,
 ]
 
 function pickStage1Template(): (c: Stage1Ctx) => string {

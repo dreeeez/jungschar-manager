@@ -13,7 +13,7 @@ const NAV = [
   { href: '/ideas', title: 'Archiv', description: 'Vergangene Termine', color: PAGE_COLORS.archive, icon: Icons.archive },
   { href: '/pool', title: 'Ideenpool', description: 'Was wir mal machen könnten', color: PAGE_COLORS.pool, icon: Icons.bulb },
   { href: '/status', title: 'Bot-Status', description: 'Health, nächste Nachricht, Pings', color: PAGE_COLORS.status, icon: Icons.activity },
-  { href: '/feedback', title: 'Feedback', description: 'Meldungen aus /bug', color: PAGE_COLORS.status, icon: Icons.bulb },
+  { href: '/feedback', title: 'Feedback', description: 'Meldungen aus /feedback', color: PAGE_COLORS.status, icon: Icons.bulb },
   { href: '/settings', title: 'Einstellungen', description: 'Termin-Sync, Wetter', color: PAGE_COLORS.settings, icon: Icons.settings },
 ]
 
@@ -22,7 +22,7 @@ export default function Home() {
   const [openFeedback, setOpenFeedback] = useState<number | null>(null)
   const name = helper?.name ?? user?.first_name ?? ''
 
-  // Zahl der offenen /bug-Meldungen in der Feedback-Zeile.
+  // Zahl der offenen /feedback-Meldungen in der Feedback-Zeile.
   useEffect(() => {
     ;(supabase as any)
       .from('feedback')

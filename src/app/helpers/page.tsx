@@ -12,6 +12,7 @@ interface Helper {
   telegram_username: string | null
   is_admin: boolean
   is_senior: boolean
+  is_ateam: boolean
 }
 
 export default function HelpersPage() {
@@ -50,6 +51,20 @@ export default function HelpersPage() {
     }
   }
 
+  /** A-Team (Work and Travel): kommt in der Einteilung nur gemeinsam als Duo dran. */
+  async function toggleATeam(helper: Helper) {
+    const next = !helper.is_ateam
+    setHelpers(prev => prev.map(h => h.id === helper.id ? { ...h, is_ateam: next } : h))
+    const { error } = await (supabase as any)
+      .from('helpers')
+      .update({ is_ateam: next })
+      .eq('id', helper.id)
+    if (error) {
+      showAlert('Fehler: ' + error.message)
+      setHelpers(prev => prev.map(h => h.id === helper.id ? { ...h, is_ateam: helper.is_ateam } : h))
+    }
+  }
+
   async function deleteHelper(id: string, name: string) {
     const confirmed = await showConfirm(`"${name}" wirklich löschen?`)
     if (!confirmed) return
@@ -73,7 +88,7 @@ export default function HelpersPage() {
       title="Helfer"
       back="/"
       accent="helpers"
-      subtitle="Neue Helfer registrieren sich im Bot mit /register."
+      subtitle="Neue Helfer registrieren sich im Bot mit /register. A-Team kommt nur gemeinsam als Duo dran."
     >
       {helpers.length === 0 ? (
         <Empty>Noch keine Helfer vorhanden</Empty>
@@ -91,6 +106,9 @@ export default function HelpersPage() {
                   {helper.is_admin && <Badge tone="accent">Admin</Badge>}
                   <Badge tone={helper.is_senior ? 'warn' : 'outline'} onClick={() => toggleSenior(helper)}>
                     Senior
+                  </Badge>
+                  <Badge tone={helper.is_ateam ? 'accent' : 'outline'} onClick={() => toggleATeam(helper)}>
+                    A-Team
                   </Badge>
                 </div>
               </div>

@@ -29,12 +29,12 @@ src/
     ideas/          Mini-App: Aktivitäten-History
     ideen/          Mini-App: Ideenpool nur lesend, einzige Seite für Helfer
     settings/       Mini-App: Wetter-Ort, ICS-Upload
-    api/idea-photo/ Bild einer /idee oder eines /bug aus Telegram durchreichen (Session nötig)
-    feedback/       Mini-App: Meldungen aus /bug, abhaken (nur Admins)
+    api/idea-photo/ Bild einer /idee oder eines /feedback aus Telegram durchreichen (Session nötig)
+    feedback/       Mini-App: Meldungen aus /feedback, abhaken (nur Admins)
   components/ui.tsx UI-Bausteine der Mini-App (Page mit Seitenfarbe, Karten, Badges, Sheet, Icons) — keine Emojis in der UI
   services/         Server-side Business-Logik
     reminders.ts          Reminder-Engine (Stage 1/2/3)
-    poll-reminder.ts      Donnerstag-Ping mit 20 Templates
+    poll-reminder.ts      Donnerstag-Ping mit 30 Templates
     bot-commands.ts       Telegram-Befehle + Callback-Handler
     helpers.ts / parents.ts / events.ts / attendance.ts / weather.ts
     database.ts           Supabase-Client (Service-Role)
@@ -54,9 +54,9 @@ Vier zeitlich gestaffelte Reminder-Pings, alle vom täglichen Vercel-Cron `0 8 *
 
 | Wann | Endpoint | Stage | Inhalt |
 |---|---|---|---|
-| Sonntag 5–8 Tage vor Event (Fr- und Sa-Termine) | `/api/cron/reminder` (Stage 1) | `stage1_sunday` | Heads-up — 7 rotierende Themes (Spy, Glaskugel, Wettervorhersage, Spotify Wrapped, Stadion, Festival, Mission Control) + fester Top-Header `+++ HEADS-UP +++` (kurz, sonst bricht er am Handy um). Essen nur bei Samstags-Terminen: `🏠 Einladung: Familie X lädt uns zu sich ein` (per `/invite`), sonst `🍽️ Essen: Familie X` (Elterndienst aus der Mini-App), sonst rotierend „Essen: diesmal von uns selbst. Werdet kreativ oder freimütig“. Danach als **eigene Nachricht** „💡 Frische Ideen von den Eltern“ (nur wenn es welche gibt): alle `/idee`-Einträge (`source='elterngruppe'`) seit der letzten Live-Nachricht Stage 1 oder 2 (`reminder_log.sent_at`, ohne frühere seit dem vorigen Termin) mit Name, Zeit und Text (gekürzt auf 300 Zeichen, 📷 bei Bild), Zeile „Alle Ideen“: Link `t.me/<bot>/<MINI_APP_SHORT_NAME>?startapp=ideen`, wenn in `admins.ts` ein Kurzname der benannten Mini-App (BotFather `/newapp`) steht, sonst die Anleitung „im Chat mit dem Bot unten auf Ideen tippen“. Die Haupt-Mini-App bleibt aus, sie zeigt allen „OPEN“, dahinter die Bilder als Album mit Name und Text als Caption |
+| Sonntag 5–8 Tage vor Event (Fr- und Sa-Termine) | `/api/cron/reminder` (Stage 1) | `stage1_sunday` | Heads-up — 15 rotierende Themes (Spy, Glaskugel, Wettervorhersage, Spotify Wrapped, Stadion, Festival, Mission Control, Kochshow, Lotto, Navi, Paket, Helden, Eilmeldung, Krimi, Bahnhof) + fester Top-Header `+++ HEADS-UP +++` (kurz, sonst bricht er am Handy um). Essen nur bei Samstags-Terminen: `🏠 Einladung: Familie X lädt uns zu sich ein` (per `/invite`), sonst `🍽️ Essen: Familie X` (Elterndienst aus der Mini-App), sonst rotierend „Essen: diesmal von uns selbst. Werdet kreativ oder freimütig“. Danach als **eigene Nachricht** „💡 Frische Ideen von den Eltern“ (nur wenn es welche gibt): alle `/idee`-Einträge (`source='elterngruppe'`) seit der letzten Live-Nachricht Stage 1 oder 2 (`reminder_log.sent_at`, ohne frühere seit dem vorigen Termin) mit Name, Zeit und Text (gekürzt auf 300 Zeichen, 📷 bei Bild), Zeile „Alle Ideen“: Link `t.me/<bot>/<MINI_APP_SHORT_NAME>?startapp=ideen`, wenn in `admins.ts` ein Kurzname der benannten Mini-App (BotFather `/newapp`) steht, sonst die Anleitung „im Chat mit dem Bot unten auf Ideen tippen“. Die Haupt-Mini-App bleibt aus, sie zeigt allen „OPEN“, dahinter die Bilder als Album mit Name und Text als Caption |
 | Mittwoch 2–4 Tage vor Event (Fr- und Sa-Termine) | `/api/cron/reminder` (Stage 2) | `stage2_wednesday` | `++ 🔥 Countdown: N Tage 🔥 ++` (nur zwei Plus, sonst Umbruch am Handy) mit Vote-Buttons (votey/votec/voten), kompakter Checkliste, ohne Essen. Danach wie bei Stage 1 die eigene Nachricht „Frische Ideen von den Eltern“, wenn seit dem Sonntag neue reinkamen |
-| Donnerstag 18:00 lokal | `/api/cron/poll-reminder` | (separates Cron) | Tagged Helfer ohne Vote-Eintrag, replyt zur Mittwochs-Nachricht. 20 rotierende `+++ … +++` Templates |
+| Donnerstag 18:00 lokal | `/api/cron/poll-reminder` | (separates Cron) | Tagged Helfer ohne Vote-Eintrag, replyt zur Mittwochs-Nachricht. 30 rotierende `+++ … +++` Templates |
 | Tag des Events 20:00 lokal | `/api/cron/review-ping` (Crons 18:00 + 19:00 UTC, sendet nur wenn Berlin ≥ 20 Uhr) | `review_pings` | DM an jede ID der Zugangsliste: Sterne-Buttons → Drinnen/Draußen → Freitext. Ergebnis wird `ideas`-Eintrag (`source='bot'`, Rating, Tag, Wetter). Sobald einer fertig ist, werden die DMs der anderen bearbeitet („X hat bereits bewertet“). Logik in `services/review-ping.ts`, Test: `?test=1&date=YYYY-MM-DD[&user=<id>]` |
 | Tag des Events 20:00 lokal | `/api/cron/review-ping` (derselbe Lauf) | `thanks_photos` | Danke in die Helfer-Gruppe (6 rotierende Templates, ohne Namen und Tags) + URL-Button „Momente festgehalten?“ → privater Chat mit dem Bot (`?start=fotos`). Nicht, wenn der Termin aus dem Kalender verschwunden ist. Im Test (`?test=1`) in die Sandbox, ohne Log |
 | Samstag morgen (Tag des Events) | `/api/cron/reminder` (Stage 3) | `stage3_saturday` | Aufwacher mit 6 rotierenden Themes + 18 rotierenden Bibelversen + festem `Ihr schafft das! Viel Spaß und Gottes Segen` Closing. Top-Header rotiert zwischen `+++ HEUTE / JUNGSCHAR-DAY / GAME ON / SHOWTIME / T-0 / DER TAG +++` |
@@ -70,15 +70,19 @@ Schedule-Logik in `services/reminders.ts:processReminders()`:
 
 `reminder_log` mit UNIQUE(event_id, reminder_type) verhindert Duplikate. **Testläufe (`?test=N`) loggen nicht**: ein Test-Eintrag würde den Live-Send desselben Termins unterdrücken und die Ideen-Liste („seit dem letzten Heads-up“) verschieben.
 
-## Halbjahres-Einteilung
+## Einteilung in Blöcken
 
-Kein Automatismus. Button „Halbjahr einteilen“ im Kalender (`services/rotation.ts`):
-- Fenster: HJ 1 = heute bis Ende Februar (ab September), HJ 2 = heute bis Ende August (ab März). Alle Termine im Fenster.
+Logik in `services/rotation.ts`, kein Halbjahr mehr (`halfYearWindow` gibt es nur noch für den Elterndienst).
+- **Block** = Termine einer gepinnten Einteilungs-Nachricht in der Helfer-Gruppe (gleiche `events.rotation_message_id`, `rotation_chat_id` = `TELEGRAM_CHAT_ID`). Der aktuelle Block ist die höchste `rotation_message_id` (`currentBlock`). Der nächste Block = die nächsten 4 Termine danach (`nextBlock`, `BLOCK_SIZE`); Zuweisungen dort ohne Live-Tag = **Entwurf**.
+- **Entwurf (automatisch):** Der tägliche Reminder-Cron ruft `processRotationBlocks()` (nur live). Ist nur noch ≤ 1 Termin des Blocks offen (vorletzter vorbei), zieht er den nächsten Block per Quote, speichert ihn und schickt Marco eine DM (`sendDraftDm`, nur `DRAFT_NOTIFY_IDS`) mit Button in die App. Einmal pro Block (`settings.rotation_draft_for_<message_id>`). **Gepostet wird nie automatisch.**
+- **Posten (von Hand, App → Kalender → Einteilung):** Karte „Nächster Block“ → Vorschau mit Tauschen (Auswahl sortiert nach Bilanz, ★ = liegt am weitesten zurück), „Neu ziehen“, „Nachricht ansehen“, „Als Entwurf speichern“ (`commit { proposals, draftOnly }`) oder „Speichern und jetzt posten …“ → Sandbox oder Helfer-Gruppe (`/api/rotation/commit[?test=1] { proposals }`). Die neue Nachricht enthält die **noch offenen Termine des alten Blocks** oben plus den neuen Block, wird gepinnt, der alte Pin gelöst. Sandbox-Posts markieren nichts und lösen keine Pins.
+- „Aktuelle Einteilung neu posten (ganz unten)“: offene Termine des aktuellen Blocks noch einmal als neue Nachricht, gepinnt (`commit` ohne Body).
+- Tausch im Termin-Sheet nach dem Posten: editiert die gepinnte Nachricht (`/api/rotation/rerender`) und schickt als Antwort darauf „🔄 Einteilung aktualisiert, bitte prüfen“ (`sendRotationUpdateHint`, höchstens alle 30 Min. pro Nachricht, `settings.rotation_hint_<id>`). Entwürfe bleiben still.
 - Paare: immer Senior + Junior (`helpers.is_senior`). Zwei Senioren nur, wenn ein Senior mindestens einen Einsatz zurückliegt. Zwei Junioren nie, sonst wird der Termin übersprungen.
-- Fair: pro Halbjahr gleich oft, Zähler startet bei 0, Vergangenheit zählt nicht. Gleichstände werden zufällig aufgelöst (wer beim vorherigen Termin dran war, wird gemieden), jeder Klick auf „Halbjahr einteilen“ liefert also eine neue Verteilung.
-- Ablauf: „Halbjahr einteilen“ → erst abfragen, wer zuletzt Jungschar gemacht hat (vorausgewählt: Team des letzten vergangenen Termins; zählt als ein Einsatz, kommt beim ersten Termin nicht dran) → berechnen (`POST /api/rotation/preview { lastHelperIds }`), Vorschau mit Namen tauschen, „Nachricht ansehen“ (`POST /api/rotation/message`), „Neu berechnen“ → „Speichern und posten …“ → Chat wählen: Sandbox oder Helfer-Gruppe (`/api/rotation/commit[?test=1]` mit `proposals`: Zuweisungen der Termine **ersetzen**, posten, pinnen).
-- „Gespeicherte Einteilung posten“: postet den aktuellen Stand ohne Neuberechnung (`/api/rotation/commit[?test=1]` ohne Body), Chat wählbar. Helfer-Tausch im Termin-Sheet editiert die gepinnte Nachricht (`rotation_message_id`). Lehnt Telegram ab, antwortet commit mit Fehler.
+- **A-Team** (`helpers.is_ateam`, Migration 016, Work and Travel, Stand 2026-11: Michael und Torkil): kommt nur gemeinsam als Duo dran, nie mit anderen. Liegt einer davon am weitesten zurück, ist das ganze Duo dran; gibt es nur ein A-Team-Mitglied, wird es nicht eingeteilt. Schalter „A-Team“ auf der Helfer-Seite.
+- Fair über die ganze Zeit (Quote, `loadBalance`): pro Helfer Bilanz = Ist (Einsätze aller Termine vor dem Block, auch schon eingeteilte) minus Soll (fairer Anteil an jedem Termin seit Registrierung bzw. erstem Einsatz; das Team eines Termins wird auf alle damals Dabeigewesenen verteilt). Wer am weitesten zurückliegt, kommt zuerst. Neue Helfer starten bei 0. Gleichstände (±0,5 Einsätze) werden zufällig aufgelöst, das Team des letzten Termins pausiert beim ersten neuen Termin.
 - Bei Termin-Ausfall rückt der Reminder-Cron die Duos weiter (`shiftRotationOnCancellation`).
+- Sandbox-Gruppe ist eine Supergruppe: `-1003402657014` (die alte ID `-3402657014` kennt Telegram nicht mehr).
 
 ## Elterndienst (Essen)
 
@@ -99,7 +103,7 @@ Mittwoch-Stage-2 sendet Inline-Buttons `votey_<event_id>` (Bin dabei) / `votec_<
 
 `getBirthdaysAroundEvent()` liefert Kinder mit Geburtstag ±3 Tage um das Event-Datum, Format `▶ 🎂 Name wird X (Tag. Mon.)` pro Kind. Nur Stage 1 + 2 zeigen Geburtstage, Stage 3 nicht.
 
-Info-Zeilen in Stage 1 + 2 beginnen mit `▶` (Datum · Wetter, Team, Essen, Geburtstage); Checkliste und Vote-Block nicht. Datum mit kurzem Monat (`formatDateShortMonth`: „Samstag, 31. Okt.“). Stage 1 hat in allen 7 Themes denselben Info-Block (`stage1Info`), nur Header, Team-Label und Closing wechseln.
+Info-Zeilen in Stage 1 + 2 beginnen mit `▶` (Datum · Wetter, Team, Essen, Geburtstage); Checkliste und Vote-Block nicht. Datum mit kurzem Monat (`formatDateShortMonth`: „Samstag, 31. Okt.“). Stage 1 hat in allen 15 Themes denselben Info-Block (`stage1Info`), nur Header, Team-Label und Closing wechseln.
 
 ## Wetter
 
@@ -150,14 +154,14 @@ Ideenpool → Button „Ideen in Helfer-Gruppe teilen“ (nur Admins) → bis zu
 | `/bilder` | Helfer, privat | eigene noch nicht gepostete Fotos/Videos einzeln, je mit Button „Rauswerfen“ (`phx_<id>`, nur eigene) |
 | `/review` | Admin, privat | alle noch nicht geposteten Fotos/Videos einzeln, je mit Button „Rauswerfen“ (`phx_<id>`, löscht die Zeile) |
 | `/send` (alt: `/senden`) | Admin, privat | Rückfrage → Album(s) in die Elterngruppe, Caption mit Text, `/idee` (+ `/invite`, wenn die nächste Jungschar samstags ist). `/send test` → Sandbox ohne Markierung |
-| `/bug` | Eltern + Helfer + Admins, privat | Fehler, Wunsch, Idee zu Bot/App: Text oder Screenshot mit Bildunterschrift → `feedback` (Migration 015: name, role, text, photo_file_id, done_at). Admins bekommen sofort eine DM; Mini-App → „Feedback“ (nur Admins): offene zuerst, „Erledigt“/„Wieder öffnen“, nichts wird gelöscht; Startseite zeigt „N offen“. Bild via `/api/idea-photo?kind=feedback&id=` |
+| `/feedback` (alt: `/bug`, nicht mehr im Menü) | Eltern + Helfer + Admins, privat | Fehler, Wunsch, Idee zu Bot/App: Text oder Screenshot mit Bildunterschrift → `feedback` (Migration 015: name, role, text, photo_file_id, done_at). Admins bekommen sofort eine DM; Mini-App → „Feedback“ (nur Admins): offene zuerst, „Erledigt“/„Wieder öffnen“, nichts wird gelöscht; Startseite zeigt „N offen“. Bild via `/api/idea-photo?kind=feedback&id=` |
 | `/chatid` | Admin | Chat-ID |
 
-**Befehle in Gruppen:** In fremden Gruppen (z. B. Elterngruppe) reagiert der Bot nur auf `/idee`, `/invite`, `/bug`, und zwar per DM (`/inspo` nur privat) (`continueInPrivate`), in der Gruppe sagt er nichts. Nur wenn die DM scheitert (Bot nie gestartet), antwortet er stumm in der Gruppe mit dem Button „Privat schreiben“. Alle anderen Befehle ignoriert er dort still (Middleware in `setupBotCommands`). Gelöscht wird nichts, keine Admin-Rechte nötig. In der Helfer-Gruppe (`TELEGRAM_CHAT_ID`) funktionieren alle Befehle wie gehabt. Befehlsmenü (`scripts/set-bot-commands.mjs`): Standard privat = Eltern-Sicht, in Gruppen leer, Helfer-Gruppe nur `/next`/`/status`; beim `/start` setzt der Bot pro privatem Chat das Menü je Rolle (`commandsFor`). In Gruppen-Posts des Bots stehen die Befehle deshalb als Links `t.me/<bot>?start=<payload>` mit Label `/idee` usw., die direkt den privaten Chat öffnen.
+**Befehle in Gruppen:** In fremden Gruppen (z. B. Elterngruppe) reagiert der Bot nur auf `/idee`, `/invite`, `/feedback`, und zwar per DM (`/inspo` nur privat) (`continueInPrivate`), in der Gruppe sagt er nichts. Nur wenn die DM scheitert (Bot nie gestartet), antwortet er stumm in der Gruppe mit dem Button „Privat schreiben“. Alle anderen Befehle ignoriert er dort still (Middleware in `setupBotCommands`). Gelöscht wird nichts, keine Admin-Rechte nötig. In der Helfer-Gruppe (`TELEGRAM_CHAT_ID`) funktionieren alle Befehle wie gehabt. Befehlsmenü (`scripts/set-bot-commands.mjs`): Standard privat = Eltern-Sicht, in Gruppen leer, Helfer-Gruppe nur `/next`/`/status`; beim `/start` setzt der Bot pro privatem Chat das Menü je Rolle (`commandsFor`). In Gruppen-Posts des Bots stehen die Befehle deshalb als Links `t.me/<bot>?start=<payload>` mit Label `/idee` usw., die direkt den privaten Chat öffnen.
 
 **Grundsatz Eltern:** der Bot schreibt Eltern nie aktiv per DM an. Eltern schreiben dem Bot (`/idee`, `/invite`, `/inspo`, `/termine`); Gruppen-Posts in die Elterngruppe (Fotos, Geburtstagsgruß) sind davon unberührt. Bewertung (review-ping) nur Admins, Fotos nur Helfer.
 
-Fotos und Videos (`services/photos.ts`, Tabelle `event_photos`, Migrationen 013 + 014 für `media_type` und `media_group_id`): abends 20:00 postet der review-ping-Cron die Danke-Nachricht mit dem Button „Momente festgehalten?“ in die Helfer-Gruppe. Der Button führt in den privaten Chat (ein Bot kann die Galerie nicht selbst öffnen); dort schicken nur Helfer/Admins Fotos und Videos → nur `file_id` + `media_type` (+ `media_group_id` bei Alben) gespeichert, zugeordnet zum Termin des Tages (bis 3 Tage danach); keine Info-DM an Admins beim Eingang. Unter der Bestätigung ein Button „Rauswerfen“ (`phu_<id>`) bzw. „Album rauswerfen“ (`phg_<media_group_id>`), Helfer nur eigene. Admins: `/review` (prüfen, rauswerfen), `/send` (Rückfrage → Album(s) à 10 in `TELEGRAM_ELTERN_CHAT_ID`, `posted_at` gesetzt; die Caption des ersten Albums = kurzer rotierender Text (6 Varianten) plus `/idee`-Zeile (6 Varianten) und `/invite`-Zeile (12 Varianten, nur wenn die nächste Jungschar an einem Samstag ist), beide als Direktlinks in den privaten Chat. Eine Nachricht, keine zweite Blase).
+Fotos und Videos (`services/photos.ts`, Tabelle `event_photos`, Migrationen 013 + 014 für `media_type` und `media_group_id`): abends 20:00 postet der review-ping-Cron die Danke-Nachricht mit dem Button „Momente festgehalten?“ in die Helfer-Gruppe. Der Button führt in den privaten Chat (ein Bot kann die Galerie nicht selbst öffnen); dort schicken nur Helfer/Admins Fotos und Videos → nur `file_id` + `media_type` (+ `media_group_id` bei Alben) gespeichert, zugeordnet zum Termin des Tages (bis 3 Tage danach); keine Info-DM an Admins beim Eingang. Unter der Bestätigung ein Button „Rauswerfen“ (`phu_<id>`) bzw. „Album rauswerfen“ (`phg_<media_group_id>`), Helfer nur eigene. Admins: `/review` (prüfen, rauswerfen), `/send` (Rückfrage → Album(s) à 10 in `TELEGRAM_ELTERN_CHAT_ID`, `posted_at` gesetzt; die Caption des letzten Albums (ganz unten) = kurzer rotierender Text (6 Varianten) plus `/idee`-Zeile (6 Varianten) und `/invite`-Zeile (12 Varianten, nur wenn die nächste Jungschar an einem Samstag ist), beide als Direktlinks in den privaten Chat. Eine Nachricht, keine zweite Blase).
 
 Geburtstagsgruß: der tägliche Reminder-Cron postet in `TELEGRAM_ELTERN_CHAT_ID` für Kinder mit Geburtstag heute, einmal pro Tag (`settings.last_birthday_greeting`).
 
@@ -223,7 +227,7 @@ Optional:
 ## Schemas (kompakt)
 
 ```sql
-helpers (id, name, telegram_user_id UNIQUE, telegram_username, is_admin)
+helpers (id, name, telegram_user_id UNIQUE, telegram_username, is_admin, is_senior, is_ateam, created_at)
 events (id, event_date UNIQUE, title, description)
 assignments (event_id, helper_id) UNIQUE(event_id, helper_id)
 parents (id, name, telegram_username, active)
