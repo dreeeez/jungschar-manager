@@ -248,7 +248,7 @@ const CAPTION_TEMPLATES: Array<(w: string) => string> = [
   (w) => `📸 <b>Jungschar ${w} in Bildern</b>\nAlle Kinder heil zurück, nur die Hosen haben gelitten 😄`,
   (w) => `📸 <b>Beweisfotos ${w}</b>\nFalls jemand fragt, was in der Jungschar so passiert: das hier 😎`,
   (w) => `📸 <b>Ein paar Momente ${w}</b>\nLaut, dreckig, glücklich. Genau so soll es sein!`,
-  (w) => `📸 <b>Highlights ${w}</b>\nDanke fürs Ausleihen eurer Kinder, wir hatten richtig Spaß!`,
+  (w) => `📸 <b>Highlights ${w}</b>\nDanke, dass eure Kinder dabei waren, wir hatten richtig Spaß!`,
   (w) => `📸 <b>Frisch aus der Jungschar ${w}</b>\nDas Programm stand, das Wetter hat mitgespielt, die Kinder sowieso 🙌`,
 ]
 
