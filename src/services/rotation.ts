@@ -29,6 +29,14 @@ import { APP_URL } from './admins'
 
 const HELPERS_PER_EVENT = 2
 export const BLOCK_SIZE = 4
+/**
+ * A-Team (Work and Travel) in der Einteilung berücksichtigen? Aktuell aus
+ * (Wunsch Marco, 2026-11-21): A-Team-Helfer werden gar nicht eingeteilt und
+ * zählen auch nicht ins Soll der anderen. Markierung in der App bleibt;
+ * zum Einschalten auf true setzen.
+ */
+const ATEAM_IN_ROTATION = false
+
 /** Bekommt die DM, wenn ein neuer Entwurf steht (Marco). */
 const DRAFT_NOTIFY_IDS = [5856427770]
 /** Hinweis nach Tauschen höchstens alle 30 Minuten (ein Tausch = zwei Änderungen). */
@@ -195,7 +203,7 @@ export interface PlanResult {
  * aller Termine davor. Schreibt nichts.
  */
 async function planEvents(events: { id: string; event_date: string }[]): Promise<PlanResult> {
-  const helpers = await loadHelpers()
+  const helpers = (await loadHelpers()).filter(h => ATEAM_IN_ROTATION || !h.isATeam)
   const seniors = helpers.filter(h => h.isSenior).length
   const result: PlanResult = { proposals: [], skipped: [], helpers: { seniors, juniors: helpers.length - seniors }, balances: {} }
   if (events.length === 0 || helpers.length < HELPERS_PER_EVENT) return result
