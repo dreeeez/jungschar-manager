@@ -174,28 +174,36 @@ export async function processReviewPings(opts: {
   for (const uid of recipients) {
     if (alreadyPinged.has(uid) && !isTest) continue
 
-    const text = `${header(event)}\n\nBewerte mit Sternen:\n\n<i>Fotos oder Videos von heute? Schick sie mir einfach hier rein. /review zeigt alles, /send postet es in den Elternchat.</i>`
-    const res = await sendTelegramMessage(String(uid), text, starsKeyboard((event as any).id))
-    if (!res?.ok) {
-      result.failed.push({ userId: uid, error: res?.description ?? 'unbekannt' })
-      continue
-    }
+    // Pro Empfänger abgesichert: ein Fehler (Telegram, Datenbank) stoppt nicht
+    // die anderen DMs und nicht die Danke-Nachricht danach.
+    try {
+      const text = `${header(event)}\n\nBewerte mit Sternen:\n\n<i>Fotos oder Videos von heute? Schick sie mir einfach hier rein. /review zeigt alles, /send postet es in den Elternchat.</i>`
+      const res = await sendTelegramMessage(String(uid), text, starsKeyboard((event as any).id))
+      if (!res?.ok) {
+        result.failed.push({ userId: uid, error: res?.description ?? 'unbekannt' })
+        continue
+      }
 
-    await db.from('review_pings').upsert(
-      {
-        event_id: (event as any).id,
-        telegram_user_id: uid,
-        chat_id: uid,
-        message_id: res.result.message_id,
-        state: 'stars',
-        stars: null,
-        place: null,
-        is_test: isTest,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'event_id,telegram_user_id' },
-    )
-    result.sent.push(uid)
+      const { error } = await db.from('review_pings').upsert(
+        {
+          event_id: (event as any).id,
+          telegram_user_id: uid,
+          chat_id: uid,
+          message_id: res.result.message_id,
+          state: 'stars',
+          stars: null,
+          place: null,
+          is_test: isTest,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'event_id,telegram_user_id' },
+      )
+      // DM ist draußen; fehlt der Eintrag, legt ihn der erste Sterne-Klick nach.
+      if (error) result.failed.push({ userId: uid, error: `DM gesendet, Eintrag fehlt: ${error.message}` })
+      result.sent.push(uid)
+    } catch (e: any) {
+      result.failed.push({ userId: uid, error: e?.message ?? 'unbekannt' })
+    }
   }
 
   return result
@@ -227,8 +235,29 @@ export async function handleReviewCallback(
   eventId: string,
   value: string,
   userId: number,
+  clicked?: { chatId: number; messageId: number },
 ): Promise<string> {
-  const ping = await loadPing(eventId, userId)
+  let ping = await loadPing(eventId, userId)
+
+  // Selbstheilung: DM ging raus, aber der Eintrag fehlt (Lauf vorher abgebrochen).
+  // Beim ersten Sterne-Klick aus der DM heraus nachlegen.
+  if (!ping && action === 'rvs' && clicked && ADMIN_TELEGRAM_USER_IDS.has(userId) && !(await hasLog(eventId))) {
+    await getSupabase().from('review_pings').upsert(
+      {
+        event_id: eventId,
+        telegram_user_id: userId,
+        chat_id: clicked.chatId,
+        message_id: clicked.messageId,
+        state: 'stars',
+        stars: null,
+        place: null,
+        is_test: false,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'event_id,telegram_user_id' },
+    )
+    ping = await loadPing(eventId, userId)
+  }
   if (!ping || !ping.message_id) return 'Kein offener Bewertungs-Ping.'
 
   const event = await loadEvent(eventId)

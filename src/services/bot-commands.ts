@@ -799,7 +799,14 @@ export function setupBotCommands(bot: Bot) {
 
       // Abend-Bewertung (Sterne / Drinnen-Draußen)
       if (action === 'rvs' || action === 'rvp') {
-        const toast = await handleReviewCallback(action, eventId, value ?? '', telegramUserId)
+        const m = ctx.callbackQuery.message
+        const toast = await handleReviewCallback(
+          action,
+          eventId,
+          value ?? '',
+          telegramUserId,
+          m ? { chatId: m.chat.id, messageId: m.message_id } : undefined,
+        )
         await ctx.answerCallbackQuery({ text: toast })
         return
       }

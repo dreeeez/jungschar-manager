@@ -7,6 +7,8 @@ export interface IcsEvent {
   uid: string
   summary: string
   dtstart: Date
+  /** Ende laut DTEND (nur bei Terminen mit Uhrzeit). */
+  dtend: Date | null
   description: string | null
 }
 
@@ -83,6 +85,7 @@ export function parseIcs(text: string): IcsEvent[] {
           uid: current.uid,
           summary: current.summary,
           dtstart: current.dtstart,
+          dtend: current.dtend ?? null,
           description: current.description ?? null,
         })
       }
@@ -106,6 +109,10 @@ export function parseIcs(text: string): IcsEvent[] {
         break
       case 'DTSTART':
         current.dtstart = parseIcsDate(value) ?? undefined
+        break
+      case 'DTEND':
+        // Nur echte Uhrzeiten (UTC); ganztägige Termine haben kein sinnvolles Ende.
+        current.dtend = /T\d{6}Z$/.test(value) ? parseIcsDate(value) : null
         break
       case 'DESCRIPTION':
         current.description = unescapeIcsText(value)
@@ -221,6 +228,24 @@ export async function syncJungscharEvents(): Promise<SyncResult> {
  * (lieber ein Reminder zu viel als eine fälschliche Absage bei kurz nicht
  * erreichbarem Feed).
  */
+/**
+ * Ende des Jungschar-Termins am Tag {date} (YYYY-MM-DD) laut ICS, oder null
+ * (kein Termin, keine Uhrzeit, Feed nicht erreichbar).
+ */
+export async function fetchJungscharEndTime(date: string): Promise<Date | null> {
+  const { data: setting } = await getSupabase().from('settings').select('value').eq('key', 'ical_url').single()
+  if (!setting?.value) return null
+  try {
+    const response = await fetch(setting.value, { cache: 'no-store' })
+    if (!response.ok) return null
+    for (const e of parseIcs(await response.text())) {
+      if (e.summary.trim().toLowerCase() !== JUNGSCHAR_SUMMARY.toLowerCase()) continue
+      if (localDateString(e.dtstart) === date && e.dtend) return e.dtend
+    }
+  } catch {}
+  return null
+}
+
 export async function fetchJungscharDatesFromIcs(): Promise<Set<string> | null> {
   const db = getSupabase()
 
